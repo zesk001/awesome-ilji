@@ -358,10 +358,32 @@
   // 자재입고확인 시 입고된 시설/자재 내용 메모 (지역|현장 -> 공사명 -> 내용)
   let RECV={}; try{ RECV=JSON.parse(localStorage.getItem('recv_memo'))||{}; }catch(e){}
   function saveRecv(){ try{ localStorage.setItem('recv_memo',JSON.stringify(RECV)); }catch(e){} }
+  // ★ 내가 오늘 손댄 공사 항목만 표시(개인·기기·날짜별). WSTAT는 공유, 표시는 개인 기준.
+  let MYW={}; function loadMyw(){ try{ MYW=JSON.parse(localStorage.getItem('myw_'+dateKey()))||{}; }catch(e){ MYW={}; } }
+  function saveMyw(){ try{ localStorage.setItem('myw_'+dateKey(),JSON.stringify(MYW)); }catch(e){} }
+  function mywK(gkey,work){ return gkey+'|||'+work; }
+  function markMyw(gkey,work){ MYW[mywK(gkey,work)]=1; saveMyw(); }
+  function unmarkMyw(gkey,work){ delete MYW[mywK(gkey,work)]; saveMyw(); }
+  loadMyw();
   let gongsaRefresh=function(){};
   // 견적서 저장소 (지역|현장 -> [{name,date}]) — 사무에서 작성, 공사에서 사용
   let ESTIMATES={}; try{ ESTIMATES=JSON.parse(localStorage.getItem('estimates'))||{}; }catch(e){}
   function saveEst(){ try{ localStorage.setItem('estimates',JSON.stringify(ESTIMATES)); }catch(e){} }
+  // ★ 문서기록(발주서·청구서·사진대지·세금계산서) — 지역|현장 -> 공사명 -> {발주,청구,사진대지,세금계산서}
+  let DOCREC={}; try{ DOCREC=JSON.parse(localStorage.getItem('docrec'))||{}; }catch(e){}
+  function saveDoc(){ try{ localStorage.setItem('docrec',JSON.stringify(DOCREC)); }catch(e){} }
+  function docGet(gkey,name){ return (DOCREC[gkey]&&DOCREC[gkey][name])||{}; }
+  function docSet(gkey,name,field,val){
+    DOCREC[gkey]=DOCREC[gkey]||{}; DOCREC[gkey][name]=DOCREC[gkey][name]||{};
+    if(val===null) delete DOCREC[gkey][name][field]; else DOCREC[gkey][name][field]=val;
+    if(!Object.keys(DOCREC[gkey][name]).length) delete DOCREC[gkey][name];
+    if(DOCREC[gkey]&&!Object.keys(DOCREC[gkey]).length) delete DOCREC[gkey];
+    saveDoc();
+  }
+  function hasOrder(gkey,name){ return !!docGet(gkey,name).발주; }
+  function hasInvoice(gkey,name){ return !!docGet(gkey,name).청구; }
+  function curWriter(){ try{ return localStorage.getItem('ilji_writer')||''; }catch(e){ return ''; } }
+  const DOCFIELD={'발주서':'발주','청구서':'청구','사진대지작성':'사진대지','세금계산서발행':'세금계산서'};
   function todayStr(){ return dateStr(); }  // 전송·저장 날짜 = 선택한 작업 날짜
   // 한 지역의 현장 목록 = 실제 학교(가나다) + 기타구역 (사무·공사 공통)
   function siteList(region){
@@ -371,6 +393,7 @@
     return list;
   }
   const STAGES_ALL=['자재입고확인','자재가공','자재출고준비 완료','공사중','공사완료'];
+  const MATERIAL_STAGES=['자재입고확인','자재가공','자재출고준비 완료'];  // 발주서 작성 후 열림
   const STAGE_STYLE={
     '자재입고확인':{bg:'#ffe6bf', fg:'#9a5a16'},
     '자재가공':{bg:'#fac57a', fg:'#8a4d10'},
@@ -396,12 +419,16 @@
       panel.innerHTML=head(region+' · 현장 선택')+'<button class="back-btn" data-back="1">← 지역 선택으로</button><div class="school-list">'+rows+'</div>';
     }
     function statKey(school){ return curRegion+'|'+school; }
-    function stageRow(w,cur){
-      return '<div class="stage-row">'+STAGES.map(st=>{
+    function stageRow(w,cur,ordered){
+      const html='<div class="stage-row">'+STAGES.map(st=>{
         const S=STAGE_STYLE[st], on=cur===st;
+        if(MATERIAL_STAGES.indexOf(st)>=0 && !ordered){
+          return '<button class="stage-btn" data-locked="1" style="opacity:.4;cursor:not-allowed">🔒'+STAGE_NUM[st]+' '+st+'</button>';
+        }
         const sty = on ? ('background:'+S.bg+';color:'+S.fg+';border-color:'+S.bg) : ('--c:'+S.bg);
         return '<button class="stage-btn'+(on?' on':'')+'" data-work="'+w+'" data-stage="'+st+'" style="'+sty+'">'+STAGE_NUM[st]+' '+st+'</button>';
       }).join('')+'</div>';
+      return html+(ordered?'':'<div class="work-note" style="margin-top:4px">🔒 자재 단계는 사무 → 발주서를 먼저 작성하면 열립니다.</div>');
     }
     function showWork(school){ expanded=''; renderWork(school); }
     function renderWork(school){
@@ -420,7 +447,7 @@
           let block='<div class="work-item" data-work="'+w+'"><span class="work-name">'+w+'</span><span class="work-date">'+e.date+'</span>'+badge+'</div>';
           if(memo && expanded!==w){ block+='<div class="work-recv">📦 입고: '+memo+'</div>'; }
           if(expanded===w){
-            block+=stageRow(w,cur);
+            block+=stageRow(w,cur,hasOrder(key,w));
             block+='<div class="recv-box"><label>📦 입고된 시설/자재 내용 <small>(자재입고확인 시 기재)</small></label><textarea class="recv-input" data-recvwork="'+w+'" placeholder="예: 평행봉 2조, 철봉 1조, 늑목 3틀 입고">'+memo.replace(/</g,'&lt;')+'</textarea></div>';
           }
           return block;
@@ -436,12 +463,15 @@
       if(e.target.closest('[data-backschool]')){ showSchools(curRegion); return; }
       const stage=e.target.closest('.stage-btn');
       if(stage){
+        if(stage.dataset.locked){ alert('이 공사는 사무 → 발주서를 먼저 작성해야 자재 단계를 진행할 수 있어요.'); return; }
         const school=panel.querySelector('.work-wrap').dataset.school;
         const key=statKey(school), work=stage.dataset.work; WSTAT[key]=WSTAT[key]||{};
+        if(MATERIAL_STAGES.indexOf(stage.dataset.stage)>=0 && !hasOrder(key,work)){ alert('발주서를 먼저 작성하세요.'); return; }
         let nv;
         if(WSTAT[key][work]===stage.dataset.stage){ delete WSTAT[key][work]; nv=''; }
         else { WSTAT[key][work]=stage.dataset.stage; nv=stage.dataset.stage; }
         if(!Object.keys(WSTAT[key]).length) delete WSTAT[key];
+        if(nv) markMyw(key,work); else unmarkMyw(key,work);
         saveStat(); gongsaPost('stage',{region:curRegion,school:school,name:work,stage:nv}); renderWork(school); renderSummary(); return;
       }
       const work=e.target.closest('.work-item');
@@ -460,6 +490,7 @@
       const key=statKey(wrap.dataset.school), w=ta.dataset.recvwork, v=ta.value, sc=wrap.dataset.school, reg=curRegion;
       RECV[key]=RECV[key]||{};
       if(v.trim()) RECV[key][w]=v; else { delete RECV[key][w]; if(!Object.keys(RECV[key]).length) delete RECV[key]; }
+      if(v.trim()) markMyw(key,w);
       saveRecv(); renderSummary();
       clearTimeout(recvTimer); recvTimer=setTimeout(()=>{ gongsaPost('recv',{region:reg,school:sc,name:w,recv:v}); }, 800);
     });
@@ -474,7 +505,7 @@
     const panel=document.getElementById('etc');
     const cat='사무', color='#8a8f98';
     const DOCS=['견적서','발주서','청구서','사진대지작성','세금계산서발행','방문예정','특이사항'];
-    let curRegion='', curSchool='', curRemarkCat='';
+    let curRegion='', curSchool='', curRemarkCat='', orderDraft=null;
     function head(txt){ return '<h2>📋 사무 <span class="badge" style="background:'+color+'">'+txt+'</span></h2>'; }
     function showRegions(){
       panel.innerHTML=head('지역 선택')+searchBarHTML()+'<div class="region-grid"></div>';
@@ -506,19 +537,65 @@
         '<div class="school-list">'+cards+'</div>';
     }
     function showDocItems(doc){
-      const region=curRegion, school=curSchool;
-      const ests=ESTIMATES[region+'|'+school]||[];
+      const region=curRegion, school=curSchool, gkey=region+'|'+school, fld=DOCFIELD[doc];
+      const ests=ESTIMATES[gkey]||[];
+      const needInv=(doc==='사진대지작성'||doc==='세금계산서발행');
       let body;
       if(!ests.length){
         body='<div class="work-note">먼저 견적서에서 공사명을 작성하세요.</div>';
       } else {
-        body='<div class="work-note">'+doc+'에 해당하는 공사명을 클릭하면 오늘의 업무에 기록됩니다.</div>'+
+        const guide = doc==='발주서' ? '공사명을 누르고 발주 내역을 한 줄로 적으세요. (적으면 공사 탭의 자재 단계가 열립니다)'
+          : needInv ? '청구서가 작성된 공사만 열립니다. 공사명을 누르면 저장됩니다.'
+          : '공사명을 누르면 저장됩니다.';
+        body='<div class="work-note">'+guide+'</div>'+
           '<div class="school-list">'+ests.map(e=>{
-            const key='사무|'+region+'|'+school+'|'+doc+'|'+e.name;
-            return '<div class="school-row'+(isSel(cat,key)?' selected':'')+'" data-docitem="'+e.name+'" data-doc="'+doc+'" data-key="'+key+'"><span class="sr-name">'+e.name+'</span></div>';
+            const rec=docGet(gkey,e.name)[fld];
+            const done=!!rec;
+            const locked=needInv && !hasInvoice(gkey,e.name);
+            if(locked){
+              return '<div class="school-row" style="opacity:.45;cursor:not-allowed"><span class="sr-name">🔒 '+e.name+'</span><span style="margin-left:auto;font-size:12px;color:#999">청구서 먼저</span></div>';
+            }
+            let sub;
+            if(doc==='발주서') sub = done ? ('✓ '+((rec.items&&rec.items[0]&&rec.items[0].vendor)||rec.date||'')+((rec.items&&rec.items.length>1)?(' 외 '+(rec.items.length-1)):'')) : '거래처·내역';
+            else sub = done ? ('✓ '+(rec.date||'')) : '클릭 저장';
+            return '<div class="school-row'+(done?' selected':'')+'" data-docpick="'+encodeURIComponent(e.name)+'" data-doc="'+doc+'"><span class="sr-name">'+e.name+'</span><span style="margin-left:auto;font-size:12px;color:#888">'+sub+'</span></div>';
           }).join('')+'</div>';
       }
       panel.innerHTML=head(region+' · '+school+' · '+doc)+'<button class="back-btn" data-backdocs="1">← 항목으로</button>'+body;
+    }
+    // 발주서: 거래처+내역 여러 줄 (+ 거래처 추가)
+    function orderRows(name){
+      if(orderDraft && orderDraft.name===name) return orderDraft.rows;
+      const rec=docGet(curRegion+'|'+curSchool,name).발주||{};
+      const rows=(rec.items&&rec.items.length)?rec.items.map(it=>({v:it.vendor||'',d:it.detail||''})):[{v:'',d:''}];
+      orderDraft={name:name, rows:rows};
+      return rows;
+    }
+    function readOrderRows(){
+      const rows=[]; let i=0;
+      while(panel.querySelector('#orderV'+i)){
+        rows.push({v:(panel.querySelector('#orderV'+i).value||'').trim(), d:(panel.querySelector('#orderD'+i).value||'').trim()});
+        i++;
+      }
+      return rows;
+    }
+    function showOrderForm(name){
+      const region=curRegion, school=curSchool;
+      const rec=docGet(region+'|'+school,name).발주||{};
+      const rows=orderRows(name);
+      const rowsHtml=rows.map((r,i)=>
+        '<div style="display:flex;gap:6px;margin-bottom:6px">'+
+          '<input id="orderV'+i+'" class="est-input" style="flex:0 0 38%" type="text" placeholder="거래처" value="'+(r.v||'').replace(/"/g,'&quot;')+'">'+
+          '<input id="orderD'+i+'" class="est-input" style="flex:1" type="text" placeholder="내역 (예: 평행봉 2조)" value="'+(r.d||'').replace(/"/g,'&quot;')+'">'+
+          (rows.length>1?'<button class="est-add" data-delorderrow="'+i+'" style="flex:0 0 auto;background:#999">×</button>':'')+
+        '</div>'
+      ).join('');
+      panel.innerHTML=head(region+' · '+school+' · 발주서')+'<button class="back-btn" data-backdocitems="발주서">← 발주서 목록</button>'+
+        '<div class="work-note"><b>'+name+'</b> · 발주서'+(rec.date?(' (작성 '+rec.date+(rec.writer?(' · '+rec.writer):'')+')'):'')+'</div>'+
+        rowsHtml+
+        '<div class="visit-form"><button class="est-add" data-addorderrow="'+encodeURIComponent(name)+'" style="background:#7a7f88">+ 거래처 추가</button>'+
+        '<button class="est-add" data-saveorder="'+encodeURIComponent(name)+'">저장</button></div>'+
+        (rec.date?'<div class="visit-form"><button class="est-add" data-delorder="'+encodeURIComponent(name)+'" style="background:#c0392b">발주서 삭제</button></div>':'');
     }
     function showEstimate(school){
       const key=curRegion+'|'+school;
@@ -677,6 +754,46 @@
         di.classList.toggle('selected');
         return;
       }
+      // ★ 사무 파이프라인: 문서 선택/저장
+      const dpk=e.target.closest('[data-docpick]');
+      if(dpk){
+        const doc=dpk.dataset.doc, name=decodeURIComponent(dpk.dataset.docpick), gkey=curRegion+'|'+curSchool, fld=DOCFIELD[doc];
+        if(doc==='발주서'){ orderDraft=null; showOrderForm(name); return; }
+        const rec=docGet(gkey,name)[fld];
+        const selKey='사무|'+curRegion+'|'+curSchool+'|'+doc+'|'+name;
+        if(rec){
+          docSet(gkey,name,fld,null);
+          if(SEL[cat]&&SEL[cat][selKey]){ delete SEL[cat][selKey]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
+        } else {
+          docSet(gkey,name,fld,{date:todayStr(),writer:curWriter()});
+          SEL[cat]=SEL[cat]||{}; SEL[cat][selKey]={region:'사무·'+curRegion, name:curSchool+' · '+name, tag:doc};
+        }
+        saveSel(); renderSummary(); showDocItems(doc); return;
+      }
+      const bdi=e.target.closest('[data-backdocitems]');
+      if(bdi){ orderDraft=null; showDocItems(bdi.dataset.backdocitems); return; }
+      const aor=e.target.closest('[data-addorderrow]');
+      if(aor){ const name=decodeURIComponent(aor.dataset.addorderrow); orderDraft={name:name, rows:readOrderRows()}; orderDraft.rows.push({v:'',d:''}); showOrderForm(name); return; }
+      const dorr=e.target.closest('[data-delorderrow]');
+      if(dorr){ const i=+dorr.dataset.delorderrow; const name=orderDraft&&orderDraft.name; if(name){ orderDraft.rows=readOrderRows(); orderDraft.rows.splice(i,1); if(!orderDraft.rows.length) orderDraft.rows=[{v:'',d:''}]; showOrderForm(name); } return; }
+      const sao=e.target.closest('[data-saveorder]');
+      if(sao){
+        const name=decodeURIComponent(sao.dataset.saveorder), gkey=curRegion+'|'+curSchool;
+        const items=readOrderRows().filter(r=>r.v||r.d).map(r=>({vendor:r.v,detail:r.d}));
+        if(!items.length){ alert('거래처 또는 내역을 한 줄 이상 적어주세요.'); return; }
+        docSet(gkey,name,'발주',{date:todayStr(),writer:curWriter(),items:items});
+        const selKey='사무|'+curRegion+'|'+curSchool+'|발주서|'+name;
+        SEL[cat]=SEL[cat]||{}; SEL[cat][selKey]={region:'사무·'+curRegion, name:curSchool+' · '+name+' ('+items[0].vendor+(items.length>1?(' 외 '+(items.length-1)):'')+')', tag:'발주서'};
+        saveSel(); orderDraft=null; renderSummary(); gongsaRefresh(); showDocItems('발주서'); return;
+      }
+      const delo=e.target.closest('[data-delorder]');
+      if(delo){
+        const name=decodeURIComponent(delo.dataset.delorder), gkey=curRegion+'|'+curSchool;
+        docSet(gkey,name,'발주',null);
+        const selKey='사무|'+curRegion+'|'+curSchool+'|발주서|'+name;
+        if(SEL[cat]&&SEL[cat][selKey]){ delete SEL[cat][selKey]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
+        saveSel(); orderDraft=null; renderSummary(); gongsaRefresh(); showDocItems('발주서'); return;
+      }
       const sch=e.target.closest('[data-school]');
       if(sch){ if(sch.dataset.sregion) curRegion=sch.dataset.sregion; showDocs(sch.dataset.school); return; }
       const doc=e.target.closest('[data-doc]');
@@ -716,14 +833,16 @@
     order.forEach(cat=>{
       if(cat==='공사'){
         const entries=[];
-        Object.keys(WSTAT||{}).forEach(gkey=>{
+        // ★ 내가 오늘 손댄 공사(MYW)만 표시. 단계가 사라진 항목은 제외.
+        Object.keys(MYW||{}).forEach(mk=>{
+          const sep=mk.indexOf('|||'); if(sep<0) return;
+          const gkey=mk.slice(0,sep), work=mk.slice(sep+3);
+          if(!(WSTAT[gkey] && WSTAT[gkey][work])) return;
           const parts=gkey.split('|'); const region=parts[0], school=parts.slice(1).join('|');
           const ests=ESTIMATES[gkey]||[];
-          Object.keys(WSTAT[gkey]).forEach(work=>{
-            const est=ests.find(x=>x.name===work); const dt=est?est.date:'';
-            const rmemo=(RECV[gkey]&&RECV[gkey][work])||'';
-            entries.push({region:region, name:school+' · '+work+(dt?' ('+dt+')':'')+(rmemo?' 📦'+rmemo:''), tag:WSTAT[gkey][work], gkey:gkey, work:work});
-          });
+          const est=ests.find(x=>x.name===work); const dt=est?est.date:'';
+          const rmemo=(RECV[gkey]&&RECV[gkey][work])||'';
+          entries.push({region:region, name:school+' · '+work+(dt?' ('+dt+')':'')+(rmemo?' 📦'+rmemo:''), tag:WSTAT[gkey][work], gkey:gkey, work:work});
         });
         if(entries.length) groups.push({label:'공사',color:CAT_COLORS['공사'],cat:'공사',entries:entries});
         return;
@@ -761,7 +880,7 @@
     const it=del.closest('.sum-item');
     if(it.dataset.gkey){
       const gk=it.dataset.gkey, w=it.dataset.work;
-      if(WSTAT[gk]){ delete WSTAT[gk][w]; if(!Object.keys(WSTAT[gk]).length) delete WSTAT[gk]; saveStat(); }
+      unmarkMyw(gk,w);
       renderSummary(); gongsaRefresh(); return;
     }
     toggleSel(it.dataset.cat,it.dataset.key);
@@ -769,9 +888,9 @@
     if(tp){ const r=tp.querySelector('.school-row[data-key="'+it.dataset.key+'"]'); if(r) r.classList.remove('selected'); }
   });
   document.getElementById('clearSummary').addEventListener('click',()=>{
-    if(confirm('오늘의 업무(점검·소독·공사 진행단계 포함)를 모두 지울까요?')){
+    if(confirm('내 오늘의 업무(점검·소독·공사 표시)를 모두 지울까요?\n※ 공사 진행단계는 공유 자료라 지워지지 않고, 내 목록에서만 사라집니다.')){
       SEL={}; saveSel();
-      WSTAT={}; saveStat();
+      MYW={}; saveMyw();
       renderSummary();
       Object.values(panels).forEach(pp=>pp.querySelectorAll('.school-row.selected').forEach(x=>x.classList.remove('selected')));
       gongsaRefresh();
@@ -797,6 +916,7 @@
     if(!wdate.value){ wdate.value=dateStr(); return; }
     const ps=wdate.value.split('-'); cur=new Date(+ps[0],+ps[1]-1,+ps[2]);
     try{ SEL=JSON.parse(localStorage.getItem(dateKey()))||{}; }catch(e){ SEL={}; }
+    loadMyw();
     renderHeaderDate(); renderSummary(); renderSentStatus();
     Object.values(panels).forEach(p=>{ if(p._home) p._home(); });
   });
@@ -835,8 +955,8 @@
     const dt=todayStr(); const rows=[];
     Object.keys(SEL['점검']||{}).forEach(k=>{const v=SEL['점검'][k]; rows.push([dt,'점검',v.region||'',v.name||k,'점검','','']);});
     Object.keys(SEL['소독']||{}).forEach(k=>{const v=SEL['소독'][k]; rows.push([dt,'소독',v.region||'',v.name||k,(v.sub?'단타':'소독'),'','']);});
-    Object.keys(WSTAT||{}).forEach(gk=>{const ps=gk.split('|');const region=ps[0],school=ps.slice(1).join('|');const ests=ESTIMATES[gk]||[];
-      Object.keys(WSTAT[gk]).forEach(w=>{const est=ests.find(x=>x.name===w);const rm=(RECV[gk]&&RECV[gk][w])||'';const bigo=rm?('입고: '+rm+(est?' / 견적 '+est.date:'')):(est?est.date:'');rows.push([dt,'공사',region,school,w,WSTAT[gk][w],bigo]);});});
+    // ★ 전송도 내가 오늘 손댄 공사(MYW)만 포함
+    Object.keys(MYW||{}).forEach(mk=>{const sep=mk.indexOf('|||');if(sep<0)return;const gk=mk.slice(0,sep),w=mk.slice(sep+3);if(!(WSTAT[gk]&&WSTAT[gk][w]))return;const ps=gk.split('|');const region=ps[0],school=ps.slice(1).join('|');const ests=ESTIMATES[gk]||[];const est=ests.find(x=>x.name===w);const rm=(RECV[gk]&&RECV[gk][w])||'';const bigo=rm?('입고: '+rm+(est?' / 견적 '+est.date:'')):(est?est.date:'');rows.push([dt,'공사',region,school,w,WSTAT[gk][w],bigo]);});
     Object.keys(SEL['사무']||{}).forEach(k=>{const v=SEL['사무'][k]||{};const p=k.split('|');
       if(v.type==='기타업무'){rows.push([dt,'사무','','','기타업무','',v.workText||'']);}
       else if(v.type==='연차'){rows.push([dt,'사무','','','연차',v.leaveDate||'','']);}
