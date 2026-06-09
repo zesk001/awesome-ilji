@@ -811,7 +811,10 @@
   window.__gongsaState=function(st){
     try{
       if(st){
-        if(st.estimates){ ESTIMATES=st.estimates; saveEst(); }
+        if(st.estimates){
+          Object.keys(st.estimates).forEach(function(k){ (st.estimates[k]||[]).forEach(function(e){ if(e&&e.date){ var dd=new Date(e.date); if(!isNaN(dd)) e.date=dd.getFullYear()+'-'+pad2(dd.getMonth()+1)+'-'+pad2(dd.getDate()); } }); });
+          ESTIMATES=st.estimates; saveEst();
+        }
         if(st.wstat){ WSTAT=st.wstat; saveStat(); }
         if(st.recv){ RECV=st.recv; saveRecv(); }
       }
