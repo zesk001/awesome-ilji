@@ -47,6 +47,12 @@
   .region-grid button:hover .rg-name, .region-grid button:hover .rg-cnt { color:#fff; }
   .region-grid .rg-name { display:block; font-size:17px; font-weight:bold; color:#333; }
   .region-grid .rg-cnt { display:block; font-size:12px; color:#7a93a6; margin-top:5px; }
+  .site-search { width:100%; border:1.5px solid #cfdcd3; border-radius:10px; padding:11px 14px; font-size:15px; margin-bottom:12px; font-family:inherit; }
+  .site-search:focus { outline:none; border-color:#3f9d5a; }
+  .search-results { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; }
+  .search-results:empty { display:none; }
+  .sr-region { display:block; font-size:11px; color:#8898a4; margin-top:3px; }
+  .wb-date-lb { margin-left:10px; }
 
   .back-btn { border:none; background:#eef4f0; color:#1e5631; font-size:14px; font-weight:bold; padding:8px 16px; border-radius:20px; cursor:pointer; margin-bottom:16px; }
   .back-btn:hover { background:#dceadf; }
@@ -178,7 +184,9 @@
   <div class="writerbar">
     <label>작성자</label>
     <select id="writerSel"></select>
-    <span class="wb-hint">작성 후 아래 「전송」을 눌러 제출하세요</span>
+    <label class="wb-date-lb">작업 날짜</label>
+    <input type="date" id="workDate">
+    <span class="wb-hint">내용은 이 기기에 자동 저장돼요 · 다 쓰면 「전송」</span>
   </div>
 
   <nav class="menu">
@@ -209,8 +217,18 @@
 <script>
   const d = new Date();
   const days = ['일','월','화','수','목','금','토'];
-  document.getElementById('today').textContent = d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일';
-  document.getElementById('weekday').textContent = days[d.getDay()]+'요일';
+  // 작업 날짜(기본 오늘). 날짜를 바꾸면 그 날짜로 작성·저장·전송됩니다.
+  let cur = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  function pad2(x){ return String(x).padStart(2,'0'); }
+  function dateKey(){ return 'ilji_'+cur.getFullYear()+'-'+(cur.getMonth()+1)+'-'+cur.getDate(); }
+  function dateStr(){ return cur.getFullYear()+'-'+pad2(cur.getMonth()+1)+'-'+pad2(cur.getDate()); }
+  function todayStrFixed(){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+  function statStoreKey(){ return 'gongsa_status_'+dateKey(); }
+  function renderHeaderDate(){
+    document.getElementById('today').textContent = cur.getFullYear()+'년 '+(cur.getMonth()+1)+'월 '+cur.getDate()+'일';
+    document.getElementById('weekday').textContent = days[cur.getDay()]+'요일'+(dateStr()!==todayStrFixed()?' · 지난 날짜 작성중':'');
+  }
+  renderHeaderDate();
 
   const buttons = document.querySelectorAll('.menu button');
   buttons.forEach(btn => {
@@ -233,10 +251,9 @@
 
   // 오늘의 업무 저장소 (다중 선택 · 분류별)
   const CAT_COLORS={'점검':'#2f80c4','소독':'#27a36a','공사':'#e8842c','사무':'#8a8f98'};
-  const todayKey='ilji_'+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
   let SEL={};
-  try{ SEL=JSON.parse(localStorage.getItem(todayKey))||{}; }catch(e){ SEL={}; }
-  function saveSel(){ try{ localStorage.setItem(todayKey,JSON.stringify(SEL)); }catch(e){} }
+  try{ SEL=JSON.parse(localStorage.getItem(dateKey()))||{}; }catch(e){ SEL={}; }
+  function saveSel(){ try{ localStorage.setItem(dateKey(),JSON.stringify(SEL)); }catch(e){} }
   function isSel(cat,key){ return !!(SEL[cat]&&SEL[cat][key]); }
   function toggleSel(cat,key,info){
     SEL[cat]=SEL[cat]||{};
@@ -256,13 +273,35 @@
     if(extra){ html+='<button data-region="'+extra.label+'"><span class="rg-name">'+extra.label+'</span><span class="rg-cnt">'+extra.items.length+'개</span></button>'; }
     grid.innerHTML=html;
   }
+  // 현장 검색 (지역 선택 화면 위 검색창)
+  function searchBarHTML(){ return '<input class="site-search" type="text" placeholder="🔍 현장 이름으로 검색 (예: 가온초)" autocomplete="off"><div class="search-results"></div>'; }
+  function matchSchools(q){ q=(q||'').trim(); if(!q) return []; return SCHOOLS.filter(s=>s.학교명.indexOf(q)>=0).slice(0,80); }
+  function searchRowsHTML(list, mode, cat){
+    if(!list.length) return '<div class="sum-empty">검색 결과 없음</div>';
+    return list.map(s=>{
+      const reg='<span class="sr-region">'+s.지역+'</span>';
+      if(mode==='select') return '<div class="school-row'+(isSel(cat,s.학교명)?' selected':'')+'" data-key="'+s.학교명+'" data-name="'+s.학교명+'" data-region="'+s.지역+'" data-sub=""><span class="sr-name">'+s.학교명+'</span>'+reg+'</div>';
+      return '<div class="school-row" data-school="'+s.학교명+'" data-sregion="'+s.지역+'"><span class="sr-name">'+s.학교명+'</span>'+reg+'</div>';
+    }).join('');
+  }
+  function wireSearch(panel, mode, cat){
+    panel.addEventListener('input',e=>{
+      if(!e.target.closest('.site-search')) return;
+      const grid=panel.querySelector('.region-grid'), res=panel.querySelector('.search-results');
+      if(!res) return;
+      const q=e.target.value.trim();
+      if(!q){ res.innerHTML=''; if(grid) grid.style.display=''; return; }
+      if(grid) grid.style.display='none';
+      res.innerHTML=searchRowsHTML(matchSchools(q), mode, cat);
+    });
+  }
 
   // 분류별(점검·소독·공사) 지역→학교 화면을 동일 방식으로 구성
   function setupCategory(panelId, cat, color, icon){
     const panel=document.getElementById(panelId);
     const extra=null;  // 점검·소독은 '기타지역' 없음 (공사·사무만 ETC_REGION 사용)
     function showRegions(){
-      panel.innerHTML='<h2>'+icon+' '+cat+' <span class="badge" style="background:'+color+'">지역 선택</span></h2><div class="region-grid"></div>';
+      panel.innerHTML='<h2>'+icon+' '+cat+' <span class="badge" style="background:'+color+'">지역 선택</span></h2>'+searchBarHTML()+'<div class="region-grid"></div>';
       renderRegionsInto(panel.querySelector('.region-grid'), extra);
     }
     function rowHTML(display,key,region,sub,subColor){
@@ -302,18 +341,19 @@
         row.classList.toggle('selected');
       }
     });
+    wireSearch(panel,'select',cat);
     panel._home=showRegions;
     showRegions();
     return panel;
   }
   // 공사 진행단계 저장소 (학교|지역별 공사명->단계), 업무일지와 공유
-  let WSTAT={}; try{ WSTAT=JSON.parse(localStorage.getItem('gongsa_status'))||{}; }catch(e){}
-  function saveStat(){ try{ localStorage.setItem('gongsa_status',JSON.stringify(WSTAT)); }catch(e){} }
+  let WSTAT={}; try{ WSTAT=JSON.parse(localStorage.getItem(statStoreKey()))||{}; }catch(e){}
+  function saveStat(){ try{ localStorage.setItem(statStoreKey(),JSON.stringify(WSTAT)); }catch(e){} }
   let gongsaRefresh=function(){};
   // 견적서 저장소 (지역|현장 -> [{name,date}]) — 사무에서 작성, 공사에서 사용
   let ESTIMATES={}; try{ ESTIMATES=JSON.parse(localStorage.getItem('estimates'))||{}; }catch(e){}
   function saveEst(){ try{ localStorage.setItem('estimates',JSON.stringify(ESTIMATES)); }catch(e){} }
-  function todayStr(){ const t=new Date(); return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
+  function todayStr(){ return dateStr(); }  // 전송·저장 날짜 = 선택한 작업 날짜
   // 한 지역의 현장 목록 = 실제 학교(가나다) + 기타구역 (사무·공사 공통)
   function siteList(region){
     if(region===ETC_REGION.label) return ETC_REGION.items.slice();
@@ -338,7 +378,7 @@
     let curRegion='', expanded='';
     function head(txt){ return '<h2>'+icon+' 공사 <span class="badge" style="background:'+color+'">'+txt+'</span></h2>'; }
     function showRegions(){
-      panel.innerHTML=head('지역 선택')+'<div class="region-grid"></div>';
+      panel.innerHTML=head('지역 선택')+searchBarHTML()+'<div class="region-grid"></div>';
       renderRegionsInto(panel.querySelector('.region-grid'), ETC_REGION);
     }
     function showSchools(region){
@@ -396,9 +436,10 @@
         renderWork(school); return;
       }
       const sch=e.target.closest('.school-row[data-school]');
-      if(sch){ showWork(sch.dataset.school); return; }
+      if(sch){ if(sch.dataset.sregion) curRegion=sch.dataset.sregion; showWork(sch.dataset.school); return; }
     });
     gongsaRefresh=function(){ const w=panel.querySelector('.work-wrap'); if(w) renderWork(w.dataset.school); };
+    wireSearch(panel,'goto');
     panel._home=showRegions;
     showRegions();
     return panel;
@@ -411,7 +452,7 @@
     let curRegion='', curSchool='', curRemarkCat='';
     function head(txt){ return '<h2>📋 사무 <span class="badge" style="background:'+color+'">'+txt+'</span></h2>'; }
     function showRegions(){
-      panel.innerHTML=head('지역 선택')+'<div class="region-grid"></div>';
+      panel.innerHTML=head('지역 선택')+searchBarHTML()+'<div class="region-grid"></div>';
       const grid=panel.querySelector('.region-grid');
       renderRegionsInto(grid, ETC_REGION);
       grid.insertAdjacentHTML('beforeend',
@@ -610,7 +651,7 @@
         return;
       }
       const sch=e.target.closest('[data-school]');
-      if(sch){ showDocs(sch.dataset.school); return; }
+      if(sch){ if(sch.dataset.sregion) curRegion=sch.dataset.sregion; showDocs(sch.dataset.school); return; }
       const doc=e.target.closest('[data-doc]');
       if(doc){
         const d=doc.dataset.doc;
@@ -621,6 +662,7 @@
         return;
       }
     });
+    wireSearch(panel,'goto');
     panel._home=showRegions;
     showRegions();
     return panel;
@@ -711,7 +753,7 @@
 
   // ====== 작성자 · 전송(구글 스프레드시트) ======
   // ↓↓ 11명 실제 이름으로 교체하세요 ↓↓
-  const NAMES=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','원채아 주임','김지훈 주임'];
+  const NAMES=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','원채아 대리','김지훈 주임'];
   // ↓↓ 구글 앱스 스크립트 배포 후 받은 웹앱 URL을 붙여넣으세요 ↓↓
   const APPS_URL=(window.__APPS_URL)||'https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
 
@@ -719,6 +761,18 @@
   wsel.innerHTML='<option value="">(이름 선택)</option>'+NAMES.map(n=>'<option>'+n+'</option>').join('');
   try{ wsel.value=localStorage.getItem('ilji_writer')||''; }catch(e){}
   wsel.addEventListener('change',()=>{ try{ localStorage.setItem('ilji_writer',wsel.value); }catch(e){} });
+
+  // 작업 날짜 선택 — 그 날짜의 저장분을 불러와 이어쓰기/수정
+  const wdate=document.getElementById('workDate');
+  wdate.value=dateStr(); wdate.max=todayStrFixed();
+  wdate.addEventListener('change',()=>{
+    if(!wdate.value){ wdate.value=dateStr(); return; }
+    const ps=wdate.value.split('-'); cur=new Date(+ps[0],+ps[1]-1,+ps[2]);
+    try{ SEL=JSON.parse(localStorage.getItem(dateKey()))||{}; }catch(e){ SEL={}; }
+    try{ WSTAT=JSON.parse(localStorage.getItem(statStoreKey()))||{}; }catch(e){ WSTAT={}; }
+    renderHeaderDate(); renderSummary(); renderSentStatus();
+    Object.values(panels).forEach(p=>{ if(p._home) p._home(); });
+  });
 
   function collectRows(){
     const dt=todayStr(); const rows=[];
@@ -735,7 +789,7 @@
     return rows;
   }
   // 전송 상태(마지막 전송 시각) — 날짜별 저장
-  function sentKey(){ return 'sent_'+todayKey; }
+  function sentKey(){ return 'sent_'+dateKey(); }
   function nowStamp(){ const t=new Date(); const p=x=>String(x).padStart(2,'0'); return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes()); }
   function renderSentStatus(){ const el=document.getElementById('sentStatus'); if(!el) return; let t=''; try{ t=localStorage.getItem(sentKey())||''; }catch(e){} el.textContent = t? ('✓ 마지막 전송 '+t) : ''; }
   // 전송 전 확인용 요약(분류별 건수)
@@ -751,7 +805,7 @@
     if(APPS_URL.indexOf('PASTE_')===0){ alert('아직 전송 주소가 설정되지 않았습니다. (구글 앱스 스크립트 URL 입력 필요)'); return; }
     const rows=collectRows();
     if(!rows.length){ alert('전송할 내용이 없습니다.'); return; }
-    if(!confirm(writer+' 님, 아래 내용을 전송할까요?\n(오늘 이미 전송했다면 새 내용으로 교체됩니다)\n\n'+sendSummaryText(rows))) return;
+    if(!confirm(writer+' 님, ['+dateStr()+'] 작업을 전송할까요?\n(같은 날짜로 이미 전송했다면 새 내용으로 교체됩니다)\n\n'+sendSummaryText(rows))) return;
     const btn=document.getElementById('sendBtn'); btn.textContent='전송 중...'; btn.disabled=true;
     fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({writer:writer,date:todayStr(),rows:rows})})
