@@ -74,6 +74,12 @@
   .stage-btn.on { background:var(--c); border-color:var(--c); color:#fff; }
   .stage-pill { color:#fff; font-size:12px; font-weight:bold; padding:3px 10px; border-radius:20px; white-space:nowrap; }
   .work-date { font-size:11px; color:#b0a18f; margin-right:2px; }
+  .work-recv { font-size:12px; color:#9a5a16; background:#fff7ef; border:1px dashed #e8b58a; border-radius:8px; padding:6px 10px; margin:2px 2px 8px; }
+  .recv-box { padding:2px 2px 10px; }
+  .recv-box label { display:block; font-size:13px; color:#9a5a16; font-weight:bold; margin-bottom:6px; }
+  .recv-box label small { color:#bb9; font-weight:normal; }
+  .recv-input { width:100%; min-height:54px; border:1.5px solid #e0d4c8; border-radius:10px; padding:9px 12px; font-size:13px; font-family:inherit; resize:vertical; }
+  .recv-input:focus { outline:none; border-color:#e8842c; }
   .est-form { display:flex; gap:8px; margin-bottom:14px; }
   .visit-form { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
   .visit-form input { flex:1; min-width:150px; }
@@ -349,6 +355,9 @@
   // 공사 진행단계 저장소 (학교|지역별 공사명->단계), 업무일지와 공유
   let WSTAT={}; try{ WSTAT=JSON.parse(localStorage.getItem(statStoreKey()))||{}; }catch(e){}
   function saveStat(){ try{ localStorage.setItem(statStoreKey(),JSON.stringify(WSTAT)); }catch(e){} }
+  // 자재입고확인 시 입고된 시설/자재 내용 메모 (지역|현장 -> 공사명 -> 내용)
+  let RECV={}; try{ RECV=JSON.parse(localStorage.getItem('recv_memo'))||{}; }catch(e){}
+  function saveRecv(){ try{ localStorage.setItem('recv_memo',JSON.stringify(RECV)); }catch(e){} }
   let gongsaRefresh=function(){};
   // 견적서 저장소 (지역|현장 -> [{name,date}]) — 사무에서 작성, 공사에서 사용
   let ESTIMATES={}; try{ ESTIMATES=JSON.parse(localStorage.getItem('estimates'))||{}; }catch(e){}
@@ -407,8 +416,13 @@
           const w=e.name, cur=stat[w]||'';
           const sc=STAGE_STYLE[cur];
           const badge=cur?'<span class="work-stage" style="background:'+sc.bg+';color:'+sc.fg+'">'+STAGE_NUM[cur]+' '+cur+'</span>':'<span class="work-stage off">상태 미정</span>';
+          const memo=(RECV[key]&&RECV[key][w])||'';
           let block='<div class="work-item" data-work="'+w+'"><span class="work-name">'+w+'</span><span class="work-date">'+e.date+'</span>'+badge+'</div>';
-          if(expanded===w){ block+=stageRow(w,cur); }
+          if(memo && expanded!==w){ block+='<div class="work-recv">📦 입고: '+memo+'</div>'; }
+          if(expanded===w){
+            block+=stageRow(w,cur);
+            block+='<div class="recv-box"><label>📦 입고된 시설/자재 내용 <small>(자재입고확인 시 기재)</small></label><textarea class="recv-input" data-recvwork="'+w+'" placeholder="예: 평행봉 2조, 철봉 1조, 늑목 3틀 입고">'+memo.replace(/</g,'&lt;')+'</textarea></div>';
+          }
           return block;
         }).join('')+'</div>';
       }
@@ -437,6 +451,14 @@
       }
       const sch=e.target.closest('.school-row[data-school]');
       if(sch){ if(sch.dataset.sregion) curRegion=sch.dataset.sregion; showWork(sch.dataset.school); return; }
+    });
+    panel.addEventListener('input',e=>{
+      const ta=e.target.closest('.recv-input'); if(!ta) return;
+      const wrap=panel.querySelector('.work-wrap'); if(!wrap) return;
+      const key=statKey(wrap.dataset.school), w=ta.dataset.recvwork, v=ta.value;
+      RECV[key]=RECV[key]||{};
+      if(v.trim()) RECV[key][w]=v; else { delete RECV[key][w]; if(!Object.keys(RECV[key]).length) delete RECV[key]; }
+      saveRecv(); renderSummary();
     });
     gongsaRefresh=function(){ const w=panel.querySelector('.work-wrap'); if(w) renderWork(w.dataset.school); };
     wireSearch(panel,'goto');
@@ -605,6 +627,7 @@
           ESTIMATES[key].splice(i,1);
           if(!ESTIMATES[key].length) delete ESTIMATES[key];
           if(WSTAT[key]){ delete WSTAT[key][removed.name]; if(!Object.keys(WSTAT[key]).length) delete WSTAT[key]; saveStat(); }
+          if(RECV[key]){ delete RECV[key][removed.name]; if(!Object.keys(RECV[key]).length) delete RECV[key]; saveRecv(); }
           saveEst(); renderSummary();
         }
         showEstimate(curSchool); return;
@@ -694,7 +717,8 @@
           const ests=ESTIMATES[gkey]||[];
           Object.keys(WSTAT[gkey]).forEach(work=>{
             const est=ests.find(x=>x.name===work); const dt=est?est.date:'';
-            entries.push({region:region, name:school+' · '+work+(dt?' ('+dt+')':''), tag:WSTAT[gkey][work], gkey:gkey, work:work});
+            const rmemo=(RECV[gkey]&&RECV[gkey][work])||'';
+            entries.push({region:region, name:school+' · '+work+(dt?' ('+dt+')':'')+(rmemo?' 📦'+rmemo:''), tag:WSTAT[gkey][work], gkey:gkey, work:work});
           });
         });
         if(entries.length) groups.push({label:'공사',color:CAT_COLORS['공사'],cat:'공사',entries:entries});
@@ -779,7 +803,7 @@
     Object.keys(SEL['점검']||{}).forEach(k=>{const v=SEL['점검'][k]; rows.push([dt,'점검',v.region||'',v.name||k,'점검','','']);});
     Object.keys(SEL['소독']||{}).forEach(k=>{const v=SEL['소독'][k]; rows.push([dt,'소독',v.region||'',v.name||k,(v.sub?'단타':'소독'),'','']);});
     Object.keys(WSTAT||{}).forEach(gk=>{const ps=gk.split('|');const region=ps[0],school=ps.slice(1).join('|');const ests=ESTIMATES[gk]||[];
-      Object.keys(WSTAT[gk]).forEach(w=>{const est=ests.find(x=>x.name===w);rows.push([dt,'공사',region,school,w,WSTAT[gk][w],est?est.date:'']);});});
+      Object.keys(WSTAT[gk]).forEach(w=>{const est=ests.find(x=>x.name===w);const rm=(RECV[gk]&&RECV[gk][w])||'';const bigo=rm?('입고: '+rm+(est?' / 견적 '+est.date:'')):(est?est.date:'');rows.push([dt,'공사',region,school,w,WSTAT[gk][w],bigo]);});});
     Object.keys(SEL['사무']||{}).forEach(k=>{const v=SEL['사무'][k]||{};const p=k.split('|');
       if(v.type==='기타업무'){rows.push([dt,'사무','','','기타업무','',v.workText||'']);}
       else if(v.type==='연차'){rows.push([dt,'사무','','','연차',v.leaveDate||'','']);}
