@@ -211,7 +211,7 @@
   <section class="summary">
     <div class="summary-head">
       <h3>📝 오늘의 업무 <span id="summaryCount" class="cnt-wrap"></span></h3>
-      <div class="sum-btns"><span id="sentStatus" class="sent-status"></span><button id="sendBtn">전송</button><button id="clearSummary">전체 지우기</button></div>
+      <div class="sum-btns"><span id="sentStatus" class="sent-status"></span><button id="consolidateBtn" style="display:none;border:none;background:#b8860b;color:#fff;font-weight:bold;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px">취합</button><button id="sendBtn">전송</button><button id="clearSummary">전체 지우기</button></div>
     </div>
     <div id="summaryBody"></div>
   </section>
@@ -365,6 +365,14 @@
   function markMyw(gkey,work){ MYW[mywK(gkey,work)]=1; saveMyw(); }
   function unmarkMyw(gkey,work){ delete MYW[mywK(gkey,work)]; saveMyw(); }
   loadMyw();
+  // ★ 내 견적/문서 변경 추적(델타) — 날짜별. 전송 시 이 부분만 서버로 보냄.
+  let MYEST={}, MYDOC={};
+  function loadMyd(){ try{ MYEST=JSON.parse(localStorage.getItem('myest_'+dateKey()))||{}; }catch(e){ MYEST={}; } try{ MYDOC=JSON.parse(localStorage.getItem('mydoc_'+dateKey()))||{}; }catch(e){ MYDOC={}; } }
+  function saveMyd(){ try{ localStorage.setItem('myest_'+dateKey(),JSON.stringify(MYEST)); localStorage.setItem('mydoc_'+dateKey(),JSON.stringify(MYDOC)); }catch(e){} }
+  function markMyest(gkey,name){ MYEST[gkey+'|||'+name]=1; saveMyd(); }
+  function markMydoc(gkey,name,field){ MYDOC[gkey+'|||'+name+'|||'+field]=1; saveMyd(); }
+  function split2(k){ const i=k.indexOf('|||'); return [k.slice(0,i), k.slice(i+3)]; }
+  loadMyd();
   let gongsaRefresh=function(){};
   // 견적서 저장소 (지역|현장 -> [{name,date}]) — 사무에서 작성, 공사에서 사용
   let ESTIMATES={}; try{ ESTIMATES=JSON.parse(localStorage.getItem('estimates'))||{}; }catch(e){}
@@ -696,7 +704,7 @@
       if(e.target.closest('[data-backdocs]')){ showDocs(curSchool); return; }
       if(e.target.closest('[data-addest]')){
         const inp=panel.querySelector('#estInput'); const v=(inp&&inp.value||'').trim();
-        if(v){ const key=curRegion+'|'+curSchool; ESTIMATES[key]=ESTIMATES[key]||[]; ESTIMATES[key].push({name:v,date:todayStr()}); saveEst(); gongsaPost('add',{region:curRegion,school:curSchool,name:v,date:todayStr()}); }
+        if(v){ const key=curRegion+'|'+curSchool; ESTIMATES[key]=ESTIMATES[key]||[]; ESTIMATES[key].push({name:v,date:todayStr()}); saveEst(); markMyest(key,v); }
         showEstimate(curSchool); return;
       }
       const del=e.target.closest('[data-delest]');
@@ -708,8 +716,7 @@
           if(!ESTIMATES[key].length) delete ESTIMATES[key];
           if(WSTAT[key]){ delete WSTAT[key][removed.name]; if(!Object.keys(WSTAT[key]).length) delete WSTAT[key]; saveStat(); }
           if(RECV[key]){ delete RECV[key][removed.name]; if(!Object.keys(RECV[key]).length) delete RECV[key]; saveRecv(); }
-          saveEst(); renderSummary();
-          gongsaPost('del',{region:curRegion,school:curSchool,name:removed.name});
+          saveEst(); markMyest(key,removed.name); renderSummary();
         }
         showEstimate(curSchool); return;
       }
@@ -768,7 +775,7 @@
           docSet(gkey,name,fld,{date:todayStr(),writer:curWriter()});
           SEL[cat]=SEL[cat]||{}; SEL[cat][selKey]={region:'사무·'+curRegion, name:curSchool+' · '+name, tag:doc};
         }
-        saveSel(); renderSummary(); showDocItems(doc); return;
+        markMydoc(gkey,name,fld); saveSel(); renderSummary(); showDocItems(doc); return;
       }
       const bdi=e.target.closest('[data-backdocitems]');
       if(bdi){ orderDraft=null; showDocItems(bdi.dataset.backdocitems); return; }
@@ -782,6 +789,7 @@
         const items=readOrderRows().filter(r=>r.v||r.d).map(r=>({vendor:r.v,detail:r.d}));
         if(!items.length){ alert('거래처 또는 내역을 한 줄 이상 적어주세요.'); return; }
         docSet(gkey,name,'발주',{date:todayStr(),writer:curWriter(),items:items});
+        markMydoc(gkey,name,'발주');
         const selKey='사무|'+curRegion+'|'+curSchool+'|발주서|'+name;
         SEL[cat]=SEL[cat]||{}; SEL[cat][selKey]={region:'사무·'+curRegion, name:curSchool+' · '+name+' ('+items[0].vendor+(items.length>1?(' 외 '+(items.length-1)):'')+')', tag:'발주서'};
         saveSel(); orderDraft=null; renderSummary(); gongsaRefresh(); showDocItems('발주서'); return;
@@ -789,7 +797,7 @@
       const delo=e.target.closest('[data-delorder]');
       if(delo){
         const name=decodeURIComponent(delo.dataset.delorder), gkey=curRegion+'|'+curSchool;
-        docSet(gkey,name,'발주',null);
+        docSet(gkey,name,'발주',null); markMydoc(gkey,name,'발주');
         const selKey='사무|'+curRegion+'|'+curSchool+'|발주서|'+name;
         if(SEL[cat]&&SEL[cat][selKey]){ delete SEL[cat][selKey]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
         saveSel(); orderDraft=null; renderSummary(); gongsaRefresh(); showDocItems('발주서'); return;
@@ -907,7 +915,7 @@
   const wsel=document.getElementById('writerSel');
   wsel.innerHTML='<option value="">(이름 선택)</option>'+NAMES.map(n=>'<option>'+n+'</option>').join('');
   try{ wsel.value=localStorage.getItem('ilji_writer')||''; }catch(e){}
-  wsel.addEventListener('change',()=>{ try{ localStorage.setItem('ilji_writer',wsel.value); }catch(e){} });
+  wsel.addEventListener('change',()=>{ try{ localStorage.setItem('ilji_writer',wsel.value); }catch(e){} updateConsolVis(); tryRecover(); });
 
   // 작업 날짜 선택 — 그 날짜의 저장분을 불러와 이어쓰기/수정
   const wdate=document.getElementById('workDate');
@@ -916,35 +924,35 @@
     if(!wdate.value){ wdate.value=dateStr(); return; }
     const ps=wdate.value.split('-'); cur=new Date(+ps[0],+ps[1]-1,+ps[2]);
     try{ SEL=JSON.parse(localStorage.getItem(dateKey()))||{}; }catch(e){ SEL={}; }
-    loadMyw();
+    loadMyw(); loadMyd();
     renderHeaderDate(); renderSummary(); renderSentStatus();
     Object.values(panels).forEach(p=>{ if(p._home) p._home(); });
   });
 
   // ===== 공사현황 공유(서버 저장 → 모든 직원·기기 동일하게 이어짐) =====
-  function gongsaPost(op, payload){
+  function gongsaPost(op, payload){ /* ②단계: 클릭은 내 기기에만 저장. 공유는 전송→취합으로 처리 */ }
+  // ===== ②단계: 서버 '확정현황(master)' 읽어 기준화 + 내 미전송 변경분 보존 =====
+  window.__applyMaster=function(m){
     try{
-      fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify(Object.assign({action:'gongsa',op:op,writer:(wsel&&wsel.value)||''}, payload))});
-    }catch(e){}
-  }
-  window.__gongsaState=function(st){
-    try{
-      if(st){
-        if(st.estimates){
-          Object.keys(st.estimates).forEach(function(k){ (st.estimates[k]||[]).forEach(function(e){ if(e&&e.date){ var dd=new Date(e.date); if(!isNaN(dd)) e.date=dd.getFullYear()+'-'+pad2(dd.getMonth()+1)+'-'+pad2(dd.getDate()); } }); });
-          ESTIMATES=st.estimates; saveEst();
-        }
-        if(st.wstat){ WSTAT=st.wstat; saveStat(); }
-        if(st.recv){ RECV=st.recv; saveRecv(); }
-      }
+      m=m||{};
+      if(m.estimates){ Object.keys(m.estimates).forEach(function(k){ (m.estimates[k]||[]).forEach(function(e){ if(e&&e.date){ var dd=new Date(e.date); if(!isNaN(dd)) e.date=dd.getFullYear()+'-'+pad2(dd.getMonth()+1)+'-'+pad2(dd.getDate()); } }); }); }
+      var myStage={}, myRecv={}, myDoc={}, myEst={};
+      Object.keys(MYW||{}).forEach(function(k){ var a=split2(k),gk=a[0],w=a[1]; myStage[k]=(WSTAT[gk]&&WSTAT[gk][w])||''; if(RECV[gk]&&RECV[gk][w]!==undefined) myRecv[k]=RECV[gk][w]; });
+      Object.keys(MYDOC||{}).forEach(function(k){ var p=k.split('|||'); myDoc[k]=(DOCREC[p[0]]&&DOCREC[p[0]][p[1]]&&DOCREC[p[0]][p[1]][p[2]])||null; });
+      Object.keys(MYEST||{}).forEach(function(k){ var a=split2(k); (myEst[a[0]]=myEst[a[0]]||[]).push(a[1]); });
+      ESTIMATES=m.estimates||{}; WSTAT=m.wstat||{}; RECV=m.recv||{}; DOCREC=m.docrec||{};
+      Object.keys(myEst).forEach(function(gk){ ESTIMATES[gk]=ESTIMATES[gk]||[]; myEst[gk].forEach(function(nm){ if(!ESTIMATES[gk].find(function(x){return x.name===nm;})) ESTIMATES[gk].push({name:nm,date:todayStr()}); }); });
+      Object.keys(myStage).forEach(function(k){ var a=split2(k),gk=a[0],w=a[1],v=myStage[k]; if(v){ WSTAT[gk]=WSTAT[gk]||{}; WSTAT[gk][w]=v; } else if(WSTAT[gk]){ delete WSTAT[gk][w]; if(!Object.keys(WSTAT[gk]).length) delete WSTAT[gk]; } });
+      Object.keys(myRecv).forEach(function(k){ var a=split2(k),gk=a[0],w=a[1],v=myRecv[k]; RECV[gk]=RECV[gk]||{}; if(v) RECV[gk][w]=v; else { delete RECV[gk][w]; if(!Object.keys(RECV[gk]).length) delete RECV[gk]; } });
+      Object.keys(myDoc).forEach(function(k){ var p=k.split('|||'),v=myDoc[k]; if(v){ DOCREC[p[0]]=DOCREC[p[0]]||{}; DOCREC[p[0]][p[1]]=DOCREC[p[0]][p[1]]||{}; DOCREC[p[0]][p[1]][p[2]]=v; } else if(DOCREC[p[0]]&&DOCREC[p[0]][p[1]]){ delete DOCREC[p[0]][p[1]][p[2]]; if(!Object.keys(DOCREC[p[0]][p[1]]).length) delete DOCREC[p[0]][p[1]]; } });
+      saveEst(); saveStat(); saveRecv(); saveDoc();
       renderSummary(); gongsaRefresh();
     }catch(e){}
   };
-  function loadSharedState(){
+  function loadMaster(){
     try{
       var s=document.createElement('script');
-      s.src=APPS_URL+'?action=state&callback=__gongsaState&t='+Date.now();
+      s.src=APPS_URL+'?action=master&callback=__applyMaster&t='+Date.now();
       s.onload=function(){ s.remove(); };
       s.onerror=function(){ s.remove(); };
       document.body.appendChild(s);
@@ -976,24 +984,110 @@
     const parts=order.filter(c=>cnt[c]).map(c=>c+' '+cnt[c]+'건');
     return parts.join(', ')+'\n총 '+rows.length+'건';
   }
+  // ===== ②단계: 내 변경분(델타) 만들기 =====
+  function buildDelta(){
+    var d={est:[],stage:[],recv:[],doc:[]};
+    Object.keys(MYEST||{}).forEach(function(k){ var a=split2(k),gk=a[0],nm=a[1]; var arr=ESTIMATES[gk]||[]; var e=arr.find(function(x){return x.name===nm;}); d.est.push({gkey:gk,name:nm,date:(e?e.date:''),del:!e}); });
+    Object.keys(MYW||{}).forEach(function(k){ var a=split2(k),gk=a[0],w=a[1]; var v=(WSTAT[gk]&&WSTAT[gk][w])||''; d.stage.push({gkey:gk,work:w,stage:v}); if(RECV[gk]&&RECV[gk][w]!==undefined) d.recv.push({gkey:gk,work:w,memo:RECV[gk][w]||''}); });
+    Object.keys(MYDOC||{}).forEach(function(k){ var p=k.split('|||'); var v=(DOCREC[p[0]]&&DOCREC[p[0]][p[1]]&&DOCREC[p[0]][p[1]][p[2]])||null; d.doc.push({gkey:p[0],name:p[1],field:p[2],val:v}); });
+    return d;
+  }
+  function submitData(writer){
+    return fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'submit', writer:writer, date:todayStr(), delta:buildDelta(), rows:collectRows(), sel:SEL})});
+  }
   function send(){
-    const writer=wsel.value;
+    var writer=wsel.value;
     if(!writer){ alert('먼저 작성자 이름을 선택하세요.'); return; }
-    if(APPS_URL.indexOf('PASTE_')===0){ alert('아직 전송 주소가 설정되지 않았습니다. (구글 앱스 스크립트 URL 입력 필요)'); return; }
-    const rows=collectRows();
-    if(!rows.length){ alert('전송할 내용이 없습니다.'); return; }
-    if(!confirm(writer+' 님, ['+dateStr()+'] 작업을 전송할까요?\n(같은 날짜로 이미 전송했다면 새 내용으로 교체됩니다)\n\n'+sendSummaryText(rows))) return;
-    const btn=document.getElementById('sendBtn'); btn.textContent='전송 중...'; btn.disabled=true;
-    fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({writer:writer,date:todayStr(),rows:rows})})
-      .then(()=>{ try{ localStorage.setItem(sentKey(), nowStamp()); }catch(e){} renderSentStatus(); btn.textContent='전송 완료 ✓'; setTimeout(()=>{btn.textContent='전송';btn.disabled=false;},2500); })
-      .catch(()=>{ alert('전송 실패 — 인터넷 연결을 확인하세요.'); btn.textContent='전송';btn.disabled=false; });
+    var rows=collectRows(), delta=buildDelta();
+    if(!(rows.length||delta.est.length||delta.stage.length||delta.doc.length)){ alert('전송할 내용이 없습니다.'); return; }
+    if(!confirm(writer+' 님, ['+dateStr()+'] 작업을 전송할까요?\n전송하면 김재성님이 「취합」할 때 모두에게 반영됩니다.\n\n'+sendSummaryText(rows))) return;
+    var btn=document.getElementById('sendBtn'); btn.textContent='전송 중...'; btn.disabled=true;
+    submitData(writer)
+      .then(function(){ try{ localStorage.setItem(sentKey(), nowStamp()); }catch(e){} renderSentStatus(); btn.textContent='전송 완료 ✓'; setTimeout(function(){btn.textContent='전송';btn.disabled=false;},2500); })
+      .catch(function(){ alert('전송 실패 — 인터넷 연결을 확인하세요.'); btn.textContent='전송';btn.disabled=false; });
+  }
+  // 자동백업: 변경분이 있으면 4분마다 조용히 서버 보관(기기 분실 대비)
+  function autoBackup(){
+    try{ var writer=(wsel&&wsel.value)||''; if(!writer) return; var d=buildDelta();
+      if(!(d.est.length||d.stage.length||d.doc.length) && !collectRows().length) return;
+      submitData(writer); try{ localStorage.setItem('autobk_'+dateKey(), nowStamp()); }catch(e){}
+    }catch(e){}
+  }
+  setInterval(autoBackup, 240000);
+  // 기기복구: 이 기기에 오늘 작성분이 없는데 서버에 내 전송분이 있으면 복원 제안
+  window.__recover=function(res){
+    try{
+      if(!res||!res.payload) return;
+      var has=Object.keys(MYW||{}).length||Object.keys(MYEST||{}).length||Object.keys(MYDOC||{}).length||Object.keys(SEL||{}).length;
+      if(has) return;
+      var p=res.payload;
+      if(!confirm('이 기기에 오늘 작성분이 없어요. 서버에 저장된 내 최근 작업을 불러올까요?')) return;
+      if(p.sel){ SEL=p.sel; saveSel(); }
+      if(p.delta){
+        (p.delta.est||[]).forEach(function(x){ if(x.del) return; ESTIMATES[x.gkey]=ESTIMATES[x.gkey]||[]; if(!ESTIMATES[x.gkey].find(function(y){return y.name===x.name;})) ESTIMATES[x.gkey].push({name:x.name,date:x.date||todayStr()}); markMyest(x.gkey,x.name); });
+        (p.delta.stage||[]).forEach(function(x){ if(!x.stage) return; WSTAT[x.gkey]=WSTAT[x.gkey]||{}; WSTAT[x.gkey][x.work]=x.stage; markMyw(x.gkey,x.work); });
+        (p.delta.recv||[]).forEach(function(x){ if(!x.memo) return; RECV[x.gkey]=RECV[x.gkey]||{}; RECV[x.gkey][x.work]=x.memo; });
+        (p.delta.doc||[]).forEach(function(x){ if(!x.val) return; DOCREC[x.gkey]=DOCREC[x.gkey]||{}; DOCREC[x.gkey][x.name]=DOCREC[x.gkey][x.name]||{}; DOCREC[x.gkey][x.name][x.field]=x.val; markMydoc(x.gkey,x.name,x.field); });
+        saveEst(); saveStat(); saveRecv(); saveDoc();
+      }
+      renderSummary(); gongsaRefresh();
+    }catch(e){}
+  };
+  function tryRecover(){
+    try{ var writer=(wsel&&wsel.value)||''; if(!writer) return;
+      var s=document.createElement('script');
+      s.src=APPS_URL+'?action=mine&writer='+encodeURIComponent(writer)+'&date='+encodeURIComponent(todayStr())+'&callback=__recover&t='+Date.now();
+      s.onload=function(){ s.remove(); }; s.onerror=function(){ s.remove(); };
+      document.body.appendChild(s);
+    }catch(e){}
   }
   document.getElementById('sendBtn').addEventListener('click',send);
+  // ===== 김재성 전용: 취합(제출함 → 확정현황 반영) =====
+  var __cLastSince=(function(){ try{ return localStorage.getItem('consol_since')||''; }catch(e){ return ''; } })();
+  function updateConsolVis(){ var w=(wsel&&wsel.value)||''; var b=document.getElementById('consolidateBtn'); if(b) b.style.display=(w.indexOf('김재성')===0)?'':'none'; }
+  function consolidate(){
+    if(!confirm('지금까지 전송된 모든 직원의 작업을 모아 「확정현황」에 반영할까요?')) return;
+    var btn=document.getElementById('consolidateBtn'); btn.textContent='취합 중...'; btn.disabled=true;
+    window.__cMaster=function(m){
+      window.__cMasterData=m||{};
+      var s2=document.createElement('script');
+      s2.src=APPS_URL+'?action=inbox&since='+encodeURIComponent(__cLastSince||'')+'&callback=__cInbox&t='+Date.now();
+      s2.onerror=function(){ btn.textContent='취합'; btn.disabled=false; alert('취합 실패(제출함 읽기).'); };
+      document.body.appendChild(s2);
+    };
+    window.__cInbox=function(res){
+      try{
+        var master=window.__cMasterData||{};
+        master.estimates=master.estimates||{}; master.wstat=master.wstat||{}; master.recv=master.recv||{}; master.docrec=master.docrec||{};
+        var items=(res&&res.items)||[], applied=0;
+        items.forEach(function(it){
+          var p; try{ p=(typeof it.payload==='string')?JSON.parse(it.payload):it.payload; }catch(e){ p=null; }
+          if(!p||!p.delta) return; var d=p.delta;
+          (d.est||[]).forEach(function(x){ master.estimates[x.gkey]=master.estimates[x.gkey]||[]; var arr=master.estimates[x.gkey]; var idx=arr.findIndex(function(y){return y.name===x.name;}); if(x.del){ if(idx>=0) arr.splice(idx,1); if(!arr.length) delete master.estimates[x.gkey]; } else if(idx<0){ arr.push({name:x.name,date:x.date||''}); } });
+          (d.stage||[]).forEach(function(x){ if(x.stage){ master.wstat[x.gkey]=master.wstat[x.gkey]||{}; master.wstat[x.gkey][x.work]=x.stage; } else if(master.wstat[x.gkey]){ delete master.wstat[x.gkey][x.work]; if(!Object.keys(master.wstat[x.gkey]).length) delete master.wstat[x.gkey]; } });
+          (d.recv||[]).forEach(function(x){ master.recv[x.gkey]=master.recv[x.gkey]||{}; if(x.memo){ master.recv[x.gkey][x.work]=x.memo; } else { delete master.recv[x.gkey][x.work]; if(!Object.keys(master.recv[x.gkey]).length) delete master.recv[x.gkey]; } });
+          (d.doc||[]).forEach(function(x){ master.docrec[x.gkey]=master.docrec[x.gkey]||{}; master.docrec[x.gkey][x.name]=master.docrec[x.gkey][x.name]||{}; if(x.val){ master.docrec[x.gkey][x.name][x.field]=x.val; } else { delete master.docrec[x.gkey][x.name][x.field]; if(!Object.keys(master.docrec[x.gkey][x.name]).length) delete master.docrec[x.gkey][x.name]; if(!Object.keys(master.docrec[x.gkey]).length) delete master.docrec[x.gkey]; } });
+          applied++;
+        });
+        fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'setmaster', master:master})})
+          .then(function(){ if(res&&res.now){ __cLastSince=String(res.now); try{ localStorage.setItem('consol_since',__cLastSince); }catch(e){} }
+            btn.textContent='취합 완료 ✓ ('+applied+'건)'; setTimeout(function(){btn.textContent='취합';btn.disabled=false;},2500); __applyMaster(master); })
+          .catch(function(){ btn.textContent='취합'; btn.disabled=false; alert('취합 저장 실패.'); });
+      }catch(e){ btn.textContent='취합'; btn.disabled=false; }
+    };
+    var s1=document.createElement('script');
+    s1.src=APPS_URL+'?action=master&callback=__cMaster&t='+Date.now();
+    s1.onerror=function(){ btn.textContent='취합'; btn.disabled=false; alert('취합 실패(확정현황 읽기).'); };
+    document.body.appendChild(s1);
+  }
+  document.getElementById('consolidateBtn').addEventListener('click',consolidate);
+  updateConsolVis();
   renderSentStatus();
 
   buttons[0].click();
-  loadSharedState();   // 서버에서 공사현황(견적서·단계·입고내용) 불러와 공유 상태로 맞춤
+  loadMaster();   // 서버 확정현황 불러오기 + 기기복구 시도
+  tryRecover();
 </script>
 </body>
 </html>
