@@ -353,8 +353,8 @@
     return panel;
   }
   // 공사 진행단계 저장소 (학교|지역별 공사명->단계), 업무일지와 공유
-  let WSTAT={}; try{ WSTAT=JSON.parse(localStorage.getItem(statStoreKey()))||{}; }catch(e){}
-  function saveStat(){ try{ localStorage.setItem(statStoreKey(),JSON.stringify(WSTAT)); }catch(e){} }
+  let WSTAT={}; try{ WSTAT=JSON.parse(localStorage.getItem('gongsa_status'))||{}; }catch(e){}  // 날짜무관 전역(서버와 공유)
+  function saveStat(){ try{ localStorage.setItem('gongsa_status',JSON.stringify(WSTAT)); }catch(e){} }
   // 자재입고확인 시 입고된 시설/자재 내용 메모 (지역|현장 -> 공사명 -> 내용)
   let RECV={}; try{ RECV=JSON.parse(localStorage.getItem('recv_memo'))||{}; }catch(e){}
   function saveRecv(){ try{ localStorage.setItem('recv_memo',JSON.stringify(RECV)); }catch(e){} }
@@ -437,11 +437,12 @@
       const stage=e.target.closest('.stage-btn');
       if(stage){
         const school=panel.querySelector('.work-wrap').dataset.school;
-        const key=statKey(school); WSTAT[key]=WSTAT[key]||{};
-        if(WSTAT[key][stage.dataset.work]===stage.dataset.stage) delete WSTAT[key][stage.dataset.work];
-        else WSTAT[key][stage.dataset.work]=stage.dataset.stage;
+        const key=statKey(school), work=stage.dataset.work; WSTAT[key]=WSTAT[key]||{};
+        let nv;
+        if(WSTAT[key][work]===stage.dataset.stage){ delete WSTAT[key][work]; nv=''; }
+        else { WSTAT[key][work]=stage.dataset.stage; nv=stage.dataset.stage; }
         if(!Object.keys(WSTAT[key]).length) delete WSTAT[key];
-        saveStat(); renderWork(school); renderSummary(); return;
+        saveStat(); gongsaPost('stage',{region:curRegion,school:school,name:work,stage:nv}); renderWork(school); renderSummary(); return;
       }
       const work=e.target.closest('.work-item');
       if(work){
@@ -452,13 +453,15 @@
       const sch=e.target.closest('.school-row[data-school]');
       if(sch){ if(sch.dataset.sregion) curRegion=sch.dataset.sregion; showWork(sch.dataset.school); return; }
     });
+    let recvTimer=null;
     panel.addEventListener('input',e=>{
       const ta=e.target.closest('.recv-input'); if(!ta) return;
       const wrap=panel.querySelector('.work-wrap'); if(!wrap) return;
-      const key=statKey(wrap.dataset.school), w=ta.dataset.recvwork, v=ta.value;
+      const key=statKey(wrap.dataset.school), w=ta.dataset.recvwork, v=ta.value, sc=wrap.dataset.school, reg=curRegion;
       RECV[key]=RECV[key]||{};
       if(v.trim()) RECV[key][w]=v; else { delete RECV[key][w]; if(!Object.keys(RECV[key]).length) delete RECV[key]; }
       saveRecv(); renderSummary();
+      clearTimeout(recvTimer); recvTimer=setTimeout(()=>{ gongsaPost('recv',{region:reg,school:sc,name:w,recv:v}); }, 800);
     });
     gongsaRefresh=function(){ const w=panel.querySelector('.work-wrap'); if(w) renderWork(w.dataset.school); };
     wireSearch(panel,'goto');
@@ -616,7 +619,7 @@
       if(e.target.closest('[data-backdocs]')){ showDocs(curSchool); return; }
       if(e.target.closest('[data-addest]')){
         const inp=panel.querySelector('#estInput'); const v=(inp&&inp.value||'').trim();
-        if(v){ const key=curRegion+'|'+curSchool; ESTIMATES[key]=ESTIMATES[key]||[]; ESTIMATES[key].push({name:v,date:todayStr()}); saveEst(); }
+        if(v){ const key=curRegion+'|'+curSchool; ESTIMATES[key]=ESTIMATES[key]||[]; ESTIMATES[key].push({name:v,date:todayStr()}); saveEst(); gongsaPost('add',{region:curRegion,school:curSchool,name:v,date:todayStr()}); }
         showEstimate(curSchool); return;
       }
       const del=e.target.closest('[data-delest]');
@@ -629,6 +632,7 @@
           if(WSTAT[key]){ delete WSTAT[key][removed.name]; if(!Object.keys(WSTAT[key]).length) delete WSTAT[key]; saveStat(); }
           if(RECV[key]){ delete RECV[key][removed.name]; if(!Object.keys(RECV[key]).length) delete RECV[key]; saveRecv(); }
           saveEst(); renderSummary();
+          gongsaPost('del',{region:curRegion,school:curSchool,name:removed.name});
         }
         showEstimate(curSchool); return;
       }
@@ -793,10 +797,36 @@
     if(!wdate.value){ wdate.value=dateStr(); return; }
     const ps=wdate.value.split('-'); cur=new Date(+ps[0],+ps[1]-1,+ps[2]);
     try{ SEL=JSON.parse(localStorage.getItem(dateKey()))||{}; }catch(e){ SEL={}; }
-    try{ WSTAT=JSON.parse(localStorage.getItem(statStoreKey()))||{}; }catch(e){ WSTAT={}; }
     renderHeaderDate(); renderSummary(); renderSentStatus();
     Object.values(panels).forEach(p=>{ if(p._home) p._home(); });
   });
+
+  // ===== 공사현황 공유(서버 저장 → 모든 직원·기기 동일하게 이어짐) =====
+  function gongsaPost(op, payload){
+    try{
+      fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify(Object.assign({action:'gongsa',op:op,writer:(wsel&&wsel.value)||''}, payload))});
+    }catch(e){}
+  }
+  window.__gongsaState=function(st){
+    try{
+      if(st){
+        if(st.estimates){ ESTIMATES=st.estimates; saveEst(); }
+        if(st.wstat){ WSTAT=st.wstat; saveStat(); }
+        if(st.recv){ RECV=st.recv; saveRecv(); }
+      }
+      renderSummary(); gongsaRefresh();
+    }catch(e){}
+  };
+  function loadSharedState(){
+    try{
+      var s=document.createElement('script');
+      s.src=APPS_URL+'?action=state&callback=__gongsaState&t='+Date.now();
+      s.onload=function(){ s.remove(); };
+      s.onerror=function(){ s.remove(); };
+      document.body.appendChild(s);
+    }catch(e){}
+  }
 
   function collectRows(){
     const dt=todayStr(); const rows=[];
@@ -840,6 +870,7 @@
   renderSentStatus();
 
   buttons[0].click();
+  loadSharedState();   // 서버에서 공사현황(견적서·단계·입고내용) 불러와 공유 상태로 맞춤
 </script>
 </body>
 </html>
