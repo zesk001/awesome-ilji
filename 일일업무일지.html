@@ -134,6 +134,32 @@
   .sum-item i:hover { color:#d33; }
   footer { text-align:center; color:#9aa59d; font-size:12px; margin-top:26px; }
 
+  /* ── ④단계: 보기 대시보드 ── */
+  .view-btns { display:flex; gap:8px; margin:0 14px; }
+  .view-btns button { border:1.5px solid rgba(255,255,255,.55); background:rgba(255,255,255,.13); color:#fff; border-radius:9px; padding:8px 14px; cursor:pointer; font-size:13px; font-weight:bold; font-family:inherit; }
+  .view-btns button:hover { background:rgba(255,255,255,.28); }
+  #viewOverlay { position:fixed; inset:0; background:rgba(20,40,28,.45); z-index:50; display:none; align-items:flex-start; justify-content:center; padding:30px 14px; overflow-y:auto; }
+  .vo-card { background:#fff; border-radius:16px; max-width:760px; width:100%; padding:20px 22px 26px; box-shadow:0 10px 40px rgba(0,0,0,.25); }
+  .vo-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .vo-tabs { display:flex; gap:6px; }
+  .vo-tabs button { border:1.5px solid #cfdcd3; background:#f7fbf8; color:#456; border-radius:9px; padding:7px 14px; cursor:pointer; font-size:13px; font-weight:bold; font-family:inherit; }
+  .vo-tabs button.on { background:#1e5631; border-color:#1e5631; color:#fff; }
+  #voDate { font-size:14px; padding:6px 10px; border:1.5px solid #cfdcd3; border-radius:9px; background:#f7fbf8; font-family:inherit; }
+  #voClose { margin-left:auto; border:none; background:#f3f3f3; border-radius:8px; padding:6px 12px; cursor:pointer; font-size:14px; color:#777; }
+  #voClose:hover { background:#ffe6e6; color:#d33; }
+  .vo-writer { border:1px solid #e6ece8; border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+  .vo-writer h4 { color:#1e5631; font-size:15px; margin-bottom:4px; }
+  .vo-sent { font-size:12px; color:#6b8f7d; margin-bottom:8px; }
+  .vo-warn { color:#b8860b; }
+  .vo-cat { display:flex; gap:8px; padding:8px 0; border-bottom:1px dashed #eee; align-items:flex-start; }
+  .vo-cat:last-child { border-bottom:none; }
+  .vo-items { display:flex; flex-direction:column; gap:5px; flex:1; }
+  .vo-item { font-size:13px; color:#333; background:#f5f8fa; border-radius:8px; padding:5px 9px; }
+  .vo-place { color:#667; }
+  .vo-extra { color:#888; font-size:12px; }
+  .vo-empty { color:#aaa; text-align:center; padding:16px 0; font-size:14px; }
+  .vo-none { font-size:12px; color:#999; margin-top:4px; }
+
   /* ── 휴대폰 화면 최적화 ── */
   @media (max-width:600px){
     .wrap { padding:14px 12px 40px; }
@@ -167,6 +193,10 @@
     .est-add { width:100%; padding:11px 0; }
     .remark-cat { flex:1 1 40%; justify-content:center; }
     .stage-btn { font-size:12px; padding:7px 10px; }
+    .view-btns { margin:0; width:100%; }
+    .view-btns button { flex:1; padding:9px 6px; }
+    #viewOverlay { padding:14px 8px; }
+    .vo-card { padding:16px 14px 20px; }
   }
 </style>
 </head>
@@ -180,6 +210,10 @@
         <h1>일일업무일지</h1>
         <div class="sub">(주)어썸조경 · AWESOME LANDSCAPE</div>
       </div>
+    </div>
+    <div class="view-btns">
+      <button id="btnViewMine" type="button">📖 내 일지</button>
+      <button id="btnViewAll" type="button">👥 전체 일지</button>
     </div>
     <div class="header-date">
       <div class="today" id="today"></div>
@@ -217,6 +251,21 @@
   </section>
 
   <footer>어썸조경 전체 업무 관리 시스템 · 일일업무일지</footer>
+</div>
+
+<!-- ④단계: 보기 대시보드 -->
+<div id="viewOverlay">
+  <div class="vo-card">
+    <div class="vo-head">
+      <div class="vo-tabs">
+        <button id="voTabMine" type="button">내 일지</button>
+        <button id="voTabAll" type="button">전체 일지</button>
+      </div>
+      <input type="date" id="voDate">
+      <button id="voClose" type="button">✕ 닫기</button>
+    </div>
+    <div id="voBody"></div>
+  </div>
 </div>
 
 <script src="학교DB.js"></script>
@@ -1136,6 +1185,80 @@
   document.getElementById('consolidateBtn').addEventListener('click',consolidate);
   updateConsolVis();
   renderSentStatus();
+
+  // ===== ④단계: 보기 대시보드 (내 일지 / 전체 일지) =====
+  var VO_CAT={'점검':'#2f80c4','소독':'#27a36a','공사':'#e8842c','사무':'#8e6cc4'};
+  var voMode='mine';
+  var voOv=document.getElementById('viewOverlay'), voBody=document.getElementById('voBody');
+  var voDate=document.getElementById('voDate');
+  var voTabMine=document.getElementById('voTabMine'), voTabAll=document.getElementById('voTabAll');
+  function voEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+  function voTime(tm){ var t=new Date(Number(tm)); return isNaN(t)?'':(pad2(t.getHours())+':'+pad2(t.getMinutes())); }
+  // rows: [분류,지역,현장,내용,단계,비고]
+  function voRowsHTML(rows){
+    if(!rows.length) return '<div class="vo-empty">기록이 없어요.</div>';
+    var order=['점검','소독','공사','사무']; var by={};
+    rows.forEach(function(r){ var c=r[0]||'기타'; (by[c]=by[c]||[]).push(r); });
+    var cats=order.filter(function(c){return by[c];}).concat(Object.keys(by).filter(function(c){return order.indexOf(c)<0;}));
+    return cats.map(function(c){
+      var items=by[c].map(function(r){
+        var place=[r[1],r[2]].filter(Boolean).join(' ');
+        var extra=[r[4],r[5]].filter(Boolean).map(voEsc).join(' · ');
+        return '<div class="vo-item">'+(place?'<span class="vo-place">'+voEsc(place)+'</span> ':'')+'<b>'+voEsc(r[3]||'')+'</b>'+(extra?' <span class="vo-extra">'+extra+'</span>':'')+'</div>';
+      }).join('');
+      return '<div class="vo-cat"><span class="sum-tag" style="background:'+(VO_CAT[c]||'#8a8f98')+'">'+voEsc(c)+' '+by[c].length+'건</span><div class="vo-items">'+items+'</div></div>';
+    }).join('');
+  }
+  function voRenderMine(){
+    voDate.style.display='none';
+    var w=wsel.value;
+    var rows=collectRows().map(function(r){ return [r[1],r[2],r[3],r[4],r[5],r[6]]; });
+    var sent=''; try{ sent=localStorage.getItem(sentKey())||''; }catch(e){}
+    voBody.innerHTML='<div class="vo-writer"><h4>'+voEsc(w)+' — '+dateStr()+'</h4>'
+      +(sent?'<div class="vo-sent">✓ 마지막 전송 '+voEsc(sent)+'</div>':'<div class="vo-sent vo-warn">아직 전송 전 — 이 기기에 작성된 내용이에요</div>')
+      +voRowsHTML(rows)+'</div>'
+      +'<div class="vo-none">다른 날짜의 내 일지는 위쪽 「작업 날짜」를 바꾸면 볼 수 있어요.</div>';
+  }
+  window.__voDay=function(res){
+    if(voMode!=='all') return;
+    var rows=(res&&res.rows)||[]; // [분류,지역,현장,내용,단계,비고,작성자,시각]
+    var byW={}; rows.forEach(function(r){ var w=r[6]||'(이름없음)'; (byW[w]=byW[w]||[]).push(r); });
+    var writers=NAMES.filter(function(n){return byW[n];}).concat(Object.keys(byW).filter(function(w){return NAMES.indexOf(w)<0;}));
+    var html=writers.map(function(w){
+      var rs=byW[w]; var tm=rs.reduce(function(m,r){ return Math.max(m,Number(r[7])||0); },0);
+      return '<div class="vo-writer"><h4>'+voEsc(w)+' <span style="font-weight:normal;color:#9aa59d;font-size:12px">'+(tm?('전송 '+voTime(tm)):'')+'</span></h4>'
+        +voRowsHTML(rs.map(function(r){return [r[0],r[1],r[2],r[3],r[4],r[5]];}))+'</div>';
+    }).join('');
+    var none=NAMES.filter(function(n){return !byW[n];});
+    if(!html) html='<div class="vo-empty">이 날짜에 전송된 일지가 없어요.</div>';
+    if(none.length) html+='<div class="vo-none">전송 없음: '+none.map(voEsc).join(', ')+'</div>';
+    voBody.innerHTML=html;
+  };
+  function voRenderAll(){
+    voDate.style.display='';
+    voBody.innerHTML='<div class="vo-empty">불러오는 중...</div>';
+    var s=document.createElement('script');
+    s.src=APPS_URL+'?action=day&date='+encodeURIComponent(voDate.value||dateStr())+'&callback=__voDay&t='+Date.now();
+    s.onload=function(){ s.remove(); };
+    s.onerror=function(){ s.remove(); voBody.innerHTML='<div class="vo-empty">불러오기 실패 — 인터넷 연결을 확인하세요.</div>'; };
+    document.body.appendChild(s);
+  }
+  function voRender(){
+    voTabMine.className=(voMode==='mine')?'on':'';
+    voTabAll.className=(voMode==='all')?'on':'';
+    if(voMode==='mine') voRenderMine(); else voRenderAll();
+  }
+  function voOpen(mode){
+    if(mode==='mine' && !wsel.value){ alert('먼저 작성자 이름을 선택하세요.'); return; }
+    voMode=mode; voDate.value=dateStr(); voOv.style.display='flex'; voRender();
+  }
+  document.getElementById('btnViewMine').addEventListener('click',function(){ voOpen('mine'); });
+  document.getElementById('btnViewAll').addEventListener('click',function(){ voOpen('all'); });
+  voTabMine.addEventListener('click',function(){ if(!wsel.value){ alert('먼저 작성자 이름을 선택하세요.'); return; } voMode='mine'; voRender(); });
+  voTabAll.addEventListener('click',function(){ voMode='all'; voRender(); });
+  voDate.addEventListener('change',function(){ if(voMode==='all') voRenderAll(); });
+  document.getElementById('voClose').addEventListener('click',function(){ voOv.style.display='none'; });
+  voOv.addEventListener('click',function(e){ if(e.target===voOv) voOv.style.display='none'; });
 
   buttons[0].click();
   loadMaster();   // 서버 확정현황 불러오기 + 기기복구 시도
