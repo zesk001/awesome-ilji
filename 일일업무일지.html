@@ -915,7 +915,57 @@
   const wsel=document.getElementById('writerSel');
   wsel.innerHTML='<option value="">(이름 선택)</option>'+NAMES.map(n=>'<option>'+n+'</option>').join('');
   try{ wsel.value=localStorage.getItem('ilji_writer')||''; }catch(e){}
-  wsel.addEventListener('change',()=>{ try{ localStorage.setItem('ilji_writer',wsel.value); }catch(e){} updateConsolVis(); tryRecover(); });
+
+  // ===== ③단계: 이름 + 4자리 비밀번호(PIN) =====
+  // 처음 입력한 4자리가 그 이름의 비밀번호로 서버에 등록됨. 이후엔 같은 번호여야 통과.
+  // 비번을 잊으면: 김재성님이 구글 시트 _PIN 탭에서 해당 줄 삭제 → 초기화.
+  var PINOK=false;
+  function pinHash(name,pin){ var s=name+'|'+pin+'|awesome2026'; var h=5381; for(var i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))|0; } return 'h'+(h>>>0).toString(36)+s.length; }
+  function pinKey(n){ return 'ilji_pin_'+n; }
+  function myPinHash(){ try{ return localStorage.getItem(pinKey((wsel&&wsel.value)||''))||''; }catch(e){ return ''; } }
+  function askPin(name){
+    var msg=name+' 님의 4자리 비밀번호를 입력하세요.\n(처음이면 지금 입력한 번호가 등록돼요)';
+    for(;;){ var v=prompt(msg); if(v===null) return null; v=String(v).trim(); if(/^\d{4}$/.test(v)) return v; msg='숫자 4자리로 입력해 주세요.'; }
+  }
+  var __pinSeq=0;
+  function verifyPin(name,hash,done){
+    var cbName='__pinCb'+(++__pinSeq);
+    var to=setTimeout(function(){ cleanup(); done(false,false,true); },12000);
+    function cleanup(){ clearTimeout(to); try{ delete window[cbName]; }catch(e){ window[cbName]=null; } }
+    window[cbName]=function(res){ cleanup(); res=res||{}; done(!!res.ok, !!res.registered, false); };
+    var s=document.createElement('script');
+    s.src=APPS_URL+'?action=pin&writer='+encodeURIComponent(name)+'&hash='+encodeURIComponent(hash)+'&callback='+cbName+'&t='+Date.now();
+    s.onload=function(){ s.remove(); };
+    s.onerror=function(){ s.remove(); cleanup(); done(false,false,true); };
+    document.body.appendChild(s);
+  }
+  function pinGate(name,onPass,onFail){
+    var saved=''; try{ saved=localStorage.getItem(pinKey(name))||''; }catch(e){}
+    function tryHash(hash,silent){
+      verifyPin(name,hash,function(ok,registered,netFail){
+        if(netFail){ alert('인터넷 연결을 확인하세요. 본인 확인을 못 했어요.'); onFail(); return; }
+        if(ok){ try{ localStorage.setItem(pinKey(name),hash); }catch(e){} PINOK=true;
+          if(registered) alert('비밀번호가 등록되었어요. 다음부터 이 번호로 본인 확인을 해요.\n(잊으면 김재성님께 초기화를 요청하세요)');
+          onPass(); return; }
+        try{ localStorage.removeItem(pinKey(name)); }catch(e){}
+        if(!silent) alert('비밀번호가 달라요. 다시 입력해 주세요.');
+        var p=askPin(name); if(p===null){ onFail(); return; }
+        tryHash(pinHash(name,p),false);
+      });
+    }
+    if(saved){ tryHash(saved,true); return; }
+    var p=askPin(name); if(p===null){ onFail(); return; }
+    tryHash(pinHash(name,p),false);
+  }
+  var __prevWriter='';
+  wsel.addEventListener('change',function(){
+    var name=wsel.value||'';
+    if(!name){ __prevWriter=''; PINOK=false; try{ localStorage.setItem('ilji_writer',''); }catch(e){} updateConsolVis(); return; }
+    PINOK=false;
+    pinGate(name,
+      function(){ __prevWriter=name; try{ localStorage.setItem('ilji_writer',name); }catch(e){} updateConsolVis(); tryRecover(); },
+      function(){ wsel.value=__prevWriter; if(__prevWriter) PINOK=true; updateConsolVis(); });
+  });
 
   // 작업 날짜 선택 — 그 날짜의 저장분을 불러와 이어쓰기/수정
   const wdate=document.getElementById('workDate');
@@ -994,11 +1044,12 @@
   }
   function submitData(writer){
     return fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'submit', writer:writer, date:todayStr(), delta:buildDelta(), rows:collectRows(), sel:SEL})});
+      body:JSON.stringify({action:'submit', writer:writer, pinHash:myPinHash(), date:todayStr(), delta:buildDelta(), rows:collectRows(), sel:SEL})});
   }
   function send(){
     var writer=wsel.value;
     if(!writer){ alert('먼저 작성자 이름을 선택하세요.'); return; }
+    if(!PINOK){ alert('본인 확인이 필요해요. 이름을 다시 선택해 주세요.'); return; }
     var rows=collectRows(), delta=buildDelta();
     if(!(rows.length||delta.est.length||delta.stage.length||delta.doc.length)){ alert('전송할 내용이 없습니다.'); return; }
     if(!confirm(writer+' 님, ['+dateStr()+'] 작업을 전송할까요?\n전송하면 김재성님이 「취합」할 때 모두에게 반영됩니다.\n\n'+sendSummaryText(rows))) return;
@@ -1009,7 +1060,7 @@
   }
   // 자동백업: 변경분이 있으면 4분마다 조용히 서버 보관(기기 분실 대비)
   function autoBackup(){
-    try{ var writer=(wsel&&wsel.value)||''; if(!writer) return; var d=buildDelta();
+    try{ var writer=(wsel&&wsel.value)||''; if(!writer||!PINOK) return; var d=buildDelta();
       if(!(d.est.length||d.stage.length||d.doc.length) && !collectRows().length) return;
       submitData(writer); try{ localStorage.setItem('autobk_'+dateKey(), nowStamp()); }catch(e){}
     }catch(e){}
@@ -1037,7 +1088,7 @@
   function tryRecover(){
     try{ var writer=(wsel&&wsel.value)||''; if(!writer) return;
       var s=document.createElement('script');
-      s.src=APPS_URL+'?action=mine&writer='+encodeURIComponent(writer)+'&date='+encodeURIComponent(todayStr())+'&callback=__recover&t='+Date.now();
+      s.src=APPS_URL+'?action=mine&writer='+encodeURIComponent(writer)+'&hash='+encodeURIComponent(myPinHash())+'&date='+encodeURIComponent(todayStr())+'&callback=__recover&t='+Date.now();
       s.onload=function(){ s.remove(); }; s.onerror=function(){ s.remove(); };
       document.body.appendChild(s);
     }catch(e){}
@@ -1047,6 +1098,7 @@
   var __cLastSince=(function(){ try{ return localStorage.getItem('consol_since')||''; }catch(e){ return ''; } })();
   function updateConsolVis(){ var w=(wsel&&wsel.value)||''; var b=document.getElementById('consolidateBtn'); if(b) b.style.display=(w.indexOf('김재성')===0)?'':'none'; }
   function consolidate(){
+    if(!PINOK){ alert('본인 확인이 필요해요. 이름을 다시 선택해 주세요.'); return; }
     if(!confirm('지금까지 전송된 모든 직원의 작업을 모아 「확정현황」에 반영할까요?')) return;
     var btn=document.getElementById('consolidateBtn'); btn.textContent='취합 중...'; btn.disabled=true;
     window.__cMaster=function(m){
@@ -1070,7 +1122,7 @@
           (d.doc||[]).forEach(function(x){ master.docrec[x.gkey]=master.docrec[x.gkey]||{}; master.docrec[x.gkey][x.name]=master.docrec[x.gkey][x.name]||{}; if(x.val){ master.docrec[x.gkey][x.name][x.field]=x.val; } else { delete master.docrec[x.gkey][x.name][x.field]; if(!Object.keys(master.docrec[x.gkey][x.name]).length) delete master.docrec[x.gkey][x.name]; if(!Object.keys(master.docrec[x.gkey]).length) delete master.docrec[x.gkey]; } });
           applied++;
         });
-        fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'setmaster', master:master})})
+        fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'setmaster', master:master, pinHash:myPinHash()})})
           .then(function(){ if(res&&res.now){ __cLastSince=String(res.now); try{ localStorage.setItem('consol_since',__cLastSince); }catch(e){} }
             btn.textContent='취합 완료 ✓ ('+applied+'건)'; setTimeout(function(){btn.textContent='취합';btn.disabled=false;},2500); __applyMaster(master); })
           .catch(function(){ btn.textContent='취합'; btn.disabled=false; alert('취합 저장 실패.'); });
@@ -1087,7 +1139,12 @@
 
   buttons[0].click();
   loadMaster();   // 서버 확정현황 불러오기 + 기기복구 시도
-  tryRecover();
+  // 저장된 이름이 있으면 본인 확인(이 기기에 비번이 저장돼 있으면 조용히 통과)
+  if(wsel.value){
+    pinGate(wsel.value,
+      function(){ __prevWriter=wsel.value; updateConsolVis(); tryRecover(); },
+      function(){ wsel.value=''; try{ localStorage.setItem('ilji_writer',''); }catch(e){} updateConsolVis(); });
+  }
 </script>
 </body>
 </html>
