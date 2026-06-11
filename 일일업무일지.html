@@ -1111,6 +1111,8 @@
     Object.keys(SEL['소독']||{}).forEach(k=>{const v=SEL['소독'][k]; rows.push([dt,'소독',v.region||'',v.name||k,(v.sub?'단타':'소독'),'','']);});
     // ★ 전송도 내가 오늘 손댄 공사(MYW)만 포함
     Object.keys(MYW||{}).forEach(mk=>{const sep=mk.indexOf('|||');if(sep<0)return;const gk=mk.slice(0,sep),w=mk.slice(sep+3);if(!(WSTAT[gk]&&WSTAT[gk][w]))return;const ps=gk.split('|');const region=ps[0],school=ps.slice(1).join('|');const ests=ESTIMATES[gk]||[];const est=ests.find(x=>x.name===w);const rm=(RECV[gk]&&RECV[gk][w])||'';const bigo=rm?('입고: '+rm+(est?' / 견적 '+est.date:'')):(est?est.date:'');rows.push([dt,'공사',region,school,w,WSTAT[gk][w],bigo]);});
+    // 견적서 작성도 일지 행으로 남김 (전체 일지·주간보고에 보이도록)
+    Object.keys(MYEST||{}).forEach(mk=>{const sep=mk.indexOf('|||');if(sep<0)return;const gk=mk.slice(0,sep),nm=mk.slice(sep+3);const e=(ESTIMATES[gk]||[]).find(x=>x.name===nm);if(!e)return;const ps=gk.split('|');rows.push([dt,'사무',ps[0]||'',ps.slice(1).join('|')||'','견적서',nm,(e.date&&e.date!==dt)?('견적일 '+e.date):'']);});
     Object.keys(SEL['사무']||{}).forEach(k=>{const v=SEL['사무'][k]||{};const p=k.split('|');
       if(v.type==='기타업무'){rows.push([dt,'사무','','','기타업무','',v.workText||'']);}
       else if(v.type==='연차'){rows.push([dt,'사무','','','연차',v.leaveDate||'','']);}
