@@ -215,6 +215,7 @@
       <button id="btnViewMine" type="button">📖 내 일지</button>
       <button id="btnViewAll" type="button">👥 전체 일지</button>
       <button id="btnWeekly" type="button" style="display:none">📊 주간보고</button>
+      <button id="btnAdminEdit" type="button" style="display:none">🔑 마스터 수정</button>
     </div>
     <div class="header-date">
       <div class="today" id="today"></div>
@@ -266,6 +267,51 @@
       <button id="voClose" type="button">✕ 닫기</button>
     </div>
     <div id="voBody"></div>
+  </div>
+</div>
+
+<!-- 마스터 수정 (김재성 전용) -->
+<style>
+#adminOverlay{display:none;position:fixed;inset:0;background:rgba(20,30,24,.55);z-index:70;align-items:center;justify-content:center;padding:14px;}
+#adminOverlay .ae-card{background:#fff;border-radius:14px;max-width:920px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.25);}
+#adminOverlay .ae-head{display:flex;gap:8px;align-items:center;padding:12px 14px;border-bottom:2px solid #1e5631;flex-wrap:wrap;}
+#adminOverlay .ae-head b{color:#1e5631;}
+#adminOverlay .ae-head select,#adminOverlay .ae-head input{padding:6px 8px;border:1px solid #ccd5cf;border-radius:8px;font-size:14px;font-family:inherit;}
+#adminOverlay .ae-head button{padding:7px 12px;border:1px solid #ccd5cf;background:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;}
+#adminOverlay #aeClose{margin-left:auto;}
+#adminOverlay .ae-body{padding:10px 14px;overflow:auto;}
+#adminOverlay #aeMsg{font-size:13px;color:#666;margin-bottom:8px;}
+#adminOverlay table{width:100%;border-collapse:collapse;font-size:13px;}
+#adminOverlay th{background:#e8f1ea;color:#1e5631;padding:6px 4px;font-size:12px;}
+#adminOverlay td{padding:3px 2px;border-bottom:1px solid #eef1ef;}
+#adminOverlay td input,#adminOverlay td select{width:100%;padding:5px 6px;border:1px solid #dde5df;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;}
+#adminOverlay .ae-del{border:none;background:none;color:#c0392b;cursor:pointer;font-size:14px;}
+#adminOverlay .ae-foot{display:flex;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid #eef1ef;flex-wrap:wrap;}
+#adminOverlay .ae-foot label{font-size:12.5px;color:#555;display:flex;align-items:center;gap:4px;}
+#adminOverlay #aeSave{margin-left:auto;background:#b8860b;color:#fff;border:none;font-weight:bold;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:14px;}
+#adminOverlay #aeAdd{border:1px dashed #1e5631;color:#1e5631;background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;}
+</style>
+<div id="adminOverlay">
+  <div class="ae-card">
+    <div class="ae-head">
+      <b>🔑 마스터 수정</b>
+      <select id="aeWriter"></select>
+      <input type="date" id="aeDate">
+      <button id="aeLoad" type="button">불러오기</button>
+      <button id="aeClose" type="button">✕ 닫기</button>
+    </div>
+    <div class="ae-body">
+      <div id="aeMsg"></div>
+      <table>
+        <thead><tr><th style="width:74px">분류</th><th style="width:80px">지역</th><th style="width:130px">현장</th><th>내용/공사명</th><th style="width:110px">단계/구분</th><th>비고</th><th style="width:30px"></th></tr></thead>
+        <tbody id="aeRows"></tbody>
+      </table>
+    </div>
+    <div class="ae-foot">
+      <button id="aeAdd" type="button">＋ 행 추가</button>
+      <label><input type="checkbox" id="aeApplyStage" checked> 공사 단계를 확정현황에도 반영</label>
+      <button id="aeSave" type="button">저장(직원 명의)</button>
+    </div>
   </div>
 </div>
 
@@ -1146,7 +1192,7 @@
   document.getElementById('sendBtn').addEventListener('click',send);
   // ===== 김재성 전용: 취합(제출함 → 확정현황 반영) =====
   var __cLastSince=(function(){ try{ return localStorage.getItem('consol_since')||''; }catch(e){ return ''; } })();
-  function updateConsolVis(){ var w=(wsel&&wsel.value)||''; var show=(w.indexOf('김재성')===0); var b=document.getElementById('consolidateBtn'); if(b) b.style.display=show?'':'none'; var wb=document.getElementById('btnWeekly'); if(wb) wb.style.display=show?'':'none'; }
+  function updateConsolVis(){ var w=(wsel&&wsel.value)||''; var show=(w.indexOf('김재성')===0); var b=document.getElementById('consolidateBtn'); if(b) b.style.display=show?'':'none'; var wb=document.getElementById('btnWeekly'); if(wb) wb.style.display=show?'':'none'; var ab=document.getElementById('btnAdminEdit'); if(ab) ab.style.display=show?'':'none'; }
   (function(){ var wb=document.getElementById('btnWeekly'); if(wb) wb.addEventListener('click', function(){ window.open('주간보고.html','_blank'); }); })();
   function consolidate(){
     if(!PINOK){ alert('본인 확인이 필요해요. 이름을 다시 선택해 주세요.'); return; }
@@ -1261,6 +1307,91 @@
   voDate.addEventListener('change',function(){ if(voMode==='all') voRenderAll(); });
   document.getElementById('voClose').addEventListener('click',function(){ voOv.style.display='none'; });
   voOv.addEventListener('click',function(e){ if(e.target===voOv) voOv.style.display='none'; });
+
+  // ===== 김재성 전용: 마스터 수정(다른 직원 일지 기록 수정·삭제·대리 작성) =====
+  var aeOv=document.getElementById('adminOverlay');
+  function aeEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+  function aeOpen(){
+    if(!PINOK || (wsel.value||'').indexOf('김재성')!==0){ alert('김재성님 본인 확인 후 사용할 수 있어요.'); return; }
+    var sel=document.getElementById('aeWriter');
+    sel.innerHTML=NAMES.filter(function(n){return n.indexOf('김재성')!==0;}).map(function(n){return '<option>'+aeEsc(n)+'</option>';}).join('');
+    document.getElementById('aeDate').value=dateStr();
+    document.getElementById('aeRows').innerHTML='';
+    document.getElementById('aeMsg').textContent='직원과 날짜를 고르고 「불러오기」를 누르세요.';
+    aeOv.style.display='flex';
+  }
+  function aeRowHTML(r){ r=r||['사무','','','','',''];
+    var cats=['점검','소독','공사','사무'];
+    return '<tr>'
+      +'<td><select class="ae-cat">'+cats.map(function(c){return '<option'+(c===r[0]?' selected':'')+'>'+c+'</option>';}).join('')+'</select></td>'
+      +'<td><input class="ae-region" value="'+aeEsc(r[1])+'"></td>'
+      +'<td><input class="ae-site" value="'+aeEsc(r[2])+'"></td>'
+      +'<td><input class="ae-item" value="'+aeEsc(r[3])+'"></td>'
+      +'<td><input class="ae-stage" value="'+aeEsc(r[4])+'"></td>'
+      +'<td><input class="ae-memo" value="'+aeEsc(r[5])+'"></td>'
+      +'<td><button type="button" class="ae-del">✕</button></td></tr>';
+  }
+  window.__aeDay=function(res){
+    var w=document.getElementById('aeWriter').value;
+    var rows=((res&&res.rows)||[]).filter(function(r){ return String(r[6]||'')===w; });
+    document.getElementById('aeRows').innerHTML=rows.map(function(r){ return aeRowHTML([r[0],r[1],r[2],r[3],r[4],r[5]]); }).join('');
+    document.getElementById('aeMsg').textContent=rows.length
+      ? (w+' 님의 '+document.getElementById('aeDate').value+' 기록 '+rows.length+'건 — 고치거나 지우고 「저장」을 누르세요.')
+      : (w+' 님은 이 날짜에 전송한 기록이 없어요. 「＋ 행 추가」로 대신 작성할 수 있어요.');
+  };
+  function aeLoad(){
+    document.getElementById('aeMsg').textContent='불러오는 중...';
+    var s=document.createElement('script');
+    s.src=APPS_URL+'?action=day&date='+encodeURIComponent(document.getElementById('aeDate').value||dateStr())+'&callback=__aeDay&t='+Date.now();
+    s.onload=function(){s.remove();};
+    s.onerror=function(){s.remove(); document.getElementById('aeMsg').textContent='불러오기 실패 — 인터넷 연결을 확인하세요.';};
+    document.body.appendChild(s);
+  }
+  function aeCollect(){
+    var dt=document.getElementById('aeDate').value, rows=[];
+    document.querySelectorAll('#aeRows tr').forEach(function(tr){
+      var g=function(c){var el=tr.querySelector('.'+c);return el?String(el.value||'').trim():'';};
+      var row=[dt,g('ae-cat'),g('ae-region'),g('ae-site'),g('ae-item'),g('ae-stage'),g('ae-memo')];
+      if(row[2]||row[3]||row[4]||row[5]||row[6]) rows.push(row);
+    });
+    return rows;
+  }
+  function aeApplyStages(rows){
+    var g=rows.filter(function(r){ return r[1]==='공사' && r[3] && r[4] && r[5]; });
+    if(!g.length) return;
+    window.__aeMaster=function(m){
+      m=m||{}; m.estimates=m.estimates||{}; m.wstat=m.wstat||{}; m.recv=m.recv||{}; m.docrec=m.docrec||{};
+      g.forEach(function(r){ var gk=(r[2]||'')+'|'+r[3]; m.wstat[gk]=m.wstat[gk]||{}; m.wstat[gk][r[4]]=r[5]; });
+      fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({action:'setmaster', master:m, pinHash:myPinHash()})})
+        .then(function(){ __applyMaster(m); });
+    };
+    var s=document.createElement('script');
+    s.src=APPS_URL+'?action=master&callback=__aeMaster&t='+Date.now();
+    s.onload=function(){s.remove();}; s.onerror=function(){s.remove();};
+    document.body.appendChild(s);
+  }
+  function aeSave(){
+    var w=document.getElementById('aeWriter').value, dt=document.getElementById('aeDate').value;
+    var rows=aeCollect();
+    if(!confirm(w+' 님 명의로 ['+dt+'] 기록 '+rows.length+'건을 저장할까요?\n(빈 표로 저장하면 그 날 기록을 모두 지운 것으로 처리돼요)')) return;
+    var btn=document.getElementById('aeSave'); btn.disabled=true; btn.textContent='저장 중...';
+    fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'submit', writer:w, pinHash:'', adminHash:myPinHash(), date:dt, delta:{est:[],stage:[],recv:[],doc:[]}, rows:rows, sel:{}})})
+      .then(function(){
+        if(document.getElementById('aeApplyStage').checked) aeApplyStages(rows);
+        btn.textContent='저장 완료 ✓'; setTimeout(function(){btn.textContent='저장(직원 명의)';btn.disabled=false;},2500);
+        document.getElementById('aeMsg').textContent='저장됐어요. 전체 일지·주간보고에 바로 반영됩니다.';
+      })
+      .catch(function(){ alert('저장 실패 — 인터넷 연결을 확인하세요.'); btn.textContent='저장(직원 명의)'; btn.disabled=false; });
+  }
+  document.getElementById('btnAdminEdit').addEventListener('click',aeOpen);
+  document.getElementById('aeLoad').addEventListener('click',aeLoad);
+  document.getElementById('aeAdd').addEventListener('click',function(){ document.getElementById('aeRows').insertAdjacentHTML('beforeend',aeRowHTML()); });
+  document.getElementById('aeRows').addEventListener('click',function(e){ var t=e.target; if(t&&t.classList&&t.classList.contains('ae-del')){ var tr=t.closest('tr'); if(tr) tr.remove(); } });
+  document.getElementById('aeSave').addEventListener('click',aeSave);
+  document.getElementById('aeClose').addEventListener('click',function(){ aeOv.style.display='none'; });
+  aeOv.addEventListener('click',function(e){ if(e.target===aeOv) aeOv.style.display='none'; });
 
   buttons[0].click();
   loadMaster();   // 서버 확정현황 불러오기 + 기기복구 시도
