@@ -958,6 +958,22 @@
       } else {
         push(cat,cat,CAT_COLORS[cat],()=>true);
       }
+      if(cat==='사무'){
+        // ★ 견적서 작성(MYEST)도 오늘의 업무에 표시 (삭제는 사무 탭 견적서 화면에서)
+        const estEntries=[];
+        Object.keys(MYEST||{}).forEach(mk=>{
+          const sep=mk.indexOf('|||'); if(sep<0) return;
+          const gkey=mk.slice(0,sep), nm=mk.slice(sep+3);
+          const e2=(ESTIMATES[gkey]||[]).find(x=>x.name===nm); if(!e2) return;
+          const parts=gkey.split('|');
+          estEntries.push({key:'', name:parts.slice(1).join('|')+' · '+nm, region:'사무·'+parts[0], tag:'견적서', noDel:true});
+        });
+        if(estEntries.length){
+          let g=groups.find(x=>x.cat==='사무');
+          if(g) g.entries=estEntries.concat(g.entries);
+          else groups.push({label:'사무',color:CAT_COLORS['사무'],cat:'사무',entries:estEntries});
+        }
+      }
     });
     return groups;
   }
@@ -974,6 +990,7 @@
           const ps=STAGE_STYLE[e.tag]; const psty=ps?('background:'+ps.bg+';color:'+ps.fg):'background:#999;color:#fff';
           return '<span class="sum-item" data-gkey="'+e.gkey+'" data-work="'+e.work+'">'+e.region+' '+e.name+' <span class="stage-pill" style="'+psty+'">'+(STAGE_NUM[e.tag]||'')+' '+e.tag+'</span> <i data-del="1">×</i></span>';
         }
+        if(e.noDel){ return '<span class="sum-item">'+e.region+' '+e.name+' <b>'+bold+'</b></span>'; }
         return '<span class="sum-item" data-cat="'+g.cat+'" data-key="'+e.key+'">'+e.region+' '+e.name+' <b>'+bold+'</b> <i data-del="1">×</i></span>';
       }).join('');
       return '<div class="sum-cat"><span class="sum-tag" style="background:'+g.color+'">'+g.label+' '+g.entries.length+'</span>'+items+'</div>';
