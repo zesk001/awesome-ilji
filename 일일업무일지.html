@@ -1231,7 +1231,7 @@
   var __cLastSince=(function(){ try{ return localStorage.getItem('consol_since')||''; }catch(e){ return ''; } })();
   function updateConsolVis(){ var w=(wsel&&wsel.value)||''; var show=(w.indexOf('김재성')===0); var b=document.getElementById('consolidateBtn'); if(b) b.style.display=show?'':'none'; var wb=document.getElementById('btnWeekly'); if(wb) wb.style.display=show?'':'none'; var ab=document.getElementById('btnAdminEdit'); if(ab) ab.style.display=show?'':'none'; }
   (function(){ var wb=document.getElementById('btnWeekly'); if(wb) wb.addEventListener('click', function(){ window.open('주간보고.html','_blank'); }); })();
-  (function(){ var mb=document.getElementById('btnMap'); if(mb) mb.addEventListener('click', function(){ var u='2026_점검소독_현황지도.html'; var w=null; try{ w=window.open(u,'_blank'); }catch(e){} if(!w) location.href=u; }); })();
+  (function(){ var mb=document.getElementById('btnMap'); if(mb) mb.addEventListener('click', function(){ var u='https://zesk001.github.io/awesome-ilji/2026_점검소독_현황지도.html'; var w=null; try{ w=window.open(u,'_blank'); }catch(e){} if(!w) location.href=u; }); })();
   function consolidate(){
     if(!PINOK){ alert('본인 확인이 필요해요. 이름을 다시 선택해 주세요.'); return; }
     if(!confirm('지금까지 전송된 모든 직원의 작업을 모아 「확정현황」에 반영할까요?')) return;
