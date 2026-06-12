@@ -231,6 +231,7 @@
     <div class="view-btns">
       <button id="btnViewMine" type="button">📖 내 일지</button>
       <button id="btnViewAll" type="button">👥 전체 일지</button>
+      <button id="btnMap" type="button">🗺️ 현황지도</button>
       <button id="btnWeekly" type="button" style="display:none">📊 주간보고</button>
       <button id="btnAdminEdit" type="button" style="display:none">🔑 마스터 수정</button>
     </div>
@@ -1230,6 +1231,7 @@
   var __cLastSince=(function(){ try{ return localStorage.getItem('consol_since')||''; }catch(e){ return ''; } })();
   function updateConsolVis(){ var w=(wsel&&wsel.value)||''; var show=(w.indexOf('김재성')===0); var b=document.getElementById('consolidateBtn'); if(b) b.style.display=show?'':'none'; var wb=document.getElementById('btnWeekly'); if(wb) wb.style.display=show?'':'none'; var ab=document.getElementById('btnAdminEdit'); if(ab) ab.style.display=show?'':'none'; }
   (function(){ var wb=document.getElementById('btnWeekly'); if(wb) wb.addEventListener('click', function(){ window.open('주간보고.html','_blank'); }); })();
+  (function(){ var mb=document.getElementById('btnMap'); if(mb) mb.addEventListener('click', function(){ window.open('2026_점검소독_현황지도.html','_blank'); }); })();
   function consolidate(){
     if(!PINOK){ alert('본인 확인이 필요해요. 이름을 다시 선택해 주세요.'); return; }
     if(!confirm('지금까지 전송된 모든 직원의 작업을 모아 「확정현황」에 반영할까요?')) return;
