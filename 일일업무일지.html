@@ -2,8 +2,25 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>일일업무일지 - 어썸조경</title>
+
+<!-- PWA: 홈화면 앱(아이콘) 설정 -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1e5631">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="일일업무일지">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+</script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'Pretendard','Malgun Gothic','맑은 고딕',sans-serif; background:#f0f4f1; min-height:100vh; }
@@ -309,7 +326,7 @@
     </div>
     <div class="ae-foot">
       <button id="aeAdd" type="button">＋ 행 추가</button>
-      <label><input type="checkbox" id="aeApplyStage" checked> 공사 단계를 확정현황에도 반영</label>
+      <label><input type="checkbox" id="aeApplyStage" checked> 공사 단계·견적서를 확정현황에도 반영</label>
       <button id="aeSave" type="button">저장(직원 명의)</button>
     </div>
   </div>
@@ -1329,6 +1346,7 @@
 
   // ===== 김재성 전용: 마스터 수정(다른 직원 일지 기록 수정·삭제·대리 작성) =====
   var aeOv=document.getElementById('adminOverlay');
+  var aeOrigEsts=[];   // 불러온 견적서 원본 목록(이름변경·삭제 추적용)
   function aeEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
   function aeOpen(){
     if(!PINOK || (wsel.value||'').indexOf('김재성')!==0){ alert('김재성님 본인 확인 후 사용할 수 있어요.'); return; }
@@ -1336,6 +1354,7 @@
     sel.innerHTML=NAMES.filter(function(n){return n.indexOf('김재성')!==0;}).map(function(n){return '<option>'+aeEsc(n)+'</option>';}).join('');
     document.getElementById('aeDate').value=dateStr();
     document.getElementById('aeRows').innerHTML='';
+    aeOrigEsts=[];
     document.getElementById('aeMsg').textContent='직원과 날짜를 고르고 「불러오기」를 누르세요.';
     aeOv.style.display='flex';
   }
@@ -1353,7 +1372,17 @@
   window.__aeDay=function(res){
     var w=document.getElementById('aeWriter').value;
     var rows=((res&&res.rows)||[]).filter(function(r){ return String(r[6]||'')===w; });
-    document.getElementById('aeRows').innerHTML=rows.map(function(r){ return aeRowHTML([r[0],r[1],r[2],r[3],r[4],r[5]]); }).join('');
+    var tb=document.getElementById('aeRows');
+    tb.innerHTML=rows.map(function(r){ return aeRowHTML([r[0],r[1],r[2],r[3],r[4],r[5]]); }).join('');
+    // 견적서 행(분류=사무, 내용=견적서)에 원본 태그 부여 → 이름변경·삭제 추적
+    aeOrigEsts=[];
+    var trs=tb.querySelectorAll('tr');
+    rows.forEach(function(r,i){
+      if(String(r[0])==='사무' && String(r[3])==='견적서' && trs[i]){
+        var gk=String(r[1]||'')+'|'+String(r[2]||''), nm=String(r[4]||'');
+        if(gk!=='|' && nm){ trs[i].dataset.oest=gk+'|||'+nm; aeOrigEsts.push({gk:gk,name:nm}); }
+      }
+    });
     document.getElementById('aeMsg').textContent=rows.length
       ? (w+' 님의 '+document.getElementById('aeDate').value+' 기록 '+rows.length+'건 — 고치거나 지우고 「저장」을 누르세요.')
       : (w+' 님은 이 날짜에 전송한 기록이 없어요. 「＋ 행 추가」로 대신 작성할 수 있어요.');
@@ -1375,12 +1404,76 @@
     });
     return rows;
   }
-  function aeApplyStages(rows){
-    var g=rows.filter(function(r){ return r[1]==='공사' && r[3] && r[4] && r[5]; });
-    if(!g.length) return;
+  // 현재 표의 견적서 행을 읽어 확정현황(estimates)에 반영할 작업을 만든다.
+  // 이름이 바뀌면 연결된 공사단계·입고·문서기록(wstat/recv/docrec)도 함께 옮긴다.
+  function aeBuildEstSync(){
+    var cur=[], seen={}, renamedFrom={};
+    document.querySelectorAll('#aeRows tr').forEach(function(tr){
+      var g=function(c){ var el=tr.querySelector('.'+c); return el?String(el.value||'').trim():''; };
+      if(g('ae-cat')!=='사무' || g('ae-item')!=='견적서') return;
+      var region=g('ae-region'), site=g('ae-site'), name=g('ae-stage'), memo=g('ae-memo');
+      if(!region || !site || !name) return;
+      var gk=region+'|'+site;
+      var orig=tr.dataset.oest||'', oldgk='', oldname='';
+      if(orig){ var s=orig.indexOf('|||'); oldgk=orig.slice(0,s); oldname=orig.slice(s+3); }
+      var date=(memo.match(/(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
+      cur.push({gk:gk,name:name,date:date,oldgk:oldgk,oldname:oldname});
+      seen[gk+'|||'+name]=1;
+      if(oldname && (oldgk!==gk || oldname!==name)) renamedFrom[oldgk+'|||'+oldname]=1;
+    });
+    var dels=[];
+    (aeOrigEsts||[]).forEach(function(o){
+      var key=o.gk+'|||'+o.name;
+      if(!seen[key] && !renamedFrom[key]) dels.push(o);
+    });
+    if(!cur.length && !dels.length) return null;
+    return function(m){
+      m.estimates=m.estimates||{}; m.wstat=m.wstat||{}; m.recv=m.recv||{}; m.docrec=m.docrec||{};
+      function moveLinked(store, oldgk, oldname, gk, name){
+        if(store[oldgk] && store[oldgk][oldname]!=null){
+          var v=store[oldgk][oldname]; delete store[oldgk][oldname];
+          if(!Object.keys(store[oldgk]).length) delete store[oldgk];
+          store[gk]=store[gk]||{}; store[gk][name]=v;
+        }
+      }
+      function dropLinked(store, gk, name){
+        if(store[gk]){ delete store[gk][name]; if(!Object.keys(store[gk]).length) delete store[gk]; }
+      }
+      cur.forEach(function(c){
+        // 이름(또는 현장) 변경 → 옛 항목 제거 + 연결기록 이동
+        if(c.oldname && (c.oldgk!==c.gk || c.oldname!==c.name)){
+          if(m.estimates[c.oldgk]){
+            var oi=m.estimates[c.oldgk].findIndex(function(y){return y.name===c.oldname;});
+            if(oi>=0){ if(!c.date) c.date=m.estimates[c.oldgk][oi].date||''; m.estimates[c.oldgk].splice(oi,1); if(!m.estimates[c.oldgk].length) delete m.estimates[c.oldgk]; }
+          }
+          moveLinked(m.wstat, c.oldgk, c.oldname, c.gk, c.name);
+          moveLinked(m.recv, c.oldgk, c.oldname, c.gk, c.name);
+          moveLinked(m.docrec, c.oldgk, c.oldname, c.gk, c.name);
+        }
+        var arr=m.estimates[c.gk]=m.estimates[c.gk]||[];
+        var idx=arr.findIndex(function(y){return y.name===c.name;});
+        if(idx<0) arr.push({name:c.name, date:c.date||dateStr()});
+        else if(c.date) arr[idx].date=c.date;
+      });
+      dels.forEach(function(d){
+        if(m.estimates[d.gk]){
+          var di=m.estimates[d.gk].findIndex(function(y){return y.name===d.name;});
+          if(di>=0){ m.estimates[d.gk].splice(di,1); if(!m.estimates[d.gk].length) delete m.estimates[d.gk]; }
+        }
+        dropLinked(m.wstat, d.gk, d.name);
+        dropLinked(m.recv, d.gk, d.name);
+        dropLinked(m.docrec, d.gk, d.name);
+      });
+    };
+  }
+  function aeApplyMaster(rows){
+    var stageRows=rows.filter(function(r){ return r[1]==='공사' && r[3] && r[4] && r[5]; });
+    var estSync=aeBuildEstSync();
+    if(!stageRows.length && !estSync) return;
     window.__aeMaster=function(m){
       m=m||{}; m.estimates=m.estimates||{}; m.wstat=m.wstat||{}; m.recv=m.recv||{}; m.docrec=m.docrec||{};
-      g.forEach(function(r){ var gk=(r[2]||'')+'|'+r[3]; m.wstat[gk]=m.wstat[gk]||{}; m.wstat[gk][r[4]]=r[5]; });
+      stageRows.forEach(function(r){ var gk=(r[2]||'')+'|'+r[3]; m.wstat[gk]=m.wstat[gk]||{}; m.wstat[gk][r[4]]=r[5]; });
+      if(estSync) estSync(m);
       fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({action:'setmaster', master:m, pinHash:myPinHash()})})
         .then(function(){ __applyMaster(m); });
@@ -1398,7 +1491,7 @@
     fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({action:'submit', writer:w, pinHash:'', adminHash:myPinHash(), date:dt, delta:{est:[],stage:[],recv:[],doc:[]}, rows:rows, sel:{}})})
       .then(function(){
-        if(document.getElementById('aeApplyStage').checked) aeApplyStages(rows);
+        if(document.getElementById('aeApplyStage').checked) aeApplyMaster(rows);
         btn.textContent='저장 완료 ✓'; setTimeout(function(){btn.textContent='저장(직원 명의)';btn.disabled=false;},2500);
         document.getElementById('aeMsg').textContent='저장됐어요. 전체 일지·주간보고에 바로 반영됩니다.';
       })
