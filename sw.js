@@ -1,7 +1,7 @@
 // 일일업무일지 PWA 서비스워커
 // 정책: 페이지 내용은 항상 최신을 받아오고(네트워크 우선),
 //       인터넷이 끊겼을 때만 안내 화면을 보여준다. (오래된 화면 캐시 방지)
-const OFFLINE = 'ilji-offline-v1';
+const OFFLINE = 'ilji-offline-v2';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -27,8 +27,8 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // 페이지 이동 요청만 처리: 네트워크 우선, 실패하면 오프라인 안내
+  // 페이지 이동 요청만 처리: 항상 최신을 새로 받아오고(캐시 무시), 실패하면 오프라인 안내
   if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).catch(() => caches.match('offline.html')));
+    e.respondWith(fetch(e.request, { cache: 'no-store' }).catch(() => caches.match('offline.html')));
   }
 });

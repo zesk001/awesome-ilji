@@ -230,9 +230,8 @@
     </div>
     <div class="view-btns">
       <button id="btnViewMine" type="button">📖 내 일지</button>
-      <button id="btnViewAll" type="button">👥 전체 일지</button>
       <button id="btnMap" type="button">🗺️ 현황지도</button>
-      <button id="btnWeekly" type="button" style="display:none">📊 주간보고</button>
+      <button id="btnUpdate" type="button">🔄 업데이트</button>
       <button id="btnAdminEdit" type="button" style="display:none">🔑 마스터 수정</button>
     </div>
     <div class="header-date">
@@ -265,27 +264,28 @@
   <section class="summary">
     <div class="summary-head">
       <h3>📝 오늘의 업무 <span id="summaryCount" class="cnt-wrap"></span></h3>
-      <div class="sum-btns"><span id="sentStatus" class="sent-status"></span><button id="consolidateBtn" style="display:none;border:none;background:#b8860b;color:#fff;font-weight:bold;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:13px">취합</button><button id="sendBtn">전송</button><button id="clearSummary">전체 지우기</button></div>
+      <div class="sum-btns"><span id="sentStatus" class="sent-status"></span><button id="sendBtn">전송</button><button id="clearSummary">전체 지우기</button></div>
     </div>
     <div id="summaryBody"></div>
   </section>
 
-  <footer>어썸조경 전체 업무 관리 시스템 · 일일업무일지</footer>
+  <footer id="appFooter">어썸조경 전체 업무 관리 시스템 · 일일업무일지</footer>
 </div>
 
-<!-- ④단계: 보기 대시보드 -->
-<div id="viewOverlay">
-  <div class="vo-card">
-    <div class="vo-head">
-      <div class="vo-tabs">
-        <button id="voTabMine" type="button">내 일지</button>
-        <button id="voTabAll" type="button">전체 일지</button>
-      </div>
-      <input type="date" id="voDate">
-      <button id="voClose" type="button">✕ 닫기</button>
+<!-- 내 일지 — 주간 전체화면 대시보드 -->
+<div id="weekView">
+  <div class="wv-top">
+    <button id="wvBack" class="wv-back" type="button">← 작성으로</button>
+    <div class="wv-title">📖 <span id="wvWriter"></span> 주간 업무일지</div>
+    <div class="wv-nav">
+      <button id="wvPrev" type="button">← 지난주</button>
+      <span id="wvRange"></span>
+      <button id="wvNext" type="button">다음주 →</button>
+      <button id="wvSaveAll" type="button">💾 전체 저장</button>
+      <button id="wvReload" class="wv-reload" type="button">↻ 새로고침</button>
     </div>
-    <div id="voBody"></div>
   </div>
+  <div id="wvGrid" class="wv-grid"></div>
 </div>
 
 <!-- 마스터 수정 (김재성 전용) -->
@@ -327,7 +327,6 @@
     </div>
     <div class="ae-foot">
       <button id="aeAdd" type="button">＋ 행 추가</button>
-      <label><input type="checkbox" id="aeApplyStage" checked> 공사 단계·견적서를 확정현황에도 반영</label>
       <button id="aeSave" type="button">저장(직원 명의)</button>
     </div>
   </div>
@@ -343,13 +342,25 @@
   function dateKey(){ return 'ilji_'+cur.getFullYear()+'-'+(cur.getMonth()+1)+'-'+cur.getDate(); }
   function dateStr(){ return cur.getFullYear()+'-'+pad2(cur.getMonth()+1)+'-'+pad2(cur.getDate()); }
   function todayStrFixed(){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
-  function statStoreKey(){ return 'gongsa_status_'+dateKey(); }
+  function todayStr(){ return dateStr(); }
+  function sEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function renderHeaderDate(){
     document.getElementById('today').textContent = cur.getFullYear()+'년 '+(cur.getMonth()+1)+'월 '+cur.getDate()+'일';
     document.getElementById('weekday').textContent = days[cur.getDay()]+'요일'+(dateStr()!==todayStrFixed()?' · 지난 날짜 작성중':'');
   }
   renderHeaderDate();
 
+  // 요약 영역 메모칸 스타일(기존 CSS 보존, 추가분만 주입)
+  (function(){ var st=document.createElement('style');
+    st.textContent='.sum-item{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid #eef1ef;border-radius:10px;padding:8px 10px;margin:6px 0;background:#fafcfb;}'
+      +'.sum-item .sum-place{font-weight:bold;color:#2b3a30;}'
+      +'.sum-item .sum-memo{flex:1;min-width:150px;border:1px solid #d9e2dc;border-radius:8px;padding:6px 9px;font-size:13px;font-family:inherit;}'
+      +'.sum-item .sum-memo:focus{outline:none;border-color:#3f9d5a;}'
+      +'.sum-item i[data-del]{cursor:pointer;color:#c0392b;font-style:normal;font-weight:bold;margin-left:auto;padding:0 4px;}'
+      +'.sr-region{margin-left:auto;font-size:12px;color:#8a9a90;}';
+    document.head.appendChild(st); })();
+
+  // ===== 탭 전환 =====
   const buttons = document.querySelectorAll('.menu button');
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -358,19 +369,17 @@
       btn.classList.add('active');
       const p = document.getElementById(btn.dataset.tab);
       p.classList.add('show');
-      if(p._home) p._home();   // 탭 누르면 항상 지역 선택 화면부터 시작
+      if(p._home) p._home();   // 탭을 누르면 항상 지역 선택 화면부터
     });
   });
 
-  const SCHOOLS = window.SCHOOLS;  // 데이터는 학교DB.js 에서 로드;
-  const SUBGROUP={
-    '소독':{label:'단타', color:'#12a594', items:['단타초','단타유','단타어린이집','단타기관']}
-  };
-  // 공사·사무 지역 선택에 추가되는 '기타지역'(학교가 아닌 현장)
+  const SCHOOLS = window.SCHOOLS;  // 학교DB.js 에서 로드
+  const SUBGROUP={ '소독':{label:'단타', color:'#12a594', items:['단타초','단타유','단타어린이집','단타기관']} };
   const ETC_REGION={label:'기타지역', items:['기타초','기타중','기타고','기타유','기타어린이집','기타기관']};
-
-  // 오늘의 업무 저장소 (다중 선택 · 분류별)
   const CAT_COLORS={'점검':'#2f80c4','소독':'#27a36a','공사':'#e8842c','사무':'#8a8f98'};
+
+  // ===== 오늘의 업무 저장 (날짜별 · 이 기기) =====
+  // SEL[분류][키] = {region, name, sub, memo}  또는 사무 특수: {type:'기타업무'|'연차', workText|leaveDate}
   let SEL={};
   try{ SEL=JSON.parse(localStorage.getItem(dateKey()))||{}; }catch(e){ SEL={}; }
   function saveSel(){ try{ localStorage.setItem(dateKey(),JSON.stringify(SEL)); }catch(e){} }
@@ -383,6 +392,7 @@
     saveSel(); renderSummary();
   }
 
+  // ===== 지역/현장 화면 공통 =====
   function renderRegionsInto(grid, extra){
     const order=['천안','아산','청주','논산','공주','서산','예산','부여','홍성','안성','평택','보령','태안','금산','청양','당진','세종','서천','계룡','진천','내포신도시','증평','괴산','충주','이천'];
     const cnt={};
@@ -393,18 +403,16 @@
     if(extra){ html+='<button data-region="'+extra.label+'"><span class="rg-name">'+extra.label+'</span><span class="rg-cnt">'+extra.items.length+'개</span></button>'; }
     grid.innerHTML=html;
   }
-  // 현장 검색 (지역 선택 화면 위 검색창)
   function searchBarHTML(){ return '<input class="site-search" type="text" placeholder="🔍 현장 이름으로 검색 (예: 가온초)" autocomplete="off"><div class="search-results"></div>'; }
   function matchSchools(q){ q=(q||'').trim(); if(!q) return []; return SCHOOLS.filter(s=>s.학교명.indexOf(q)>=0).slice(0,80); }
-  function searchRowsHTML(list, mode, cat){
+  function searchRowsHTML(list, cat){
     if(!list.length) return '<div class="sum-empty">검색 결과 없음</div>';
     return list.map(s=>{
-      const reg='<span class="sr-region">'+s.지역+'</span>';
-      if(mode==='select') return '<div class="school-row'+(isSel(cat,s.학교명)?' selected':'')+'" data-key="'+s.학교명+'" data-name="'+s.학교명+'" data-region="'+s.지역+'" data-sub=""><span class="sr-name">'+s.학교명+'</span>'+reg+'</div>';
-      return '<div class="school-row" data-school="'+s.학교명+'" data-sregion="'+s.지역+'"><span class="sr-name">'+s.학교명+'</span>'+reg+'</div>';
+      const key=s.지역+'|'+s.학교명;
+      return '<div class="school-row'+(isSel(cat,key)?' selected':'')+'" data-key="'+sEsc(key)+'" data-name="'+sEsc(s.학교명)+'" data-region="'+sEsc(s.지역)+'" data-sub=""><span class="sr-name">'+sEsc(s.학교명)+'</span><span class="sr-region">'+sEsc(s.지역)+'</span></div>';
     }).join('');
   }
-  function wireSearch(panel, mode, cat){
+  function wireSearch(panel, cat){
     panel.addEventListener('input',e=>{
       if(!e.target.closest('.site-search')) return;
       const grid=panel.querySelector('.region-grid'), res=panel.querySelector('.search-results');
@@ -412,589 +420,126 @@
       const q=e.target.value.trim();
       if(!q){ res.innerHTML=''; if(grid) grid.style.display=''; return; }
       if(grid) grid.style.display='none';
-      res.innerHTML=searchRowsHTML(matchSchools(q), mode, cat);
+      res.innerHTML=searchRowsHTML(matchSchools(q), cat);
     });
   }
-
-  // 분류별(점검·소독·공사) 지역→학교 화면을 동일 방식으로 구성
-  function setupCategory(panelId, cat, color, icon){
-    const panel=document.getElementById(panelId);
-    const extra=null;  // 점검·소독은 '기타지역' 없음 (공사·사무만 ETC_REGION 사용)
-    function showRegions(){
-      panel.innerHTML='<h2>'+icon+' '+cat+' <span class="badge" style="background:'+color+'">지역 선택</span></h2>'+searchBarHTML()+'<div class="region-grid"></div>';
-      renderRegionsInto(panel.querySelector('.region-grid'), extra);
-    }
-    function rowHTML(display,key,region,sub,subColor){
-      const sty = sub ? (' style="--c:'+subColor+'"') : '';
-      return '<div class="school-row'+(sub?' sub':'')+(isSel(cat,key)?' selected':'')+'" '+
-        'data-key="'+key+'" data-name="'+display+'" data-region="'+region+'" data-sub="'+(sub?1:'')+'"'+sty+'>'+
-        '<span class="sr-name">'+display+'</span></div>';
-    }
-    function showSchools(region){
-      const isExtra = extra && region===extra.label;
-      let rows='', headCount=0, unit='개교';
-      if(isExtra){
-        rows=extra.items.map(n=>rowHTML(n,n,region,false)).join('');
-        headCount=extra.items.length; unit='개';
-      } else {
-        const schools=SCHOOLS.filter(s=>s.지역===region).sort((a,b)=>a.학교명.localeCompare(b.학교명,'ko'));
-        headCount=schools.length;
-        rows=schools.map(s=>rowHTML(s.학교명,s.학교명,region,false)).join('');
-        const sg=SUBGROUP[cat];
-        if(sg){
-          rows+='<div class="sub-sep" style="color:'+sg.color+';border-color:'+sg.color+'55">'+sg.label+'</div>';
-          rows+=sg.items.map(n=>rowHTML(n, region+'|'+n, region, true, sg.color)).join('');
-        }
-      }
-      panel.innerHTML='<h2>'+icon+' '+cat+' <span class="badge" style="background:'+color+'">'+region+' · '+headCount+unit+'</span></h2>'+
-        '<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
-        '<div class="school-list">'+rows+'</div>';
-    }
-    panel.addEventListener('click',e=>{
-      const reg=e.target.closest('button[data-region]');
-      if(reg){ showSchools(reg.dataset.region); return; }
-      if(e.target.closest('[data-back]')){ showRegions(); return; }
-      const row=e.target.closest('.school-row');
-      if(row){
-        const sub=row.dataset.sub==='1';
-        toggleSel(cat,row.dataset.key,{region:row.dataset.region,name:row.dataset.name,sub:sub});
-        row.classList.toggle('selected');
-      }
-    });
-    wireSearch(panel,'select',cat);
-    panel._home=showRegions;
-    showRegions();
-    return panel;
-  }
-  // 공사 진행단계 저장소 (학교|지역별 공사명->단계), 업무일지와 공유
-  let WSTAT={}; try{ WSTAT=JSON.parse(localStorage.getItem('gongsa_status'))||{}; }catch(e){}  // 날짜무관 전역(서버와 공유)
-  function saveStat(){ try{ localStorage.setItem('gongsa_status',JSON.stringify(WSTAT)); }catch(e){} }
-  // 자재입고확인 시 입고된 시설/자재 내용 메모 (지역|현장 -> 공사명 -> 내용)
-  let RECV={}; try{ RECV=JSON.parse(localStorage.getItem('recv_memo'))||{}; }catch(e){}
-  function saveRecv(){ try{ localStorage.setItem('recv_memo',JSON.stringify(RECV)); }catch(e){} }
-  // ★ 내가 오늘 손댄 공사 항목만 표시(개인·기기·날짜별). WSTAT는 공유, 표시는 개인 기준.
-  let MYW={}; function loadMyw(){ try{ MYW=JSON.parse(localStorage.getItem('myw_'+dateKey()))||{}; }catch(e){ MYW={}; } }
-  function saveMyw(){ try{ localStorage.setItem('myw_'+dateKey(),JSON.stringify(MYW)); }catch(e){} }
-  function mywK(gkey,work){ return gkey+'|||'+work; }
-  function markMyw(gkey,work){ MYW[mywK(gkey,work)]=1; saveMyw(); }
-  function unmarkMyw(gkey,work){ delete MYW[mywK(gkey,work)]; saveMyw(); }
-  loadMyw();
-  // ★ 내 견적/문서 변경 추적(델타) — 날짜별. 전송 시 이 부분만 서버로 보냄.
-  let MYEST={}, MYDOC={};
-  function loadMyd(){ try{ MYEST=JSON.parse(localStorage.getItem('myest_'+dateKey()))||{}; }catch(e){ MYEST={}; } try{ MYDOC=JSON.parse(localStorage.getItem('mydoc_'+dateKey()))||{}; }catch(e){ MYDOC={}; } }
-  function saveMyd(){ try{ localStorage.setItem('myest_'+dateKey(),JSON.stringify(MYEST)); localStorage.setItem('mydoc_'+dateKey(),JSON.stringify(MYDOC)); }catch(e){} }
-  function markMyest(gkey,name){ MYEST[gkey+'|||'+name]=1; saveMyd(); }
-  function markMydoc(gkey,name,field){ MYDOC[gkey+'|||'+name+'|||'+field]=1; saveMyd(); }
-  function split2(k){ const i=k.indexOf('|||'); return [k.slice(0,i), k.slice(i+3)]; }
-  loadMyd();
-  let gongsaRefresh=function(){};
-  // 견적서 저장소 (지역|현장 -> [{name,date}]) — 사무에서 작성, 공사에서 사용
-  let ESTIMATES={}; try{ ESTIMATES=JSON.parse(localStorage.getItem('estimates'))||{}; }catch(e){}
-  function saveEst(){ try{ localStorage.setItem('estimates',JSON.stringify(ESTIMATES)); }catch(e){} }
-  // ★ 문서기록(발주서·청구서·사진대지·세금계산서) — 지역|현장 -> 공사명 -> {발주,청구,사진대지,세금계산서}
-  let DOCREC={}; try{ DOCREC=JSON.parse(localStorage.getItem('docrec'))||{}; }catch(e){}
-  function saveDoc(){ try{ localStorage.setItem('docrec',JSON.stringify(DOCREC)); }catch(e){} }
-  function docGet(gkey,name){ return (DOCREC[gkey]&&DOCREC[gkey][name])||{}; }
-  function docSet(gkey,name,field,val){
-    DOCREC[gkey]=DOCREC[gkey]||{}; DOCREC[gkey][name]=DOCREC[gkey][name]||{};
-    if(val===null) delete DOCREC[gkey][name][field]; else DOCREC[gkey][name][field]=val;
-    if(!Object.keys(DOCREC[gkey][name]).length) delete DOCREC[gkey][name];
-    if(DOCREC[gkey]&&!Object.keys(DOCREC[gkey]).length) delete DOCREC[gkey];
-    saveDoc();
-  }
-  function hasOrder(gkey,name){ return !!docGet(gkey,name).발주; }
-  function hasInvoice(gkey,name){ return !!docGet(gkey,name).청구; }
-  function curWriter(){ try{ return localStorage.getItem('ilji_writer')||''; }catch(e){ return ''; } }
-  const DOCFIELD={'발주서':'발주','청구서':'청구','사진대지작성':'사진대지','세금계산서발행':'세금계산서'};
-  function todayStr(){ return dateStr(); }  // 전송·저장 날짜 = 선택한 작업 날짜
-  // 한 지역의 현장 목록 = 실제 학교(가나다) + 기타구역 (사무·공사 공통)
+  // 한 지역의 현장 목록 = 실제 학교(가나다) + 기타구역
   function siteList(region){
     if(region===ETC_REGION.label) return ETC_REGION.items.slice();
     const list=SCHOOLS.filter(s=>s.지역===region).map(s=>s.학교명).sort((a,b)=>a.localeCompare(b,'ko'));
     list.push('기타구역');
     return list;
   }
-  const STAGES_ALL=['자재입고확인','자재가공','자재출고준비 완료','공사중','공사완료'];
-  const MATERIAL_STAGES=['자재입고확인','자재가공','자재출고준비 완료'];  // 발주서 작성 후 열림
-  const STAGE_STYLE={
-    '자재입고확인':{bg:'#ffe6bf', fg:'#9a5a16'},
-    '자재가공':{bg:'#fac57a', fg:'#8a4d10'},
-    '자재출고준비 완료':{bg:'#f2a04a', fg:'#fff'},
-    '공사중':{bg:'#ec8d35', fg:'#fff'},
-    '공사완료':{bg:'#e8842c', fg:'#fff'}
-  };
-  const STAGE_NUM={'자재입고확인':'①','자재가공':'②','자재출고준비 완료':'③','공사중':'④','공사완료':'⑤'};
-  // 공사: 지역 -> 현장(학교/기타구역) -> 견적서 공사명 -> 진행단계
-  function setupConstruction(icon){
-    const color='#e8842c';
-    const panel=document.getElementById('construct');
-    const STAGES=STAGES_ALL;
-    let curRegion='', expanded='';
-    function head(txt){ return '<h2>'+icon+' 공사 <span class="badge" style="background:'+color+'">'+txt+'</span></h2>'; }
-    function showRegions(){
-      panel.innerHTML=head('지역 선택')+searchBarHTML()+'<div class="region-grid"></div>';
-      renderRegionsInto(panel.querySelector('.region-grid'), ETC_REGION);
+
+  // ===== 분류별 화면: 지역 → 현장 선택(+한 줄 메모) =====
+  // opts.extra=기타지역 추가, opts.subgroup=단타 하위그룹, opts.specials=['기타업무','연차']
+  function setupCategory(panelId, cat, color, icon, opts){
+    opts=opts||{};
+    const panel=document.getElementById(panelId);
+    const extra=opts.extra||null, sg=opts.subgroup||null, specials=opts.specials||[];
+    function head(txt){ return '<h2>'+icon+' '+cat+' <span class="badge" style="background:'+color+'">'+txt+'</span></h2>'; }
+    function rowHTML(display,key,region,sub,subColor){
+      const sty = sub ? (' style="--c:'+subColor+'"') : '';
+      return '<div class="school-row'+(sub?' sub':'')+(isSel(cat,key)?' selected':'')+'" '+
+        'data-key="'+sEsc(key)+'" data-name="'+sEsc(display)+'" data-region="'+sEsc(region)+'" data-sub="'+(sub?1:'')+'"'+sty+'>'+
+        '<span class="sr-name">'+sEsc(display)+'</span></div>';
     }
-    function showSchools(region){
-      curRegion=region;
-      const rows=siteList(region).map(n=>'<div class="school-row" data-school="'+n+'"><span class="sr-name">'+n+'</span></div>').join('');
-      panel.innerHTML=head(region+' · 현장 선택')+'<button class="back-btn" data-back="1">← 지역 선택으로</button><div class="school-list">'+rows+'</div>';
-    }
-    function statKey(school){ return curRegion+'|'+school; }
-    function stageRow(w,cur,ordered){
-      const html='<div class="stage-row">'+STAGES.map(st=>{
-        const S=STAGE_STYLE[st], on=cur===st;
-        if(MATERIAL_STAGES.indexOf(st)>=0 && !ordered){
-          return '<button class="stage-btn" data-locked="1" style="opacity:.4;cursor:not-allowed">🔒'+STAGE_NUM[st]+' '+st+'</button>';
-        }
-        const sty = on ? ('background:'+S.bg+';color:'+S.fg+';border-color:'+S.bg) : ('--c:'+S.bg);
-        return '<button class="stage-btn'+(on?' on':'')+'" data-work="'+w+'" data-stage="'+st+'" style="'+sty+'">'+STAGE_NUM[st]+' '+st+'</button>';
-      }).join('')+'</div>';
-      return html+(ordered?'':'<div class="work-note" style="margin-top:4px">🔒 자재 단계는 사무 → 발주서를 먼저 작성하면 열립니다.</div>');
-    }
-    function showWork(school){ expanded=''; renderWork(school); }
-    function renderWork(school){
-      const key=statKey(school);
-      const stat=WSTAT[key]||{};
-      const ests=ESTIMATES[key]||[];
-      let inner;
-      if(!ests.length){
-        inner='<div class="work-note">사무 → 견적서에서 이 현장의 공사명을 먼저 작성하세요.</div>';
-      } else {
-        inner='<div class="work-list">'+ests.map(e=>{
-          const w=e.name, cur=stat[w]||'';
-          const sc=STAGE_STYLE[cur];
-          const badge=cur?'<span class="work-stage" style="background:'+sc.bg+';color:'+sc.fg+'">'+STAGE_NUM[cur]+' '+cur+'</span>':'<span class="work-stage off">상태 미정</span>';
-          const memo=(RECV[key]&&RECV[key][w])||'';
-          let block='<div class="work-item" data-work="'+w+'"><span class="work-name">'+w+'</span><span class="work-date">'+e.date+'</span>'+badge+'</div>';
-          if(memo && expanded!==w){ block+='<div class="work-recv">📦 입고: '+memo+'</div>'; }
-          if(expanded===w){
-            block+=stageRow(w,cur,hasOrder(key,w));
-            block+='<div class="recv-box"><label>📦 입고된 시설/자재 내용 <small>(자재입고확인 시 기재)</small></label><textarea class="recv-input" data-recvwork="'+w+'" placeholder="예: 평행봉 2조, 철봉 1조, 늑목 3틀 입고">'+memo.replace(/</g,'&lt;')+'</textarea></div>';
-          }
-          return block;
-        }).join('')+'</div>';
-      }
-      panel.innerHTML=head(curRegion+' · '+school)+'<button class="back-btn" data-backschool="1">← 현장 목록으로</button>'+
-        '<div class="work-wrap" data-school="'+school+'">'+inner+'</div>';
-    }
-    panel.addEventListener('click',e=>{
-      const reg=e.target.closest('button[data-region]');
-      if(reg){ showSchools(reg.dataset.region); return; }
-      if(e.target.closest('[data-back]')){ showRegions(); return; }
-      if(e.target.closest('[data-backschool]')){ showSchools(curRegion); return; }
-      const stage=e.target.closest('.stage-btn');
-      if(stage){
-        if(stage.dataset.locked){ alert('이 공사는 사무 → 발주서를 먼저 작성해야 자재 단계를 진행할 수 있어요.'); return; }
-        const school=panel.querySelector('.work-wrap').dataset.school;
-        const key=statKey(school), work=stage.dataset.work; WSTAT[key]=WSTAT[key]||{};
-        if(MATERIAL_STAGES.indexOf(stage.dataset.stage)>=0 && !hasOrder(key,work)){ alert('발주서를 먼저 작성하세요.'); return; }
-        let nv;
-        if(WSTAT[key][work]===stage.dataset.stage){ delete WSTAT[key][work]; nv=''; }
-        else { WSTAT[key][work]=stage.dataset.stage; nv=stage.dataset.stage; }
-        if(!Object.keys(WSTAT[key]).length) delete WSTAT[key];
-        if(nv) markMyw(key,work); else unmarkMyw(key,work);
-        saveStat(); gongsaPost('stage',{region:curRegion,school:school,name:work,stage:nv}); renderWork(school); renderSummary(); return;
-      }
-      const work=e.target.closest('.work-item');
-      if(work){
-        const school=panel.querySelector('.work-wrap').dataset.school;
-        expanded=(expanded===work.dataset.work)?'':work.dataset.work;
-        renderWork(school); return;
-      }
-      const sch=e.target.closest('.school-row[data-school]');
-      if(sch){ if(sch.dataset.sregion) curRegion=sch.dataset.sregion; showWork(sch.dataset.school); return; }
-    });
-    let recvTimer=null;
-    panel.addEventListener('input',e=>{
-      const ta=e.target.closest('.recv-input'); if(!ta) return;
-      const wrap=panel.querySelector('.work-wrap'); if(!wrap) return;
-      const key=statKey(wrap.dataset.school), w=ta.dataset.recvwork, v=ta.value, sc=wrap.dataset.school, reg=curRegion;
-      RECV[key]=RECV[key]||{};
-      if(v.trim()) RECV[key][w]=v; else { delete RECV[key][w]; if(!Object.keys(RECV[key]).length) delete RECV[key]; }
-      if(v.trim()) markMyw(key,w);
-      saveRecv(); renderSummary();
-      clearTimeout(recvTimer); recvTimer=setTimeout(()=>{ gongsaPost('recv',{region:reg,school:sc,name:w,recv:v}); }, 800);
-    });
-    gongsaRefresh=function(){ const w=panel.querySelector('.work-wrap'); if(w) renderWork(w.dataset.school); };
-    wireSearch(panel,'goto');
-    panel._home=showRegions;
-    showRegions();
-    return panel;
-  }
-  // 사무: 지역 -> 현장(학교/기타구역) -> 견적서/발주서/청구서/사진대지작성/세금계산서발행
-  function setupEtc(){
-    const panel=document.getElementById('etc');
-    const cat='사무', color='#8a8f98';
-    const DOCS=['견적서','발주서','청구서','사진대지작성','세금계산서발행','방문예정','특이사항'];
-    let curRegion='', curSchool='', curRemarkCat='', orderDraft=null;
-    function head(txt){ return '<h2>📋 사무 <span class="badge" style="background:'+color+'">'+txt+'</span></h2>'; }
     function showRegions(){
       panel.innerHTML=head('지역 선택')+searchBarHTML()+'<div class="region-grid"></div>';
       const grid=panel.querySelector('.region-grid');
-      renderRegionsInto(grid, ETC_REGION);
-      grid.insertAdjacentHTML('beforeend',
-        '<button class="region-special" data-special="기타업무"><span class="rg-name">기타업무</span><span class="rg-cnt">직접 작성</span></button>'+
-        '<button class="region-special" data-special="연차"><span class="rg-name">연차</span><span class="rg-cnt">날짜 선택</span></button>');
+      renderRegionsInto(grid, extra);
+      specials.forEach(sp=>{
+        grid.insertAdjacentHTML('beforeend',
+          '<button class="region-special" data-special="'+sp+'"><span class="rg-name">'+sp+'</span><span class="rg-cnt">'+(sp==='연차'?'날짜 선택':'직접 작성')+'</span></button>');
+      });
     }
     function showSchools(region){
-      curRegion=region;
-      const cards=siteList(region).map(n=>'<div class="school-row" data-school="'+n+'"><span class="sr-name">'+n+'</span></div>').join('');
-      panel.innerHTML=head(region+' · 현장 선택')+'<button class="back-btn" data-backregion="1">← 지역 선택으로</button><div class="school-list">'+cards+'</div>';
-    }
-    function countDoc(school,doc){
-      const pre='사무|'+curRegion+'|'+school+'|'+doc+'|';
-      const o=SEL[cat]||{}; let c=0;
-      for(const k in o){ if(k.indexOf(pre)===0) c++; }
-      return c;
-    }
-    function showDocs(school){
-      curSchool=school;
-      const cards=DOCS.map(d=>{
-        const n = d==='견적서' ? (ESTIMATES[curRegion+'|'+school]||[]).length : countDoc(school,d);
-        return '<div class="school-row" data-doc="'+d+'"><span class="sr-name">'+d+(n?'<span class="doc-count">'+n+'</span>':'')+'</span></div>';
-      }).join('');
-      panel.innerHTML=head(curRegion+' · '+school)+'<button class="back-btn" data-backschool="1">← 현장 목록으로</button>'+
-        '<div class="work-note">견적서에서 공사명을 작성하면, 모든 항목(발주서·청구서·사진대지작성·세금계산서발행)에서 그 공사명을 골라 기록합니다.</div>'+
-        '<div class="school-list">'+cards+'</div>';
-    }
-    function showDocItems(doc){
-      const region=curRegion, school=curSchool, gkey=region+'|'+school, fld=DOCFIELD[doc];
-      const ests=ESTIMATES[gkey]||[];
-      const needInv=(doc==='사진대지작성'||doc==='세금계산서발행');
-      let body;
-      if(!ests.length){
-        body='<div class="work-note">먼저 견적서에서 공사명을 작성하세요.</div>';
+      const isExtra = extra && region===extra.label;
+      let rows, headCount, unit;
+      if(isExtra){
+        rows=extra.items.map(n=>rowHTML(n, region+'|'+n, region, false)).join('');
+        headCount=extra.items.length; unit='개';
       } else {
-        const guide = doc==='발주서' ? '공사명을 누르고 발주 내역을 한 줄로 적으세요. (적으면 공사 탭의 자재 단계가 열립니다)'
-          : needInv ? '청구서가 작성된 공사만 열립니다. 공사명을 누르면 저장됩니다.'
-          : '공사명을 누르면 저장됩니다.';
-        body='<div class="work-note">'+guide+'</div>'+
-          '<div class="school-list">'+ests.map(e=>{
-            const rec=docGet(gkey,e.name)[fld];
-            const done=!!rec;
-            const locked=needInv && !hasInvoice(gkey,e.name);
-            if(locked){
-              return '<div class="school-row" style="opacity:.45;cursor:not-allowed"><span class="sr-name">🔒 '+e.name+'</span><span style="margin-left:auto;font-size:12px;color:#999">청구서 먼저</span></div>';
-            }
-            let sub;
-            if(doc==='발주서') sub = done ? ('✓ '+((rec.items&&rec.items[0]&&rec.items[0].vendor)||rec.date||'')+((rec.items&&rec.items.length>1)?(' 외 '+(rec.items.length-1)):'')) : '거래처·내역';
-            else sub = done ? ('✓ '+(rec.date||'')) : '클릭 저장';
-            return '<div class="school-row'+(done?' selected':'')+'" data-docpick="'+encodeURIComponent(e.name)+'" data-doc="'+doc+'"><span class="sr-name">'+e.name+'</span><span style="margin-left:auto;font-size:12px;color:#888">'+sub+'</span></div>';
-          }).join('')+'</div>';
+        const sites=siteList(region);
+        headCount=sites.length; unit='곳';
+        rows=sites.map(n=>rowHTML(n, region+'|'+n, region, false)).join('');
+        if(sg){
+          rows+='<div class="sub-sep" style="color:'+sg.color+';border-color:'+sg.color+'55">'+sg.label+'</div>';
+          rows+=sg.items.map(n=>rowHTML(n, region+'|'+n, region, true, sg.color)).join('');
+        }
       }
-      panel.innerHTML=head(region+' · '+school+' · '+doc)+'<button class="back-btn" data-backdocs="1">← 항목으로</button>'+body;
+      panel.innerHTML=head(region+' · '+headCount+unit)+
+        '<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
+        '<div class="school-list">'+rows+'</div>';
     }
-    // 발주서: 거래처+내역 여러 줄 (+ 거래처 추가)
-    function orderRows(name){
-      if(orderDraft && orderDraft.name===name) return orderDraft.rows;
-      const rec=docGet(curRegion+'|'+curSchool,name).발주||{};
-      const rows=(rec.items&&rec.items.length)?rec.items.map(it=>({v:it.vendor||'',d:it.detail||''})):[{v:'',d:''}];
-      orderDraft={name:name, rows:rows};
-      return rows;
-    }
-    function readOrderRows(){
-      const rows=[]; let i=0;
-      while(panel.querySelector('#orderV'+i)){
-        rows.push({v:(panel.querySelector('#orderV'+i).value||'').trim(), d:(panel.querySelector('#orderD'+i).value||'').trim()});
-        i++;
-      }
-      return rows;
-    }
-    function showOrderForm(name){
-      const region=curRegion, school=curSchool;
-      const rec=docGet(region+'|'+school,name).발주||{};
-      const rows=orderRows(name);
-      const rowsHtml=rows.map((r,i)=>
-        '<div style="display:flex;gap:6px;margin-bottom:6px">'+
-          '<input id="orderV'+i+'" class="est-input" style="flex:0 0 38%" type="text" placeholder="거래처" value="'+(r.v||'').replace(/"/g,'&quot;')+'">'+
-          '<input id="orderD'+i+'" class="est-input" style="flex:1" type="text" placeholder="내역 (예: 평행봉 2조)" value="'+(r.d||'').replace(/"/g,'&quot;')+'">'+
-          (rows.length>1?'<button class="est-add" data-delorderrow="'+i+'" style="flex:0 0 auto;background:#999">×</button>':'')+
-        '</div>'
-      ).join('');
-      panel.innerHTML=head(region+' · '+school+' · 발주서')+'<button class="back-btn" data-backdocitems="발주서">← 발주서 목록</button>'+
-        '<div class="work-note"><b>'+name+'</b> · 발주서'+(rec.date?(' (작성 '+rec.date+(rec.writer?(' · '+rec.writer):'')+')'):'')+'</div>'+
-        rowsHtml+
-        '<div class="visit-form"><button class="est-add" data-addorderrow="'+encodeURIComponent(name)+'" style="background:#7a7f88">+ 거래처 추가</button>'+
-        '<button class="est-add" data-saveorder="'+encodeURIComponent(name)+'">저장</button></div>'+
-        (rec.date?'<div class="visit-form"><button class="est-add" data-delorder="'+encodeURIComponent(name)+'" style="background:#c0392b">발주서 삭제</button></div>':'');
-    }
-    function showEstimate(school){
-      const key=curRegion+'|'+school;
-      const ests=ESTIMATES[key]||[];
-      const items=ests.length? ests.map((e,i)=>'<div class="est-item"><span class="est-name">'+e.name+'</span><span class="est-date">'+e.date+'</span><i class="est-del" data-delest="'+i+'">×</i></div>').join('')
-        : '<div class="sum-empty">작성된 공사명이 없습니다.</div>';
-      panel.innerHTML=head(curRegion+' · '+school+' · 견적서')+'<button class="back-btn" data-backdocs="1">← 항목으로</button>'+
-        '<div class="est-form"><input id="estInput" class="est-input" type="text" placeholder="공사명 입력 후 추가"><button class="est-add" data-addest="1">추가</button></div>'+
-        '<div class="est-list">'+items+'</div>';
-    }
-    // 방문예정: 달력에서 날짜·시간 선택 + 방문목적 직접입력
-    function showVisit(){
-      const region=curRegion, school=curSchool;
-      const pre='사무|'+region+'|'+school+'|방문예정|';
-      const o=SEL[cat]||{};
-      const list=Object.keys(o).filter(k=>k.indexOf(pre)===0).map(k=>({k:k,v:o[k]}));
-      list.sort((a,b)=>(a.v.visitWhen||'').localeCompare(b.v.visitWhen||''));
-      const items=list.length? list.map(it=>'<div class="est-item"><span class="est-name">📅 '+(it.v.visitWhen||'')+'</span><span class="est-purpose">'+(it.v.purpose||'(목적 미입력)')+'</span><i class="est-del" data-delvisit="'+encodeURIComponent(it.k)+'">×</i></div>').join('')
-        : '<div class="sum-empty">등록된 방문예정이 없습니다.</div>';
-      panel.innerHTML=head(region+' · '+school+' · 방문예정')+'<button class="back-btn" data-backdocs="1">← 항목으로</button>'+
-        '<div class="work-note">달력에서 방문 날짜·시간을 고르고, 방문 목적을 적은 뒤 「추가」를 누르세요.</div>'+
-        '<div class="visit-form"><input id="visitWhen" class="est-input" type="datetime-local"><input id="visitPurpose" class="est-input" type="text" placeholder="방문 목적 입력 (예: 현장 실측, 하자 점검)"><button class="est-add" data-addvisit="1">추가</button></div>'+
-        '<div class="est-list">'+items+'</div>';
-    }
-    // 특이사항: 점검·소독·공사·사무 중 골라 메모 작성
-    function showRemark(){
-      const region=curRegion, school=curSchool;
-      const cats=['점검','소독','공사','사무'];
-      const btns=cats.map(c=>{
-        const pre='사무|'+region+'|'+school+'|특이사항|'+c+'|';
-        const o=SEL[cat]||{}; let n=0; for(const k in o){ if(k.indexOf(pre)===0) n++; }
-        return '<button class="remark-cat" data-rcat="'+c+'" style="--rc:'+CAT_COLORS[c]+'">'+c+(n?'<span class="doc-count">'+n+'</span>':'')+'</button>';
-      }).join('');
-      panel.innerHTML=head(region+' · '+school+' · 특이사항')+'<button class="back-btn" data-backdocs="1">← 항목으로</button>'+
-        '<div class="work-note">특이사항을 적을 항목을 고르세요. (점검·소독·공사·사무)</div>'+
-        '<div class="remark-cats">'+btns+'</div>';
-    }
-    function showRemarkInput(rcat){
-      curRemarkCat=rcat;
-      const region=curRegion, school=curSchool;
-      const pre='사무|'+region+'|'+school+'|특이사항|'+rcat+'|';
-      const o=SEL[cat]||{};
-      const list=Object.keys(o).filter(k=>k.indexOf(pre)===0).map(k=>({k:k,v:o[k]}));
-      const items=list.length? list.map(it=>'<div class="est-item"><span class="est-purpose">'+(it.v.remarkText||'')+'</span><i class="est-del" data-delremark="'+encodeURIComponent(it.k)+'">×</i></div>').join('')
-        : '<div class="sum-empty">작성된 특이사항이 없습니다.</div>';
-      panel.innerHTML=head(region+' · '+school+' · 특이사항 · '+rcat)+'<button class="back-btn" data-backremark="1">← 항목 선택으로</button>'+
-        '<div class="visit-form"><input id="remarkText" class="est-input" type="text" placeholder="'+rcat+' 특이사항 입력"><button class="est-add" data-addremark="1">추가</button></div>'+
-        '<div class="est-list">'+items+'</div>';
-    }
-    // 기타업무: 지역·현장과 무관하게 업무 내용 직접 작성
+    // 사무 전용 화면
     function showEtcWork(){
-      const o=SEL[cat]||{};
-      const list=Object.keys(o).filter(k=>o[k].type==='기타업무').map(k=>({k:k,v:o[k]}));
-      const items=list.length? list.map(it=>'<div class="est-item"><span class="est-purpose">'+(it.v.workText||'')+'</span><i class="est-del" data-deletcwork="'+encodeURIComponent(it.k)+'">×</i></div>').join('')
-        : '<div class="sum-empty">작성된 기타업무가 없습니다.</div>';
-      panel.innerHTML=head('기타업무')+'<button class="back-btn" data-backregion="1">← 지역 선택으로</button>'+
-        '<div class="work-note">지역·현장과 상관없는 업무 내용을 직접 적으세요.</div>'+
-        '<div class="visit-form"><input id="etcWorkText" class="est-input" type="text" placeholder="기타업무 내용 입력"><button class="est-add" data-addetcwork="1">추가</button></div>'+
-        '<div class="est-list">'+items+'</div>';
+      let txt=''; if(SEL[cat]&&SEL[cat]['__기타업무']) txt=SEL[cat]['__기타업무'].workText||'';
+      panel.innerHTML=head('기타업무')+'<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
+        '<div class="work-note">현장과 상관없는 사무 업무를 자유롭게 적으세요. 여러 줄로 적어도 됩니다.</div>'+
+        '<textarea id="etcWorkText" class="recv-input" style="min-height:120px" placeholder="예: 세금계산서 정리, 거래처 통화, 자재 발주 문의">'+sEsc(txt)+'</textarea>';
     }
-    // 연차: 달력에서 날짜 선택 (작성자는 상단 이름으로 기록)
     function showAnnual(){
-      const o=SEL[cat]||{};
-      const list=Object.keys(o).filter(k=>o[k].type==='연차').map(k=>({k:k,v:o[k]}));
-      list.sort((a,b)=>(a.v.leaveDate||'').localeCompare(b.v.leaveDate||''));
-      const items=list.length? list.map(it=>'<div class="est-item"><span class="est-name">📅 '+(it.v.leaveDate||'')+'</span><i class="est-del" data-delannual="'+encodeURIComponent(it.k)+'">×</i></div>').join('')
-        : '<div class="sum-empty">지정된 연차가 없습니다.</div>';
-      panel.innerHTML=head('연차')+'<button class="back-btn" data-backregion="1">← 지역 선택으로</button>'+
-        '<div class="work-note">달력에서 연차 사용 날짜를 고르고 「추가」를 누르세요. 작성자는 상단에서 고른 이름으로 기록됩니다.</div>'+
-        '<div class="visit-form"><input id="annualDate" class="est-input" type="date"><button class="est-add" data-addannual="1">추가</button></div>'+
-        '<div class="est-list">'+items+'</div>';
+      let dv=''; if(SEL[cat]&&SEL[cat]['__연차']) dv=SEL[cat]['__연차'].leaveDate||'';
+      panel.innerHTML=head('연차')+'<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
+        '<div class="work-note">연차 날짜를 선택하세요.</div>'+
+        '<input type="date" id="annualDate" class="site-search" style="max-width:260px" value="'+sEsc(dv)+'">';
     }
     panel.addEventListener('click',e=>{
-      const reg=e.target.closest('[data-region]');
+      const sp=e.target.closest('button[data-special]');
+      if(sp){ if(sp.dataset.special==='기타업무') showEtcWork(); else showAnnual(); return; }
+      const reg=e.target.closest('button[data-region]');
       if(reg){ showSchools(reg.dataset.region); return; }
-      if(e.target.closest('[data-backregion]')){ showRegions(); return; }
-      const sp=e.target.closest('[data-special]');
-      if(sp){ if(sp.dataset.special==='기타업무') showEtcWork(); else if(sp.dataset.special==='연차') showAnnual(); return; }
-      if(e.target.closest('[data-addetcwork]')){
-        const inp=panel.querySelector('#etcWorkText'); const txt=(inp&&inp.value||'').trim();
-        if(!txt){ alert('기타업무 내용을 입력하세요.'); return; }
-        const k='사무|기타업무|'+Date.now();
-        SEL[cat]=SEL[cat]||{}; SEL[cat][k]={region:'사무', name:txt, tag:'기타업무', type:'기타업무', workText:txt};
-        saveSel(); renderSummary(); showEtcWork(); return;
-      }
-      const dew=e.target.closest('[data-deletcwork]');
-      if(dew){ const k=decodeURIComponent(dew.dataset.deletcwork); if(SEL[cat]&&SEL[cat][k]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; saveSel(); renderSummary(); } showEtcWork(); return; }
-      if(e.target.closest('[data-addannual]')){
-        const inp=panel.querySelector('#annualDate'); const dv=(inp&&inp.value||'');
-        if(!dv){ alert('연차 날짜를 먼저 선택하세요.'); return; }
-        const k='사무|연차|'+dv;
-        SEL[cat]=SEL[cat]||{}; SEL[cat][k]={region:'사무', name:'연차 '+dv, tag:'연차', type:'연차', leaveDate:dv};
-        saveSel(); renderSummary(); showAnnual(); return;
-      }
-      const da=e.target.closest('[data-delannual]');
-      if(da){ const k=decodeURIComponent(da.dataset.delannual); if(SEL[cat]&&SEL[cat][k]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; saveSel(); renderSummary(); } showAnnual(); return; }
-      if(e.target.closest('[data-backschool]')){ showSchools(curRegion); return; }
-      if(e.target.closest('[data-backdocs]')){ showDocs(curSchool); return; }
-      if(e.target.closest('[data-addest]')){
-        const inp=panel.querySelector('#estInput'); const v=(inp&&inp.value||'').trim();
-        if(v){ const key=curRegion+'|'+curSchool; ESTIMATES[key]=ESTIMATES[key]||[]; ESTIMATES[key].push({name:v,date:todayStr()}); saveEst(); markMyest(key,v); }
-        showEstimate(curSchool); return;
-      }
-      const del=e.target.closest('[data-delest]');
-      if(del){
-        const key=curRegion+'|'+curSchool; const i=+del.dataset.delest;
-        const removed=ESTIMATES[key]&&ESTIMATES[key][i];
-        if(removed){
-          ESTIMATES[key].splice(i,1);
-          if(!ESTIMATES[key].length) delete ESTIMATES[key];
-          if(WSTAT[key]){ delete WSTAT[key][removed.name]; if(!Object.keys(WSTAT[key]).length) delete WSTAT[key]; saveStat(); }
-          if(RECV[key]){ delete RECV[key][removed.name]; if(!Object.keys(RECV[key]).length) delete RECV[key]; saveRecv(); }
-          saveEst(); markMyest(key,removed.name); renderSummary();
-        }
-        showEstimate(curSchool); return;
-      }
-      if(e.target.closest('[data-addvisit]')){
-        const w=panel.querySelector('#visitWhen'), pp=panel.querySelector('#visitPurpose');
-        const when=(w&&w.value||'').replace('T',' ');
-        const purpose=(pp&&pp.value||'').trim();
-        if(!when){ alert('방문 날짜·시간을 먼저 선택하세요.'); return; }
-        const k='사무|'+curRegion+'|'+curSchool+'|방문예정|'+when+'|'+purpose;
-        SEL[cat]=SEL[cat]||{};
-        SEL[cat][k]={region:'사무·'+curRegion, name:curSchool+' · '+when+(purpose?' ('+purpose+')':''), tag:'방문예정', visitWhen:when, purpose:purpose};
-        saveSel(); renderSummary(); showVisit(); return;
-      }
-      const dv=e.target.closest('[data-delvisit]');
-      if(dv){
-        const k=decodeURIComponent(dv.dataset.delvisit);
-        if(SEL[cat]&&SEL[cat][k]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; saveSel(); renderSummary(); }
-        showVisit(); return;
-      }
-      if(e.target.closest('[data-backremark]')){ showRemark(); return; }
-      const rcatBtn=e.target.closest('[data-rcat]');
-      if(rcatBtn){ showRemarkInput(rcatBtn.dataset.rcat); return; }
-      if(e.target.closest('[data-addremark]')){
-        const inp=panel.querySelector('#remarkText'); const txt=(inp&&inp.value||'').trim();
-        if(!txt){ alert('특이사항 내용을 입력하세요.'); return; }
-        const k='사무|'+curRegion+'|'+curSchool+'|특이사항|'+curRemarkCat+'|'+Date.now();
-        SEL[cat]=SEL[cat]||{};
-        SEL[cat][k]={region:'사무·'+curRegion, name:curSchool+' · ['+curRemarkCat+'] '+txt, tag:'특이사항', remarkCat:curRemarkCat, remarkText:txt};
-        saveSel(); renderSummary(); showRemarkInput(curRemarkCat); return;
-      }
-      const dr=e.target.closest('[data-delremark]');
-      if(dr){
-        const k=decodeURIComponent(dr.dataset.delremark);
-        if(SEL[cat]&&SEL[cat][k]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; saveSel(); renderSummary(); }
-        showRemarkInput(curRemarkCat); return;
-      }
-      const di=e.target.closest('[data-docitem]');
-      if(di){
-        const d=di.dataset.doc, nm=di.dataset.docitem;
-        const k='사무|'+curRegion+'|'+curSchool+'|'+d+'|'+nm;
-        toggleSel(cat, k, {region:'사무·'+curRegion, name:curSchool+' · '+nm, tag:d});
-        di.classList.toggle('selected');
-        return;
-      }
-      // ★ 사무 파이프라인: 문서 선택/저장
-      const dpk=e.target.closest('[data-docpick]');
-      if(dpk){
-        const doc=dpk.dataset.doc, name=decodeURIComponent(dpk.dataset.docpick), gkey=curRegion+'|'+curSchool, fld=DOCFIELD[doc];
-        if(doc==='발주서'){ orderDraft=null; showOrderForm(name); return; }
-        const rec=docGet(gkey,name)[fld];
-        const selKey='사무|'+curRegion+'|'+curSchool+'|'+doc+'|'+name;
-        if(rec){
-          docSet(gkey,name,fld,null);
-          if(SEL[cat]&&SEL[cat][selKey]){ delete SEL[cat][selKey]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
-        } else {
-          docSet(gkey,name,fld,{date:todayStr(),writer:curWriter()});
-          SEL[cat]=SEL[cat]||{}; SEL[cat][selKey]={region:'사무·'+curRegion, name:curSchool+' · '+name, tag:doc};
-        }
-        markMydoc(gkey,name,fld); saveSel(); renderSummary(); showDocItems(doc); return;
-      }
-      const bdi=e.target.closest('[data-backdocitems]');
-      if(bdi){ orderDraft=null; showDocItems(bdi.dataset.backdocitems); return; }
-      const aor=e.target.closest('[data-addorderrow]');
-      if(aor){ const name=decodeURIComponent(aor.dataset.addorderrow); orderDraft={name:name, rows:readOrderRows()}; orderDraft.rows.push({v:'',d:''}); showOrderForm(name); return; }
-      const dorr=e.target.closest('[data-delorderrow]');
-      if(dorr){ const i=+dorr.dataset.delorderrow; const name=orderDraft&&orderDraft.name; if(name){ orderDraft.rows=readOrderRows(); orderDraft.rows.splice(i,1); if(!orderDraft.rows.length) orderDraft.rows=[{v:'',d:''}]; showOrderForm(name); } return; }
-      const sao=e.target.closest('[data-saveorder]');
-      if(sao){
-        const name=decodeURIComponent(sao.dataset.saveorder), gkey=curRegion+'|'+curSchool;
-        const items=readOrderRows().filter(r=>r.v||r.d).map(r=>({vendor:r.v,detail:r.d}));
-        if(!items.length){ alert('거래처 또는 내역을 한 줄 이상 적어주세요.'); return; }
-        docSet(gkey,name,'발주',{date:todayStr(),writer:curWriter(),items:items});
-        markMydoc(gkey,name,'발주');
-        const selKey='사무|'+curRegion+'|'+curSchool+'|발주서|'+name;
-        SEL[cat]=SEL[cat]||{}; SEL[cat][selKey]={region:'사무·'+curRegion, name:curSchool+' · '+name+' ('+items[0].vendor+(items.length>1?(' 외 '+(items.length-1)):'')+')', tag:'발주서'};
-        saveSel(); orderDraft=null; renderSummary(); gongsaRefresh(); showDocItems('발주서'); return;
-      }
-      const delo=e.target.closest('[data-delorder]');
-      if(delo){
-        const name=decodeURIComponent(delo.dataset.delorder), gkey=curRegion+'|'+curSchool;
-        docSet(gkey,name,'발주',null); markMydoc(gkey,name,'발주');
-        const selKey='사무|'+curRegion+'|'+curSchool+'|발주서|'+name;
-        if(SEL[cat]&&SEL[cat][selKey]){ delete SEL[cat][selKey]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
-        saveSel(); orderDraft=null; renderSummary(); gongsaRefresh(); showDocItems('발주서'); return;
-      }
-      const sch=e.target.closest('[data-school]');
-      if(sch){ if(sch.dataset.sregion) curRegion=sch.dataset.sregion; showDocs(sch.dataset.school); return; }
-      const doc=e.target.closest('[data-doc]');
-      if(doc){
-        const d=doc.dataset.doc;
-        if(d==='견적서'){ showEstimate(curSchool); return; }
-        if(d==='방문예정'){ showVisit(); return; }
-        if(d==='특이사항'){ showRemark(); return; }
-        showDocItems(d);
-        return;
+      if(e.target.closest('[data-back]')){ showRegions(); return; }
+      const row=e.target.closest('.school-row');
+      if(row){
+        const sub=row.dataset.sub==='1', key=row.dataset.key;
+        if(isSel(cat,key)){ toggleSel(cat,key); row.classList.remove('selected'); }
+        else { toggleSel(cat,key,{region:row.dataset.region,name:row.dataset.name,sub:sub,memo:''}); row.classList.add('selected'); }
       }
     });
-    wireSearch(panel,'goto');
+    panel.addEventListener('input',e=>{
+      if(e.target.id==='etcWorkText'){
+        const v=e.target.value; SEL[cat]=SEL[cat]||{};
+        if(v.trim()) SEL[cat]['__기타업무']={region:'',name:'기타업무',type:'기타업무',workText:v,memo:''};
+        else { delete SEL[cat]['__기타업무']; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
+        saveSel(); renderSummary();
+      } else if(e.target.id==='annualDate'){
+        const v=e.target.value; SEL[cat]=SEL[cat]||{};
+        if(v) SEL[cat]['__연차']={region:'',name:'연차 '+v,type:'연차',leaveDate:v,memo:''};
+        else { delete SEL[cat]['__연차']; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
+        saveSel(); renderSummary();
+      }
+    });
+    wireSearch(panel, cat);
     panel._home=showRegions;
     showRegions();
     return panel;
   }
-  const panels={};
-  panels['점검']=setupCategory('inspect','점검','#2f80c4','🔍');
-  panels['소독']=setupCategory('disinfect','소독','#27a36a','💨');
-  const ICON_GONGSA="<svg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'><g transform='rotate(-45 32 32)'><rect x='24' y='2' width='16' height='6' rx='3' fill='#8d6e63'/><rect x='29.5' y='6' width='5' height='27' rx='2' fill='#8d6e63'/><path d='M23 32 h18 v8 c0 9 -9 14 -9 14 s-9 -5 -9 -14 z' fill='#78909c'/></g><g transform='rotate(45 32 32)'><rect x='29.5' y='16' width='5' height='40' rx='2' fill='#a1887f'/><rect x='19' y='6' width='26' height='12' rx='4' fill='#546e7a'/></g></svg>";
-  panels['공사']=setupConstruction(ICON_GONGSA);
-  panels['사무']=setupEtc();
 
-  const sumBody=document.getElementById('summaryBody');
-  function isSub(v){ return !!(v.sub||v.tanta); }
-  // 표시용 그룹 만들기 (소독→단타, 공사→기타 하위그룹 분리)
+  // ===== 오늘의 업무 요약 =====
+  function isSubV(v){ return !!v.sub; }
   function buildGroups(){
     const order=['점검','소독','공사','사무'];
     const groups=[];
     function push(cat,label,color,filterFn){
       if(!SEL[cat]) return;
       const entries=Object.keys(SEL[cat]).filter(k=>filterFn(SEL[cat][k]))
-        .map(k=>({key:k,name:SEL[cat][k].name||k,region:SEL[cat][k].region,tag:SEL[cat][k].tag}));
+        .map(k=>{const v=SEL[cat][k]||{}; return {cat:cat,key:k,name:v.name||k,region:v.region||'',memo:v.memo||'',type:v.type||''};});
       if(entries.length) groups.push({label:label,color:color,cat:cat,entries:entries});
     }
     order.forEach(cat=>{
-      if(cat==='공사'){
-        const entries=[];
-        // ★ 내가 오늘 손댄 공사(MYW)만 표시. 단계가 사라진 항목은 제외.
-        Object.keys(MYW||{}).forEach(mk=>{
-          const sep=mk.indexOf('|||'); if(sep<0) return;
-          const gkey=mk.slice(0,sep), work=mk.slice(sep+3);
-          if(!(WSTAT[gkey] && WSTAT[gkey][work])) return;
-          const parts=gkey.split('|'); const region=parts[0], school=parts.slice(1).join('|');
-          const ests=ESTIMATES[gkey]||[];
-          const est=ests.find(x=>x.name===work); const dt=est?est.date:'';
-          const rmemo=(RECV[gkey]&&RECV[gkey][work])||'';
-          entries.push({region:region, name:school+' · '+work+(dt?' ('+dt+')':'')+(rmemo?' 📦'+rmemo:''), tag:WSTAT[gkey][work], gkey:gkey, work:work});
-        });
-        if(entries.length) groups.push({label:'공사',color:CAT_COLORS['공사'],cat:'공사',entries:entries});
-        return;
-      }
       const sg=SUBGROUP[cat];
       if(sg){
-        push(cat,cat,CAT_COLORS[cat],v=>!isSub(v));
-        push(cat,sg.label,sg.color,v=>isSub(v));
+        push(cat,cat,CAT_COLORS[cat],v=>!isSubV(v));
+        push(cat,sg.label,sg.color,v=>isSubV(v));
       } else {
         push(cat,cat,CAT_COLORS[cat],()=>true);
-      }
-      if(cat==='사무'){
-        // ★ 견적서 작성(MYEST)도 오늘의 업무에 표시 (삭제는 사무 탭 견적서 화면에서)
-        const estEntries=[];
-        Object.keys(MYEST||{}).forEach(mk=>{
-          const sep=mk.indexOf('|||'); if(sep<0) return;
-          const gkey=mk.slice(0,sep), nm=mk.slice(sep+3);
-          const e2=(ESTIMATES[gkey]||[]).find(x=>x.name===nm); if(!e2) return;
-          const parts=gkey.split('|');
-          estEntries.push({key:'', name:parts.slice(1).join('|')+' · '+nm, region:'사무·'+parts[0], tag:'견적서', noDel:true});
-        });
-        if(estEntries.length){
-          let g=groups.find(x=>x.cat==='사무');
-          if(g) g.entries=estEntries.concat(g.entries);
-          else groups.push({label:'사무',color:CAT_COLORS['사무'],cat:'사무',entries:estEntries});
-        }
       }
     });
     return groups;
   }
+  const sumBody=document.getElementById('summaryBody');
   function renderSummary(){
     const groups=buildGroups();
     let total=0; groups.forEach(g=>total+=g.entries.length);
@@ -1003,53 +548,55 @@
     if(total===0){ sumBody.innerHTML='<div class="sum-empty">현장을 클릭하면 여기에 오늘 업무가 쌓입니다.</div>'; return; }
     sumBody.innerHTML=groups.map(g=>{
       const items=g.entries.map(e=>{
-        const bold=e.tag||g.label;
-        if(e.gkey){
-          const ps=STAGE_STYLE[e.tag]; const psty=ps?('background:'+ps.bg+';color:'+ps.fg):'background:#999;color:#fff';
-          return '<span class="sum-item" data-gkey="'+e.gkey+'" data-work="'+e.work+'">'+e.region+' '+e.name+' <span class="stage-pill" style="'+psty+'">'+(STAGE_NUM[e.tag]||'')+' '+e.tag+'</span> <i data-del="1">×</i></span>';
+        if(e.type==='기타업무' || e.type==='연차'){
+          return '<div class="sum-item" data-cat="'+e.cat+'" data-key="'+sEsc(e.key)+'"><span class="sum-place">'+sEsc(e.name)+'</span> <i data-del="1">×</i></div>';
         }
-        if(e.noDel){ return '<span class="sum-item">'+e.region+' '+e.name+' <b>'+bold+'</b></span>'; }
-        return '<span class="sum-item" data-cat="'+g.cat+'" data-key="'+e.key+'">'+e.region+' '+e.name+' <b>'+bold+'</b> <i data-del="1">×</i></span>';
+        const place=[e.region,e.name].filter(Boolean).join(' ');
+        return '<div class="sum-item" data-cat="'+e.cat+'" data-key="'+sEsc(e.key)+'">'+
+          '<span class="sum-place">'+sEsc(place)+'</span>'+
+          '<input class="sum-memo" data-cat="'+e.cat+'" data-key="'+sEsc(e.key)+'" value="'+sEsc(e.memo)+'" placeholder="한 줄 메모(선택)">'+
+          '<i data-del="1">×</i></div>';
       }).join('');
       return '<div class="sum-cat"><span class="sum-tag" style="background:'+g.color+'">'+g.label+' '+g.entries.length+'</span>'+items+'</div>';
     }).join('');
   }
   sumBody.addEventListener('click',e=>{
     const del=e.target.closest('[data-del]'); if(!del) return;
-    const it=del.closest('.sum-item');
-    if(it.dataset.gkey){
-      const gk=it.dataset.gkey, w=it.dataset.work;
-      unmarkMyw(gk,w);
-      renderSummary(); gongsaRefresh(); return;
-    }
-    toggleSel(it.dataset.cat,it.dataset.key);
-    const tp=panels[it.dataset.cat];
-    if(tp){ const r=tp.querySelector('.school-row[data-key="'+it.dataset.key+'"]'); if(r) r.classList.remove('selected'); }
+    const it=del.closest('.sum-item'); if(!it) return;
+    const cat=it.dataset.cat, key=it.dataset.key;
+    toggleSel(cat,key);
+    const tp=panels[cat];
+    if(tp){ tp.querySelectorAll('.school-row').forEach(r=>{ if(r.dataset.key===key) r.classList.remove('selected'); }); }
+  });
+  sumBody.addEventListener('input',e=>{
+    const inp=e.target.closest('.sum-memo'); if(!inp) return;
+    const cat=inp.dataset.cat, key=inp.dataset.key;
+    if(SEL[cat]&&SEL[cat][key]){ SEL[cat][key].memo=inp.value; saveSel(); }
   });
   document.getElementById('clearSummary').addEventListener('click',()=>{
-    if(confirm('내 오늘의 업무(점검·소독·공사 표시)를 모두 지울까요?\n※ 공사 진행단계는 공유 자료라 지워지지 않고, 내 목록에서만 사라집니다.')){
-      SEL={}; saveSel();
-      MYW={}; saveMyw();
-      renderSummary();
+    if(confirm('오늘 작성한 내용(점검·소독·공사·사무)을 모두 지울까요?')){
+      SEL={}; saveSel(); renderSummary();
       Object.values(panels).forEach(pp=>pp.querySelectorAll('.school-row.selected').forEach(x=>x.classList.remove('selected')));
-      gongsaRefresh();
     }
   });
-  renderSummary();
 
-  // ====== 작성자 · 전송(구글 스프레드시트) ======
-  // ↓↓ 11명 실제 이름으로 교체하세요 ↓↓
+  // ===== 4개 탭 구성 =====
+  const ICON_GONGSA="<svg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'><g transform='rotate(-45 32 32)'><rect x='24' y='2' width='16' height='6' rx='3' fill='#8d6e63'/><rect x='29.5' y='6' width='5' height='27' rx='2' fill='#8d6e63'/><path d='M23 32 h18 v8 c0 9 -9 14 -9 14 s-9 -5 -9 -14 z' fill='#78909c'/></g><g transform='rotate(45 32 32)'><rect x='29.5' y='16' width='5' height='40' rx='2' fill='#a1887f'/><rect x='19' y='6' width='26' height='12' rx='4' fill='#546e7a'/></g></svg>";
+  const panels={};
+  panels['점검']=setupCategory('inspect','점검','#2f80c4','🔍',{});
+  panels['소독']=setupCategory('disinfect','소독','#27a36a','💨',{subgroup:SUBGROUP['소독']});
+  panels['공사']=setupCategory('construct','공사','#e8842c',ICON_GONGSA,{extra:ETC_REGION});
+  panels['사무']=setupCategory('etc','사무','#8a8f98','📋',{extra:ETC_REGION, specials:['기타업무','연차']});
+
+  // ===== 작성자 · PIN · 전송 =====
   const NAMES=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','원채아 대리','김지훈 주임'];
-  // ↓↓ 구글 앱스 스크립트 배포 후 받은 웹앱 URL을 붙여넣으세요 ↓↓
   const APPS_URL=(window.__APPS_URL)||'https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
 
   const wsel=document.getElementById('writerSel');
   wsel.innerHTML='<option value="">(이름 선택)</option>'+NAMES.map(n=>'<option>'+n+'</option>').join('');
   try{ wsel.value=localStorage.getItem('ilji_writer')||''; }catch(e){}
 
-  // ===== ③단계: 이름 + 4자리 비밀번호(PIN) =====
-  // 처음 입력한 4자리가 그 이름의 비밀번호로 서버에 등록됨. 이후엔 같은 번호여야 통과.
-  // 비번을 잊으면: 김재성님이 구글 시트 _PIN 탭에서 해당 줄 삭제 → 초기화.
+  // 이름 + 4자리 PIN (처음 입력한 번호가 등록됨. 잊으면 김재성님이 구글시트 _PIN 탭에서 줄 삭제 → 초기화)
   var PINOK=false;
   function pinHash(name,pin){ var s=name+'|'+pin+'|awesome2026'; var h=5381; for(var i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))|0; } return 'h'+(h>>>0).toString(36)+s.length; }
   function pinKey(n){ return 'ilji_pin_'+n; }
@@ -1088,275 +635,268 @@
     var p=askPin(name); if(p===null){ onFail(); return; }
     tryHash(pinHash(name,p),false);
   }
+
+  function updateAdminVis(){ var w=(wsel&&wsel.value)||''; var show=(w.indexOf('김재성')===0); var ab=document.getElementById('btnAdminEdit'); if(ab) ab.style.display=show?'':'none'; }
   var __prevWriter='';
   wsel.addEventListener('change',function(){
     var name=wsel.value||'';
-    if(!name){ __prevWriter=''; PINOK=false; try{ localStorage.setItem('ilji_writer',''); }catch(e){} updateConsolVis(); return; }
+    if(!name){ __prevWriter=''; PINOK=false; try{ localStorage.setItem('ilji_writer',''); }catch(e){} updateAdminVis(); return; }
     PINOK=false;
     pinGate(name,
-      function(){ __prevWriter=name; try{ localStorage.setItem('ilji_writer',name); }catch(e){} updateConsolVis(); tryRecover(); },
-      function(){ wsel.value=__prevWriter; if(__prevWriter) PINOK=true; updateConsolVis(); });
+      function(){ __prevWriter=name; try{ localStorage.setItem('ilji_writer',name); }catch(e){} updateAdminVis(); },
+      function(){ wsel.value=__prevWriter; if(__prevWriter) PINOK=true; updateAdminVis(); });
   });
 
-  // 작업 날짜 선택 — 그 날짜의 저장분을 불러와 이어쓰기/수정
+  // 작업 날짜 변경 → 그 날짜 저장분 불러오기
   const wdate=document.getElementById('workDate');
   wdate.value=dateStr(); wdate.max=todayStrFixed();
   wdate.addEventListener('change',()=>{
     if(!wdate.value){ wdate.value=dateStr(); return; }
     const ps=wdate.value.split('-'); cur=new Date(+ps[0],+ps[1]-1,+ps[2]);
     try{ SEL=JSON.parse(localStorage.getItem(dateKey()))||{}; }catch(e){ SEL={}; }
-    loadMyw(); loadMyd();
     renderHeaderDate(); renderSummary(); renderSentStatus();
     Object.values(panels).forEach(p=>{ if(p._home) p._home(); });
   });
 
-  // ===== 공사현황 공유(서버 저장 → 모든 직원·기기 동일하게 이어짐) =====
-  function gongsaPost(op, payload){ /* ②단계: 클릭은 내 기기에만 저장. 공유는 전송→취합으로 처리 */ }
-  // ===== ②단계: 서버 '확정현황(master)' 읽어 기준화 + 내 미전송 변경분 보존 =====
-  window.__applyMaster=function(m){
-    try{
-      m=m||{};
-      if(m.estimates){ Object.keys(m.estimates).forEach(function(k){ (m.estimates[k]||[]).forEach(function(e){ if(e&&e.date){ var dd=new Date(e.date); if(!isNaN(dd)) e.date=dd.getFullYear()+'-'+pad2(dd.getMonth()+1)+'-'+pad2(dd.getDate()); } }); }); }
-      var myStage={}, myRecv={}, myDoc={}, myEst={};
-      Object.keys(MYW||{}).forEach(function(k){ var a=split2(k),gk=a[0],w=a[1]; myStage[k]=(WSTAT[gk]&&WSTAT[gk][w])||''; if(RECV[gk]&&RECV[gk][w]!==undefined) myRecv[k]=RECV[gk][w]; });
-      Object.keys(MYDOC||{}).forEach(function(k){ var p=k.split('|||'); myDoc[k]=(DOCREC[p[0]]&&DOCREC[p[0]][p[1]]&&DOCREC[p[0]][p[1]][p[2]])||null; });
-      Object.keys(MYEST||{}).forEach(function(k){ var a=split2(k); (myEst[a[0]]=myEst[a[0]]||[]).push(a[1]); });
-      ESTIMATES=m.estimates||{}; WSTAT=m.wstat||{}; RECV=m.recv||{}; DOCREC=m.docrec||{};
-      Object.keys(myEst).forEach(function(gk){ ESTIMATES[gk]=ESTIMATES[gk]||[]; myEst[gk].forEach(function(nm){ if(!ESTIMATES[gk].find(function(x){return x.name===nm;})) ESTIMATES[gk].push({name:nm,date:todayStr()}); }); });
-      Object.keys(myStage).forEach(function(k){ var a=split2(k),gk=a[0],w=a[1],v=myStage[k]; if(v){ WSTAT[gk]=WSTAT[gk]||{}; WSTAT[gk][w]=v; } else if(WSTAT[gk]){ delete WSTAT[gk][w]; if(!Object.keys(WSTAT[gk]).length) delete WSTAT[gk]; } });
-      Object.keys(myRecv).forEach(function(k){ var a=split2(k),gk=a[0],w=a[1],v=myRecv[k]; RECV[gk]=RECV[gk]||{}; if(v) RECV[gk][w]=v; else { delete RECV[gk][w]; if(!Object.keys(RECV[gk]).length) delete RECV[gk]; } });
-      Object.keys(myDoc).forEach(function(k){ var p=k.split('|||'),v=myDoc[k]; if(v){ DOCREC[p[0]]=DOCREC[p[0]]||{}; DOCREC[p[0]][p[1]]=DOCREC[p[0]][p[1]]||{}; DOCREC[p[0]][p[1]][p[2]]=v; } else if(DOCREC[p[0]]&&DOCREC[p[0]][p[1]]){ delete DOCREC[p[0]][p[1]][p[2]]; if(!Object.keys(DOCREC[p[0]][p[1]]).length) delete DOCREC[p[0]][p[1]]; } });
-      saveEst(); saveStat(); saveRecv(); saveDoc();
-      renderSummary(); gongsaRefresh();
-    }catch(e){}
-  };
-  function loadMaster(){
-    try{
-      var s=document.createElement('script');
-      s.src=APPS_URL+'?action=master&callback=__applyMaster&t='+Date.now();
-      s.onload=function(){ s.remove(); };
-      s.onerror=function(){ s.remove(); };
-      document.body.appendChild(s);
-    }catch(e){}
-  }
-
+  // 전송 행 만들기: [날짜, 분류, 지역, 현장, 항목, 단계, 비고]
   function collectRows(){
     const dt=todayStr(); const rows=[];
-    Object.keys(SEL['점검']||{}).forEach(k=>{const v=SEL['점검'][k]; rows.push([dt,'점검',v.region||'',v.name||k,'점검','','']);});
-    Object.keys(SEL['소독']||{}).forEach(k=>{const v=SEL['소독'][k]; rows.push([dt,'소독',v.region||'',v.name||k,(v.sub?'단타':'소독'),'','']);});
-    // ★ 전송도 내가 오늘 손댄 공사(MYW)만 포함
-    Object.keys(MYW||{}).forEach(mk=>{const sep=mk.indexOf('|||');if(sep<0)return;const gk=mk.slice(0,sep),w=mk.slice(sep+3);if(!(WSTAT[gk]&&WSTAT[gk][w]))return;const ps=gk.split('|');const region=ps[0],school=ps.slice(1).join('|');const ests=ESTIMATES[gk]||[];const est=ests.find(x=>x.name===w);const rm=(RECV[gk]&&RECV[gk][w])||'';const bigo=rm?('입고: '+rm+(est?' / 견적 '+est.date:'')):(est?est.date:'');rows.push([dt,'공사',region,school,w,WSTAT[gk][w],bigo]);});
-    // 견적서 작성도 일지 행으로 남김 (전체 일지·주간보고에 보이도록)
-    Object.keys(MYEST||{}).forEach(mk=>{const sep=mk.indexOf('|||');if(sep<0)return;const gk=mk.slice(0,sep),nm=mk.slice(sep+3);const e=(ESTIMATES[gk]||[]).find(x=>x.name===nm);if(!e)return;const ps=gk.split('|');rows.push([dt,'사무',ps[0]||'',ps.slice(1).join('|')||'','견적서',nm,(e.date&&e.date!==dt)?('견적일 '+e.date):'']);});
-    Object.keys(SEL['사무']||{}).forEach(k=>{const v=SEL['사무'][k]||{};const p=k.split('|');
-      if(v.type==='기타업무'){rows.push([dt,'사무','','','기타업무','',v.workText||'']);}
-      else if(v.type==='연차'){rows.push([dt,'사무','','','연차',v.leaveDate||'','']);}
-      else if(p[3]==='방문예정'){rows.push([dt,'사무',p[1]||'',p[2]||'','방문예정',v.visitWhen||'',v.purpose||'']);}
-      else if(p[3]==='특이사항'){rows.push([dt,'사무',p[1]||'',p[2]||'','특이사항',v.remarkCat||p[4]||'',v.remarkText||'']);}
-      else{rows.push([dt,'사무',p[1]||'',p[2]||'',p[3]||'','',p[4]||'']);}});
+    ['점검','소독','공사','사무'].forEach(cat=>{
+      Object.keys(SEL[cat]||{}).forEach(k=>{
+        const v=SEL[cat][k]||{};
+        if(v.type==='기타업무'){ rows.push([dt,'사무','','','기타업무','',v.workText||'']); return; }
+        if(v.type==='연차'){ rows.push([dt,'사무','','','연차',v.leaveDate||'','']); return; }
+        const item = (cat==='소독' && v.sub) ? '단타' : cat;
+        rows.push([dt,cat,v.region||'',v.name||'',item,'',v.memo||'']);
+      });
+    });
     return rows;
   }
-  // 전송 상태(마지막 전송 시각) — 날짜별 저장
   function sentKey(){ return 'sent_'+dateKey(); }
   function nowStamp(){ const t=new Date(); const p=x=>String(x).padStart(2,'0'); return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes()); }
   function renderSentStatus(){ const el=document.getElementById('sentStatus'); if(!el) return; let t=''; try{ t=localStorage.getItem(sentKey())||''; }catch(e){} el.textContent = t? ('✓ 마지막 전송 '+t) : ''; }
-  // 전송 전 확인용 요약(분류별 건수)
   function sendSummaryText(rows){
     const cnt={}; rows.forEach(r=>{ cnt[r[1]]=(cnt[r[1]]||0)+1; });
     const order=['점검','소독','공사','사무'];
     const parts=order.filter(c=>cnt[c]).map(c=>c+' '+cnt[c]+'건');
     return parts.join(', ')+'\n총 '+rows.length+'건';
   }
-  // ===== ②단계: 내 변경분(델타) 만들기 =====
-  function buildDelta(){
-    var d={est:[],stage:[],recv:[],doc:[]};
-    Object.keys(MYEST||{}).forEach(function(k){ var a=split2(k),gk=a[0],nm=a[1]; var arr=ESTIMATES[gk]||[]; var e=arr.find(function(x){return x.name===nm;}); d.est.push({gkey:gk,name:nm,date:(e?e.date:''),del:!e}); });
-    Object.keys(MYW||{}).forEach(function(k){ var a=split2(k),gk=a[0],w=a[1]; var v=(WSTAT[gk]&&WSTAT[gk][w])||''; d.stage.push({gkey:gk,work:w,stage:v}); if(RECV[gk]&&RECV[gk][w]!==undefined) d.recv.push({gkey:gk,work:w,memo:RECV[gk][w]||''}); });
-    Object.keys(MYDOC||{}).forEach(function(k){ var p=k.split('|||'); var v=(DOCREC[p[0]]&&DOCREC[p[0]][p[1]]&&DOCREC[p[0]][p[1]][p[2]])||null; d.doc.push({gkey:p[0],name:p[1],field:p[2],val:v}); });
-    return d;
-  }
   function submitData(writer){
     return fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'submit', writer:writer, pinHash:myPinHash(), date:todayStr(), delta:buildDelta(), rows:collectRows(), sel:SEL})});
+      body:JSON.stringify({action:'submit', writer:writer, pinHash:myPinHash(), date:todayStr(), delta:{est:[],stage:[],recv:[],doc:[]}, rows:collectRows(), sel:SEL})});
   }
   function send(){
     var writer=wsel.value;
     if(!writer){ alert('먼저 작성자 이름을 선택하세요.'); return; }
     if(!PINOK){ alert('본인 확인이 필요해요. 이름을 다시 선택해 주세요.'); return; }
-    var rows=collectRows(), delta=buildDelta();
-    if(!(rows.length||delta.est.length||delta.stage.length||delta.doc.length)){ alert('전송할 내용이 없습니다.'); return; }
-    if(!confirm(writer+' 님, ['+dateStr()+'] 작업을 전송할까요?\n전송하면 김재성님이 「취합」할 때 모두에게 반영됩니다.\n\n'+sendSummaryText(rows))) return;
+    var rows=collectRows();
+    if(!rows.length){ alert('전송할 내용이 없습니다.'); return; }
+    if(!confirm(writer+' 님, ['+dateStr()+'] 작업을 전송할까요?\n같은 날짜로 다시 전송하면 새 내용으로 덮어써집니다.\n\n'+sendSummaryText(rows))) return;
     var btn=document.getElementById('sendBtn'); btn.textContent='전송 중...'; btn.disabled=true;
     submitData(writer)
       .then(function(){ try{ localStorage.setItem(sentKey(), nowStamp()); }catch(e){} renderSentStatus(); btn.textContent='전송 완료 ✓'; setTimeout(function(){btn.textContent='전송';btn.disabled=false;},2500); })
       .catch(function(){ alert('전송 실패 — 인터넷 연결을 확인하세요.'); btn.textContent='전송';btn.disabled=false; });
   }
-  // 자동백업: 변경분이 있으면 4분마다 조용히 서버 보관(기기 분실 대비)
-  function autoBackup(){
-    try{ var writer=(wsel&&wsel.value)||''; if(!writer||!PINOK) return; var d=buildDelta();
-      if(!(d.est.length||d.stage.length||d.doc.length) && !collectRows().length) return;
-      submitData(writer); try{ localStorage.setItem('autobk_'+dateKey(), nowStamp()); }catch(e){}
-    }catch(e){}
-  }
-  setInterval(autoBackup, 240000);
-  // 기기복구: 이 기기에 오늘 작성분이 없는데 서버에 내 전송분이 있으면 복원 제안
-  window.__recover=function(res){
-    try{
-      if(!res||!res.payload) return;
-      var has=Object.keys(MYW||{}).length||Object.keys(MYEST||{}).length||Object.keys(MYDOC||{}).length||Object.keys(SEL||{}).length;
-      if(has) return;
-      var p=res.payload;
-      if(!confirm('이 기기에 오늘 작성분이 없어요. 서버에 저장된 내 최근 작업을 불러올까요?')) return;
-      if(p.sel){ SEL=p.sel; saveSel(); }
-      if(p.delta){
-        (p.delta.est||[]).forEach(function(x){ if(x.del) return; ESTIMATES[x.gkey]=ESTIMATES[x.gkey]||[]; if(!ESTIMATES[x.gkey].find(function(y){return y.name===x.name;})) ESTIMATES[x.gkey].push({name:x.name,date:x.date||todayStr()}); markMyest(x.gkey,x.name); });
-        (p.delta.stage||[]).forEach(function(x){ if(!x.stage) return; WSTAT[x.gkey]=WSTAT[x.gkey]||{}; WSTAT[x.gkey][x.work]=x.stage; markMyw(x.gkey,x.work); });
-        (p.delta.recv||[]).forEach(function(x){ if(!x.memo) return; RECV[x.gkey]=RECV[x.gkey]||{}; RECV[x.gkey][x.work]=x.memo; });
-        (p.delta.doc||[]).forEach(function(x){ if(!x.val) return; DOCREC[x.gkey]=DOCREC[x.gkey]||{}; DOCREC[x.gkey][x.name]=DOCREC[x.gkey][x.name]||{}; DOCREC[x.gkey][x.name][x.field]=x.val; markMydoc(x.gkey,x.name,x.field); });
-        saveEst(); saveStat(); saveRecv(); saveDoc();
-      }
-      renderSummary(); gongsaRefresh();
-    }catch(e){}
-  };
-  function tryRecover(){
-    try{ var writer=(wsel&&wsel.value)||''; if(!writer) return;
-      var s=document.createElement('script');
-      s.src=APPS_URL+'?action=mine&writer='+encodeURIComponent(writer)+'&hash='+encodeURIComponent(myPinHash())+'&date='+encodeURIComponent(todayStr())+'&callback=__recover&t='+Date.now();
-      s.onload=function(){ s.remove(); }; s.onerror=function(){ s.remove(); };
-      document.body.appendChild(s);
-    }catch(e){}
-  }
   document.getElementById('sendBtn').addEventListener('click',send);
-  // ===== 김재성 전용: 취합(제출함 → 확정현황 반영) =====
-  var __cLastSince=(function(){ try{ return localStorage.getItem('consol_since')||''; }catch(e){ return ''; } })();
-  function updateConsolVis(){ var w=(wsel&&wsel.value)||''; var show=(w.indexOf('김재성')===0); var b=document.getElementById('consolidateBtn'); if(b) b.style.display=show?'':'none'; var wb=document.getElementById('btnWeekly'); if(wb) wb.style.display=show?'':'none'; var ab=document.getElementById('btnAdminEdit'); if(ab) ab.style.display=show?'':'none'; }
-  (function(){ var wb=document.getElementById('btnWeekly'); if(wb) wb.addEventListener('click', function(){ window.open('주간보고.html','_blank'); }); })();
+
+  // 현황지도(외부 페이지)
   (function(){ var mb=document.getElementById('btnMap'); if(mb) mb.addEventListener('click', function(){ var u='https://zesk001.github.io/awesome-ilji/2026_점검소독_현황지도.html'; var w=null; try{ w=window.open(u,'_blank'); }catch(e){} if(!w) location.href=u; }); })();
-  function consolidate(){
-    if(!PINOK){ alert('본인 확인이 필요해요. 이름을 다시 선택해 주세요.'); return; }
-    if(!confirm('지금까지 전송된 모든 직원의 작업을 모아 「확정현황」에 반영할까요?')) return;
-    var btn=document.getElementById('consolidateBtn'); btn.textContent='취합 중...'; btn.disabled=true;
-    window.__cMaster=function(m){
-      window.__cMasterData=m||{};
-      var s2=document.createElement('script');
-      s2.src=APPS_URL+'?action=inbox&since='+encodeURIComponent(__cLastSince||'')+'&callback=__cInbox&t='+Date.now();
-      s2.onerror=function(){ btn.textContent='취합'; btn.disabled=false; alert('취합 실패(제출함 읽기).'); };
-      document.body.appendChild(s2);
-    };
-    window.__cInbox=function(res){
-      try{
-        var master=window.__cMasterData||{};
-        master.estimates=master.estimates||{}; master.wstat=master.wstat||{}; master.recv=master.recv||{}; master.docrec=master.docrec||{};
-        var items=(res&&res.items)||[], applied=0;
-        items.forEach(function(it){
-          var p; try{ p=(typeof it.payload==='string')?JSON.parse(it.payload):it.payload; }catch(e){ p=null; }
-          if(!p||!p.delta) return; var d=p.delta;
-          (d.est||[]).forEach(function(x){ master.estimates[x.gkey]=master.estimates[x.gkey]||[]; var arr=master.estimates[x.gkey]; var idx=arr.findIndex(function(y){return y.name===x.name;}); if(x.del){ if(idx>=0) arr.splice(idx,1); if(!arr.length) delete master.estimates[x.gkey]; } else if(idx<0){ arr.push({name:x.name,date:x.date||''}); } });
-          (d.stage||[]).forEach(function(x){ if(x.stage){ master.wstat[x.gkey]=master.wstat[x.gkey]||{}; master.wstat[x.gkey][x.work]=x.stage; } else if(master.wstat[x.gkey]){ delete master.wstat[x.gkey][x.work]; if(!Object.keys(master.wstat[x.gkey]).length) delete master.wstat[x.gkey]; } });
-          (d.recv||[]).forEach(function(x){ master.recv[x.gkey]=master.recv[x.gkey]||{}; if(x.memo){ master.recv[x.gkey][x.work]=x.memo; } else { delete master.recv[x.gkey][x.work]; if(!Object.keys(master.recv[x.gkey]).length) delete master.recv[x.gkey]; } });
-          (d.doc||[]).forEach(function(x){ master.docrec[x.gkey]=master.docrec[x.gkey]||{}; master.docrec[x.gkey][x.name]=master.docrec[x.gkey][x.name]||{}; if(x.val){ master.docrec[x.gkey][x.name][x.field]=x.val; } else { delete master.docrec[x.gkey][x.name][x.field]; if(!Object.keys(master.docrec[x.gkey][x.name]).length) delete master.docrec[x.gkey][x.name]; if(!Object.keys(master.docrec[x.gkey]).length) delete master.docrec[x.gkey]; } });
-          applied++;
-        });
-        fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify({action:'setmaster', master:master, pinHash:myPinHash()})})
-          .then(function(){ if(res&&res.now){ __cLastSince=String(res.now); try{ localStorage.setItem('consol_since',__cLastSince); }catch(e){} }
-            btn.textContent='취합 완료 ✓ ('+applied+'건)'; setTimeout(function(){btn.textContent='취합';btn.disabled=false;},2500); __applyMaster(master); })
-          .catch(function(){ btn.textContent='취합'; btn.disabled=false; alert('취합 저장 실패.'); });
-      }catch(e){ btn.textContent='취합'; btn.disabled=false; }
-    };
-    var s1=document.createElement('script');
-    s1.src=APPS_URL+'?action=master&callback=__cMaster&t='+Date.now();
-    s1.onerror=function(){ btn.textContent='취합'; btn.disabled=false; alert('취합 실패(확정현황 읽기).'); };
-    document.body.appendChild(s1);
+  // ===== 앱 버전 표시 + 🔄 최신버전 받기(캐시 비우고 새로고침) =====
+  var APP_VER='2026-06-16';
+  (function(){ var fo=document.getElementById('appFooter'); if(fo) fo.innerHTML='어썸조경 전체 업무 관리 시스템 · 일일업무일지 &nbsp;<span style="opacity:.55">v'+APP_VER+'</span>'; })();
+  function appUpdate(){
+    if(!confirm('최신 버전으로 새로고침할까요?\n(작성 화면에 적던 내용은 그대로 남아 있어요)')) return;
+    var go=function(){ var base=location.href.split('?')[0].split('#')[0]; location.replace(base+'?v='+Date.now()); };
+    try{
+      if('serviceWorker' in navigator){ navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ try{ r.update(); }catch(e){} }); }); }
+      if(window.caches && caches.keys){ caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); }).then(go, go); }
+      else go();
+    }catch(e){ go(); }
   }
-  document.getElementById('consolidateBtn').addEventListener('click',consolidate);
-  updateConsolVis();
-  renderSentStatus();
+  (function(){ var ub=document.getElementById('btnUpdate'); if(ub) ub.addEventListener('click', appUpdate); })();
 
-  // ===== ④단계: 보기 대시보드 (내 일지 / 전체 일지) =====
-  var VO_CAT={'점검':'#2f80c4','소독':'#27a36a','공사':'#e8842c','사무':'#8e6cc4'};
-  var voMode='mine';
-  var voOv=document.getElementById('viewOverlay'), voBody=document.getElementById('voBody');
-  var voDate=document.getElementById('voDate');
-  var voTabMine=document.getElementById('voTabMine'), voTabAll=document.getElementById('voTabAll');
-  function voEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
-  function voTime(tm){ var t=new Date(Number(tm)); return isNaN(t)?'':(pad2(t.getHours())+':'+pad2(t.getMinutes())); }
-  // rows: [분류,지역,현장,내용,단계,비고]
-  function voRowsHTML(rows){
-    if(!rows.length) return '<div class="vo-empty">기록이 없어요.</div>';
-    var order=['점검','소독','공사','사무']; var by={};
-    rows.forEach(function(r){ var c=r[0]||'기타'; (by[c]=by[c]||[]).push(r); });
-    var cats=order.filter(function(c){return by[c];}).concat(Object.keys(by).filter(function(c){return order.indexOf(c)<0;}));
-    return cats.map(function(c){
-      var items=by[c].map(function(r){
-        var place=[r[1],r[2]].filter(Boolean).join(' ');
-        var extra=[r[4],r[5]].filter(Boolean).map(voEsc).join(' · ');
-        return '<div class="vo-item">'+(place?'<span class="vo-place">'+voEsc(place)+'</span> ':'')+'<b>'+voEsc(r[3]||'')+'</b>'+(extra?' <span class="vo-extra">'+extra+'</span>':'')+'</div>';
-      }).join('');
-      return '<div class="vo-cat"><span class="sum-tag" style="background:'+(VO_CAT[c]||'#8a8f98')+'">'+voEsc(c)+' '+by[c].length+'건</span><div class="vo-items">'+items+'</div></div>';
-    }).join('');
-  }
-  function voRenderMine(){
-    voDate.style.display='none';
-    var w=wsel.value;
-    var rows=collectRows().map(function(r){ return [r[1],r[2],r[3],r[4],r[5],r[6]]; });
-    var sent=''; try{ sent=localStorage.getItem(sentKey())||''; }catch(e){}
-    voBody.innerHTML='<div class="vo-writer"><h4>'+voEsc(w)+' — '+dateStr()+'</h4>'
-      +(sent?'<div class="vo-sent">✓ 마지막 전송 '+voEsc(sent)+'</div>':'<div class="vo-sent vo-warn">아직 전송 전 — 이 기기에 작성된 내용이에요</div>')
-      +voRowsHTML(rows)+'</div>'
-      +'<div class="vo-none">다른 날짜의 내 일지는 위쪽 「작업 날짜」를 바꾸면 볼 수 있어요.</div>';
-  }
-  window.__voDay=function(res){
-    if(voMode!=='all') return;
-    var rows=(res&&res.rows)||[]; // [분류,지역,현장,내용,단계,비고,작성자,시각]
-    var byW={}; rows.forEach(function(r){ var w=r[6]||'(이름없음)'; (byW[w]=byW[w]||[]).push(r); });
-    var writers=NAMES.filter(function(n){return byW[n];}).concat(Object.keys(byW).filter(function(w){return NAMES.indexOf(w)<0;}));
-    var html=writers.map(function(w){
-      var rs=byW[w]; var tm=rs.reduce(function(m,r){ return Math.max(m,Number(r[7])||0); },0);
-      return '<div class="vo-writer"><h4>'+voEsc(w)+' <span style="font-weight:normal;color:#9aa59d;font-size:12px">'+(tm?('전송 '+voTime(tm)):'')+'</span></h4>'
-        +voRowsHTML(rs.map(function(r){return [r[0],r[1],r[2],r[3],r[4],r[5]];}))+'</div>';
-    }).join('');
-    var none=NAMES.filter(function(n){return !byW[n];});
-    if(!html) html='<div class="vo-empty">이 날짜에 전송된 일지가 없어요.</div>';
-    if(none.length) html+='<div class="vo-none">전송 없음: '+none.map(voEsc).join(', ')+'</div>';
-    voBody.innerHTML=html;
-  };
-  function voRenderAll(){
-    voDate.style.display='';
-    voBody.innerHTML='<div class="vo-empty">불러오는 중...</div>';
-    var s=document.createElement('script');
-    s.src=APPS_URL+'?action=day&date='+encodeURIComponent(voDate.value||dateStr())+'&callback=__voDay&t='+Date.now();
-    s.onload=function(){ s.remove(); };
-    s.onerror=function(){ s.remove(); voBody.innerHTML='<div class="vo-empty">불러오기 실패 — 인터넷 연결을 확인하세요.</div>'; };
-    document.body.appendChild(s);
-  }
-  function voRender(){
-    voTabMine.className=(voMode==='mine')?'on':'';
-    voTabAll.className=(voMode==='all')?'on':'';
-    if(voMode==='mine') voRenderMine(); else voRenderAll();
-  }
-  function voOpen(mode){
-    if(mode==='mine' && !wsel.value){ alert('먼저 작성자 이름을 선택하세요.'); return; }
-    voMode=mode; voDate.value=dateStr(); voOv.style.display='flex'; voRender();
-  }
-  document.getElementById('btnViewMine').addEventListener('click',function(){ voOpen('mine'); });
-  document.getElementById('btnViewAll').addEventListener('click',function(){ voOpen('all'); });
-  voTabMine.addEventListener('click',function(){ if(!wsel.value){ alert('먼저 작성자 이름을 선택하세요.'); return; } voMode='mine'; voRender(); });
-  voTabAll.addEventListener('click',function(){ voMode='all'; voRender(); });
-  voDate.addEventListener('change',function(){ if(voMode==='all') voRenderAll(); });
-  document.getElementById('voClose').addEventListener('click',function(){ voOv.style.display='none'; });
-  voOv.addEventListener('click',function(e){ if(e.target===voOv) voOv.style.display='none'; });
+  // ===== 내 일지 — 주간 전체화면 대시보드 =====
+  (function(){ var st=document.createElement('style');
+    st.textContent=
+      '#weekView{position:fixed;inset:0;background:#eef3ef;z-index:60;display:none;overflow-y:auto;}'
+      +'.wv-top{position:sticky;top:0;background:linear-gradient(135deg,#1e5631,#2e7d46);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:2;}'
+      +'.wv-back{border:1.5px solid rgba(255,255,255,.6);background:rgba(255,255,255,.15);color:#fff;border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:bold;font-family:inherit;font-size:14px;}'
+      +'.wv-title{font-size:17px;font-weight:bold;}'
+      +'.wv-nav{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap;}'
+      +'.wv-nav button{border:1.5px solid rgba(255,255,255,.6);background:rgba(255,255,255,.15);color:#fff;border-radius:9px;padding:7px 12px;cursor:pointer;font-family:inherit;font-size:13px;}'
+      +'#wvRange{font-size:14px;font-weight:bold;min-width:160px;text-align:center;}'
+      +'.wv-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;padding:16px 18px 50px;max-width:1500px;margin:0 auto;}'
+      +'.wv-day{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.07);display:flex;flex-direction:column;min-height:220px;overflow:hidden;}'
+      +'.wv-dhead{padding:10px 12px;border-bottom:2px solid #eef;display:flex;align-items:baseline;gap:7px;background:#f7faf8;}'
+      +'.wv-dhead b{font-size:16px;color:#1e5631;}.wv-dhead span{font-size:13px;color:#789;}'
+      +'.wv-dhead em{margin-left:auto;font-style:normal;font-size:12px;color:#fff;background:#8a9a90;border-radius:10px;padding:1px 8px;}'
+      +'.wv-dhead.today b{color:#e8842c;}.wv-dhead.today{background:#fff6ed;}'
+      +'.wv-entries{flex:1;padding:8px 10px;display:flex;flex-direction:column;gap:7px;}'
+      +'.wv-entry{display:flex;align-items:center;gap:6px;border:1px solid #eef1ef;border-radius:9px;padding:6px 7px;background:#fafcfb;flex-wrap:wrap;}'
+      +'.wv-cat{color:#fff;font-size:11px;font-weight:bold;padding:2px 7px;border-radius:9px;white-space:nowrap;}'
+      +'.wv-place{font-size:12.5px;color:#456;font-weight:bold;}'
+      +'.wv-memo{flex:1;min-width:80px;border:1px solid #e0e6e2;border-radius:7px;padding:5px 7px;font-size:12.5px;font-family:inherit;}'
+      +'.wv-memo:focus{outline:none;border-color:#3f9d5a;}'
+      +'.wv-del{border:none;background:none;color:#c0392b;font-size:17px;cursor:pointer;line-height:1;padding:0 2px;margin-left:auto;}'
+      +'.wv-add .wv-acat{border:1px solid #cfdcd3;border-radius:7px;padding:4px;font-size:12px;font-family:inherit;}'
+      +'.wv-aplace{width:84px;border:1px solid #e0e6e2;border-radius:7px;padding:5px;font-size:12px;font-family:inherit;}'
+      +'.wv-dadd{padding:8px 10px;border-top:1px dashed #e6ece8;display:flex;gap:8px;flex-wrap:wrap;}'
+      +'.wv-dadd button{border:1px dashed #1e5631;color:#1e5631;background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12.5px;font-family:inherit;}'
+      +'.wv-save{background:#b8860b!important;color:#fff!important;border:none!important;font-weight:bold;opacity:.5;}'
+      +'.wv-day.dirty .wv-save{opacity:1;box-shadow:0 0 0 3px rgba(184,134,11,.35);}'
+      +'.wv-day.dirty .wv-dhead{box-shadow:inset 5px 0 0 #b8860b;}'
+      +'#wvSaveAll{background:#b8860b!important;border-color:#b8860b!important;font-weight:bold;}'
+      +'.wv-empty{color:#bbb;font-size:12.5px;text-align:center;padding:14px 0;}'
+      +'.wv-loading{padding:48px;text-align:center;color:#789;font-size:15px;grid-column:1/-1;}'
+      +'@media (max-width:760px){.wv-grid{grid-template-columns:1fr;gap:10px;padding:12px;}.wv-nav{margin-left:0;width:100%;justify-content:space-between;}.wv-title{width:100%;}}';
+    document.head.appendChild(st); })();
 
-  // ===== 김재성 전용: 마스터 수정(다른 직원 일지 기록 수정·삭제·대리 작성) =====
+  var WV_DAYS=['월','화','수','목','금'];
+  var wvEl=document.getElementById('weekView'), wvGrid=document.getElementById('wvGrid');
+  var wvStart=null, wvSeq=0;
+  function wvColor(cat,item){ if(item==='단타') return '#12a594'; return CAT_COLORS[cat]||'#8a8f98'; }
+  function wvBadge(cat,item){ return (item && item!==cat)?item:cat; }
+  function mondayOf(dt){ var x=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate()); var day=x.getDay(); x.setDate(x.getDate()+(day===0?-6:1-day)); return x; }
+  function dStr(x){ return x.getFullYear()+'-'+pad2(x.getMonth()+1)+'-'+pad2(x.getDate()); }
+  function wvDates(){ var arr=[]; for(var i=0;i<5;i++){ var x=new Date(wvStart.getFullYear(),wvStart.getMonth(),wvStart.getDate()+i); arr.push(x); } return arr; }
+  function wvRangeText(){ var ds=wvDates(); var a=ds[0],b=ds[4]; return a.getFullYear()+'.'+pad2(a.getMonth()+1)+'.'+pad2(a.getDate())+' ~ '+pad2(b.getMonth()+1)+'.'+pad2(b.getDate()); }
+
+  function wvEntryHTML(e){
+    // e=[분류,지역,현장,항목,단계,비고]
+    var cat=e[0]||'', region=e[1]||'', site=e[2]||'', item=e[3]||cat, stage=e[4]||'', memo=e[5]||'';
+    var color=wvColor(cat,item), badge=wvBadge(cat,item);
+    var attrs=' data-kind="exist" data-cat="'+sEsc(cat)+'" data-region="'+sEsc(region)+'" data-site="'+sEsc(site)+'" data-item="'+sEsc(item)+'" data-stage="'+sEsc(stage)+'"';
+    var place=[region,site].filter(Boolean).join(' ');
+    var field;
+    if(item==='연차'){ field='<input class="wv-memo" type="date" value="'+sEsc(stage)+'">'; }
+    else { field='<input class="wv-memo" value="'+sEsc(memo)+'" placeholder="내용">'; }
+    return '<div class="wv-entry"'+attrs+'>'
+      +'<span class="wv-cat" style="background:'+color+'">'+sEsc(badge)+'</span>'
+      +(place?'<span class="wv-place">'+sEsc(place)+'</span>':'')
+      +field
+      +'<button class="wv-del" type="button" title="삭제">×</button></div>';
+  }
+  function wvAddEntryHTML(){
+    var opts=['점검','소독','공사','사무'].map(function(c){return '<option>'+c+'</option>';}).join('');
+    return '<div class="wv-entry wv-add" data-kind="add">'
+      +'<select class="wv-acat">'+opts+'</select>'
+      +'<input class="wv-aplace" placeholder="장소(선택)">'
+      +'<input class="wv-memo wv-amemo" placeholder="내용">'
+      +'<button class="wv-del" type="button" title="삭제">×</button></div>';
+  }
+  function wvDayCardHTML(dateObj, idx, entries){
+    var ds=dStr(dateObj), isToday=(ds===todayStrFixed());
+    var body = entries.length ? entries.map(wvEntryHTML).join('') : '<div class="wv-empty">기록 없음</div>';
+    return '<div class="wv-day" data-date="'+ds+'">'
+      +'<div class="wv-dhead'+(isToday?' today':'')+'"><b>'+WV_DAYS[idx]+'</b><span>'+pad2(dateObj.getMonth()+1)+'-'+pad2(dateObj.getDate())+'</span><em class="wv-dcount">'+entries.length+'건</em></div>'
+      +'<div class="wv-entries">'+body+'</div>'
+      +'<div class="wv-dadd"><button type="button" data-add>＋ 추가</button><button type="button" class="wv-save" data-save>저장</button></div>'
+      +'</div>';
+  }
+  function wvRender(byDate){
+    document.getElementById('wvWriter').textContent=wsel.value||'';
+    document.getElementById('wvRange').textContent=wvRangeText();
+    var ds=wvDates();
+    wvGrid.innerHTML=ds.map(function(x,i){ return wvDayCardHTML(x,i,(byDate[dStr(x)]||[])); }).join('');
+    wvUpdateSaveAll();
+  }
+  function wvFetchWeek(){
+    wvGrid.innerHTML='<div class="wv-loading">불러오는 중...</div>';
+    document.getElementById('wvRange').textContent=wvRangeText();
+    var writer=wsel.value, dates=wvDates().map(dStr);
+    var got={}, remain=dates.length, settled=false;
+    function done(ds,rows){ if(got[ds]!==undefined) return; got[ds]=rows; if(--remain<=0 && !settled){ settled=true; wvRender(got); } }
+    dates.forEach(function(ds){
+      var cb='__wvDay'+(++wvSeq);
+      var to=setTimeout(function(){ try{delete window[cb];}catch(e){window[cb]=null;} done(ds,[]); },12000);
+      window[cb]=function(res){ clearTimeout(to); try{delete window[cb];}catch(e){window[cb]=null;}
+        var rows=((res&&res.rows)||[]).filter(function(r){return String(r[6]||'')===writer;})
+          .map(function(r){ return [r[0],r[1],r[2],r[3],r[4],r[5]]; });
+        done(ds,rows);
+      };
+      var s=document.createElement('script');
+      s.src=APPS_URL+'?action=day&date='+encodeURIComponent(ds)+'&callback='+cb+'&t='+Date.now();
+      s.onload=function(){ s.remove(); };
+      s.onerror=function(){ s.remove(); };
+      document.body.appendChild(s);
+    });
+  }
+  function wvUpdateSaveAll(){ var n=wvGrid.querySelectorAll('.wv-day.dirty').length; var b=document.getElementById('wvSaveAll'); if(b) b.textContent = n? ('💾 전체 저장 ('+n+'일)') : '💾 전체 저장'; }
+  function wvMarkDirty(card){ if(card){ card.classList.add('dirty'); wvUpdateSaveAll(); } }
+  function wvUpdateCount(card){ var c=card.querySelectorAll('.wv-entry').length; var em=card.querySelector('.wv-dcount'); if(em) em.textContent=c+'건'; var ent=card.querySelector('.wv-entries'); if(ent && !c) ent.innerHTML='<div class="wv-empty">기록 없음</div>'; }
+  function wvRowFromEntry(dt, el){
+    if(el.dataset.kind==='add'){
+      var acat=el.querySelector('.wv-acat').value;
+      var asite=(el.querySelector('.wv-aplace').value||'').trim();
+      var amemo=(el.querySelector('.wv-amemo').value||'').trim();
+      if(!asite && !amemo) return null;
+      return [dt,acat,'',asite,acat,'',amemo];
+    }
+    var cat=el.dataset.cat, region=el.dataset.region||'', site=el.dataset.site||'', item=el.dataset.item||cat, stage=el.dataset.stage||'';
+    var val=(el.querySelector('.wv-memo')||{}).value||'';
+    if(item==='연차') return [dt,'사무','','','연차',val,''];
+    if(item==='기타업무') return [dt,'사무','','','기타업무','',val];
+    return [dt,cat,region,site,item,stage,val];
+  }
+  function wvSaveDay(card, skipConfirm){
+    var dt=card.dataset.date;
+    if(!wsel.value){ alert('먼저 작성자 이름을 선택하세요.'); return; }
+    if(!PINOK){ alert('본인 확인이 필요해요. 작성 화면에서 이름을 다시 선택해 주세요.'); return; }
+    var rows=[];
+    card.querySelectorAll('.wv-entry').forEach(function(el){ var r=wvRowFromEntry(dt,el); if(r) rows.push(r); });
+    if(!skipConfirm && !confirm(dt+' 일지를 '+rows.length+'건으로 저장(덮어쓰기)할까요?\n(0건이면 그 날 기록을 모두 지웁니다)')) return;
+    var btn=card.querySelector('.wv-save'); btn.disabled=true; btn.textContent='저장 중...';
+    return fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'submit', writer:wsel.value, pinHash:myPinHash(), date:dt, delta:{est:[],stage:[],recv:[],doc:[]}, rows:rows, sel:{}})})
+      .then(function(){ card.classList.remove('dirty'); wvUpdateSaveAll(); btn.textContent='저장됨 ✓'; setTimeout(function(){ btn.textContent='저장'; btn.disabled=false; },1800);
+        if(dt===dateStr()){ try{ localStorage.setItem(sentKey(), nowStamp()); }catch(e){} renderSentStatus(); } })
+      .catch(function(){ alert('저장 실패 — 인터넷 연결을 확인하세요.'); btn.textContent='저장'; btn.disabled=false; });
+  }
+  function wvSaveAll(){
+    if(!wsel.value){ alert('먼저 작성자 이름을 선택하세요.'); return; }
+    var dirty=[].slice.call(wvGrid.querySelectorAll('.wv-day.dirty'));
+    if(!dirty.length){ alert('변경된 내용이 없어요.\n항목을 추가·삭제·수정하면 그 요일에 저장 표시가 켜집니다.'); return; }
+    if(!confirm('변경된 '+dirty.length+'일치 일지를 저장(덮어쓰기)할까요?')) return;
+    dirty.forEach(function(c){ wvSaveDay(c, true); });
+  }
+  // 그리드 이벤트(추가·삭제·저장·수정 감지)
+  wvGrid.addEventListener('click',function(e){
+    var card=e.target.closest('.wv-day'); if(!card) return;
+    if(e.target.closest('[data-add]')){
+      var ent=card.querySelector('.wv-entries');
+      var emp=ent.querySelector('.wv-empty'); if(emp) emp.remove();
+      ent.insertAdjacentHTML('beforeend', wvAddEntryHTML());
+      wvMarkDirty(card); wvUpdateCount(card); return;
+    }
+    if(e.target.closest('[data-save]')){ wvSaveDay(card); return; }
+    if(e.target.closest('.wv-del')){ var en=e.target.closest('.wv-entry'); if(en){ en.remove(); wvMarkDirty(card); wvUpdateCount(card); } return; }
+  });
+  wvGrid.addEventListener('input',function(e){ var card=e.target.closest('.wv-day'); if(card) wvMarkDirty(card); });
+  wvGrid.addEventListener('change',function(e){ var card=e.target.closest('.wv-day'); if(card) wvMarkDirty(card); });
+
+  function wvOpen(){
+    if(!wsel.value){ alert('먼저 작성자 이름을 선택하세요.'); return; }
+    wvStart=mondayOf(cur);
+    wvEl.style.display='block';
+    document.getElementById('wvWriter').textContent=wsel.value;
+    wvFetchWeek();
+  }
+  document.getElementById('btnViewMine').addEventListener('click',wvOpen);
+  document.getElementById('wvBack').addEventListener('click',function(){ wvEl.style.display='none'; });
+  document.getElementById('wvPrev').addEventListener('click',function(){ wvStart=new Date(wvStart.getFullYear(),wvStart.getMonth(),wvStart.getDate()-7); wvFetchWeek(); });
+  document.getElementById('wvNext').addEventListener('click',function(){ wvStart=new Date(wvStart.getFullYear(),wvStart.getMonth(),wvStart.getDate()+7); wvFetchWeek(); });
+  document.getElementById('wvReload').addEventListener('click',function(){ wvFetchWeek(); });
+  document.getElementById('wvSaveAll').addEventListener('click',wvSaveAll);
+
+  // ===== 김재성 전용: 마스터 수정(다른 직원 일지 수정·삭제·대리작성) =====
   var aeOv=document.getElementById('adminOverlay');
-  var aeOrigEsts=[];   // 불러온 견적서 원본 목록(이름변경·삭제 추적용)
-  function aeEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+  function aeEsc(s){ return sEsc(s); }
   function aeOpen(){
     if(!PINOK || (wsel.value||'').indexOf('김재성')!==0){ alert('김재성님 본인 확인 후 사용할 수 있어요.'); return; }
     var sel=document.getElementById('aeWriter');
     sel.innerHTML=NAMES.filter(function(n){return n.indexOf('김재성')!==0;}).map(function(n){return '<option>'+aeEsc(n)+'</option>';}).join('');
     document.getElementById('aeDate').value=dateStr();
     document.getElementById('aeRows').innerHTML='';
-    aeOrigEsts=[];
     document.getElementById('aeMsg').textContent='직원과 날짜를 고르고 「불러오기」를 누르세요.';
     aeOv.style.display='flex';
   }
@@ -1376,15 +916,6 @@
     var rows=((res&&res.rows)||[]).filter(function(r){ return String(r[6]||'')===w; });
     var tb=document.getElementById('aeRows');
     tb.innerHTML=rows.map(function(r){ return aeRowHTML([r[0],r[1],r[2],r[3],r[4],r[5]]); }).join('');
-    // 견적서 행(분류=사무, 내용=견적서)에 원본 태그 부여 → 이름변경·삭제 추적
-    aeOrigEsts=[];
-    var trs=tb.querySelectorAll('tr');
-    rows.forEach(function(r,i){
-      if(String(r[0])==='사무' && String(r[3])==='견적서' && trs[i]){
-        var gk=String(r[1]||'')+'|'+String(r[2]||''), nm=String(r[4]||'');
-        if(gk!=='|' && nm){ trs[i].dataset.oest=gk+'|||'+nm; aeOrigEsts.push({gk:gk,name:nm}); }
-      }
-    });
     document.getElementById('aeMsg').textContent=rows.length
       ? (w+' 님의 '+document.getElementById('aeDate').value+' 기록 '+rows.length+'건 — 고치거나 지우고 「저장」을 누르세요.')
       : (w+' 님은 이 날짜에 전송한 기록이 없어요. 「＋ 행 추가」로 대신 작성할 수 있어요.');
@@ -1406,85 +937,6 @@
     });
     return rows;
   }
-  // 현재 표의 견적서 행을 읽어 확정현황(estimates)에 반영할 작업을 만든다.
-  // 이름이 바뀌면 연결된 공사단계·입고·문서기록(wstat/recv/docrec)도 함께 옮긴다.
-  function aeBuildEstSync(){
-    var cur=[], seen={}, renamedFrom={};
-    document.querySelectorAll('#aeRows tr').forEach(function(tr){
-      var g=function(c){ var el=tr.querySelector('.'+c); return el?String(el.value||'').trim():''; };
-      if(g('ae-cat')!=='사무' || g('ae-item')!=='견적서') return;
-      var region=g('ae-region'), site=g('ae-site'), name=g('ae-stage'), memo=g('ae-memo');
-      if(!region || !site || !name) return;
-      var gk=region+'|'+site;
-      var orig=tr.dataset.oest||'', oldgk='', oldname='';
-      if(orig){ var s=orig.indexOf('|||'); oldgk=orig.slice(0,s); oldname=orig.slice(s+3); }
-      var date=(memo.match(/(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
-      cur.push({gk:gk,name:name,date:date,oldgk:oldgk,oldname:oldname});
-      seen[gk+'|||'+name]=1;
-      if(oldname && (oldgk!==gk || oldname!==name)) renamedFrom[oldgk+'|||'+oldname]=1;
-    });
-    var dels=[];
-    (aeOrigEsts||[]).forEach(function(o){
-      var key=o.gk+'|||'+o.name;
-      if(!seen[key] && !renamedFrom[key]) dels.push(o);
-    });
-    if(!cur.length && !dels.length) return null;
-    return function(m){
-      m.estimates=m.estimates||{}; m.wstat=m.wstat||{}; m.recv=m.recv||{}; m.docrec=m.docrec||{};
-      function moveLinked(store, oldgk, oldname, gk, name){
-        if(store[oldgk] && store[oldgk][oldname]!=null){
-          var v=store[oldgk][oldname]; delete store[oldgk][oldname];
-          if(!Object.keys(store[oldgk]).length) delete store[oldgk];
-          store[gk]=store[gk]||{}; store[gk][name]=v;
-        }
-      }
-      function dropLinked(store, gk, name){
-        if(store[gk]){ delete store[gk][name]; if(!Object.keys(store[gk]).length) delete store[gk]; }
-      }
-      cur.forEach(function(c){
-        // 이름(또는 현장) 변경 → 옛 항목 제거 + 연결기록 이동
-        if(c.oldname && (c.oldgk!==c.gk || c.oldname!==c.name)){
-          if(m.estimates[c.oldgk]){
-            var oi=m.estimates[c.oldgk].findIndex(function(y){return y.name===c.oldname;});
-            if(oi>=0){ if(!c.date) c.date=m.estimates[c.oldgk][oi].date||''; m.estimates[c.oldgk].splice(oi,1); if(!m.estimates[c.oldgk].length) delete m.estimates[c.oldgk]; }
-          }
-          moveLinked(m.wstat, c.oldgk, c.oldname, c.gk, c.name);
-          moveLinked(m.recv, c.oldgk, c.oldname, c.gk, c.name);
-          moveLinked(m.docrec, c.oldgk, c.oldname, c.gk, c.name);
-        }
-        var arr=m.estimates[c.gk]=m.estimates[c.gk]||[];
-        var idx=arr.findIndex(function(y){return y.name===c.name;});
-        if(idx<0) arr.push({name:c.name, date:c.date||dateStr()});
-        else if(c.date) arr[idx].date=c.date;
-      });
-      dels.forEach(function(d){
-        if(m.estimates[d.gk]){
-          var di=m.estimates[d.gk].findIndex(function(y){return y.name===d.name;});
-          if(di>=0){ m.estimates[d.gk].splice(di,1); if(!m.estimates[d.gk].length) delete m.estimates[d.gk]; }
-        }
-        dropLinked(m.wstat, d.gk, d.name);
-        dropLinked(m.recv, d.gk, d.name);
-        dropLinked(m.docrec, d.gk, d.name);
-      });
-    };
-  }
-  function aeApplyMaster(rows){
-    var stageRows=rows.filter(function(r){ return r[1]==='공사' && r[3] && r[4] && r[5]; });
-    var estSync=aeBuildEstSync();
-    if(!stageRows.length && !estSync) return;
-    window.__aeMaster=function(m){
-      m=m||{}; m.estimates=m.estimates||{}; m.wstat=m.wstat||{}; m.recv=m.recv||{}; m.docrec=m.docrec||{};
-      stageRows.forEach(function(r){ var gk=(r[2]||'')+'|'+r[3]; m.wstat[gk]=m.wstat[gk]||{}; m.wstat[gk][r[4]]=r[5]; });
-      if(estSync) estSync(m);
-      fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify({action:'setmaster', master:m, pinHash:myPinHash()})})
-        .then(function(){ __applyMaster(m); });
-    };
-    var s=document.createElement('script');
-    s.src=APPS_URL+'?action=master&callback=__aeMaster&t='+Date.now();
-    s.onload=function(){s.remove();}; s.onerror=function(){s.remove();};
-    document.body.appendChild(s);
-  }
   function aeSave(){
     var w=document.getElementById('aeWriter').value, dt=document.getElementById('aeDate').value;
     var rows=aeCollect();
@@ -1493,9 +945,8 @@
     fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({action:'submit', writer:w, pinHash:'', adminHash:myPinHash(), date:dt, delta:{est:[],stage:[],recv:[],doc:[]}, rows:rows, sel:{}})})
       .then(function(){
-        if(document.getElementById('aeApplyStage').checked) aeApplyMaster(rows);
         btn.textContent='저장 완료 ✓'; setTimeout(function(){btn.textContent='저장(직원 명의)';btn.disabled=false;},2500);
-        document.getElementById('aeMsg').textContent='저장됐어요. 전체 일지·주간보고에 바로 반영됩니다.';
+        document.getElementById('aeMsg').textContent='저장됐어요. 해당 직원의 그 날짜 기록이 새 내용으로 반영됩니다.';
       })
       .catch(function(){ alert('저장 실패 — 인터넷 연결을 확인하세요.'); btn.textContent='저장(직원 명의)'; btn.disabled=false; });
   }
@@ -1507,13 +958,15 @@
   document.getElementById('aeClose').addEventListener('click',function(){ aeOv.style.display='none'; });
   aeOv.addEventListener('click',function(e){ if(e.target===aeOv) aeOv.style.display='none'; });
 
+  // ===== 초기화 =====
+  renderSummary();
   buttons[0].click();
-  loadMaster();   // 서버 확정현황 불러오기 + 기기복구 시도
-  // 저장된 이름이 있으면 본인 확인(이 기기에 비번이 저장돼 있으면 조용히 통과)
+  updateAdminVis();
+  renderSentStatus();
   if(wsel.value){
     pinGate(wsel.value,
-      function(){ __prevWriter=wsel.value; updateConsolVis(); tryRecover(); },
-      function(){ wsel.value=''; try{ localStorage.setItem('ilji_writer',''); }catch(e){} updateConsolVis(); });
+      function(){ __prevWriter=wsel.value; updateAdminVis(); },
+      function(){ wsel.value=''; try{ localStorage.setItem('ilji_writer',''); }catch(e){} updateAdminVis(); });
   }
 </script>
 </body>
