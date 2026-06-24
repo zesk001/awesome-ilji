@@ -444,6 +444,19 @@
         'data-key="'+sEsc(key)+'" data-name="'+sEsc(display)+'" data-region="'+sEsc(region)+'" data-sub="'+(sub?1:'')+'"'+sty+'>'+
         '<span class="sr-name">'+sEsc(display)+'</span></div>';
     }
+    // 기타구역: 이름 직접입력 추가 / 표시 / 삭제
+    function addCustomRegion(region,nm){
+      nm=(nm||'').trim(); if(!nm) return false;
+      const key='기타:'+region+'|'+nm+'|'+Date.now();
+      SEL[cat]=SEL[cat]||{}; SEL[cat][key]={region:region,name:nm,sub:false,memo:'',custom:true};
+      saveSel(); renderSummary(); return true;
+    }
+    function customRowsHTML(region){
+      const sc=SEL[cat]||{};
+      return Object.keys(sc).filter(k=>sc[k]&&sc[k].custom&&sc[k].region===region)
+        .map(k=>'<div class="rc-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid '+color+'66;border-radius:8px;margin-top:6px;background:#f5faf6"><span class="sr-name">✏ '+sEsc(sc[k].name)+'</span><i class="rc-del" data-key="'+sEsc(k)+'" style="cursor:pointer;color:#e5484d;font-size:18px;line-height:1" title="삭제">×</i></div>')
+        .join('');
+    }
     function showRegions(){
       panel.innerHTML=head('지역 선택')+searchBarHTML()+'<div class="region-grid"></div>';
       const grid=panel.querySelector('.region-grid');
@@ -455,22 +468,30 @@
     }
     function showSchools(region){
       const isExtra = extra && region===extra.label;
-      let rows, headCount, unit;
+      let rows='', htxt;
       if(isExtra){
-        rows=extra.items.map(n=>rowHTML(n, region+'|'+n, region, false)).join('');
-        headCount=extra.items.length; unit='개';
+        htxt=region;                 // 기타지역: 직접 입력만
       } else {
-        const sites=siteList(region);
-        headCount=sites.length; unit='곳';
+        const sites=siteList(region).filter(n=>n!=='기타구역');   // '기타구역'은 직접입력으로 대체
+        htxt=region+' · '+sites.length+'곳';
         rows=sites.map(n=>rowHTML(n, region+'|'+n, region, false)).join('');
         if(sg){
           rows+='<div class="sub-sep" style="color:'+sg.color+';border-color:'+sg.color+'55">'+sg.label+'</div>';
           rows+=sg.items.map(n=>rowHTML(n, region+'|'+n, region, true, sg.color)).join('');
         }
       }
-      panel.innerHTML=head(region+' · '+headCount+unit)+
+      const crows=customRowsHTML(region);
+      const rc='<div class="rc-wrap" style="margin-top:12px">'+
+          '<div class="work-note">목록에 없는 곳은 <b>이름을 직접 적어</b> 추가하세요 (기타구역).</div>'+
+          '<div style="display:flex;gap:6px">'+
+            '<input class="rc-input recv-input" data-region="'+sEsc(region)+'" placeholder="예: ○○공원, ○○빌라, ○○유치원" style="flex:1;margin:0">'+
+            '<button class="rc-add" data-region="'+sEsc(region)+'" style="padding:10px 16px;border:none;border-radius:8px;background:'+color+';color:#fff;font-weight:700;cursor:pointer;white-space:nowrap">추가</button>'+
+          '</div>'+
+          (crows?('<div class="rc-list">'+crows+'</div>'):'')+
+        '</div>';
+      panel.innerHTML=head(htxt)+
         '<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
-        '<div class="school-list">'+rows+'</div>';
+        '<div class="school-list">'+rows+'</div>'+rc;
     }
     // 사무 전용 화면 — 기타업무를 한 건씩(+) 추가
     function etcEntries(){
@@ -520,6 +541,19 @@
       const reg=e.target.closest('button[data-region]');
       if(reg){ showSchools(reg.dataset.region); return; }
       if(e.target.closest('[data-back]')){ showRegions(); return; }
+      const rcAdd=e.target.closest('.rc-add');
+      if(rcAdd){
+        const region=rcAdd.dataset.region; const inp=panel.querySelector('.rc-input');
+        if(addCustomRegion(region, inp&&inp.value)){ showSchools(region); const ni=panel.querySelector('.rc-input'); if(ni) ni.focus(); }
+        else if(inp) inp.focus();
+        return;
+      }
+      const rcDel=e.target.closest('.rc-del');
+      if(rcDel){
+        const k=rcDel.dataset.key; const region=(SEL[cat]&&SEL[cat][k]&&SEL[cat][k].region)||'';
+        if(SEL[cat]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
+        saveSel(); renderSummary(); showSchools(region); return;
+      }
       const row=e.target.closest('.school-row');
       if(row){
         const sub=row.dataset.sub==='1', key=row.dataset.key;
@@ -547,6 +581,14 @@
         if(v) SEL[cat]['__연차']={region:'',name:'연차 '+v,type:'연차',leaveDate:v,memo:''};
         else { delete SEL[cat]['__연차']; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
         saveSel(); renderSummary();
+      }
+    });
+    panel.addEventListener('keydown',e=>{
+      const ri=e.target.closest('.rc-input');
+      if(ri && e.key==='Enter' && !e.isComposing && e.keyCode!==229){
+        e.preventDefault();
+        const region=ri.dataset.region;
+        if(addCustomRegion(region, ri.value)){ showSchools(region); const ni=panel.querySelector('.rc-input'); if(ni) ni.focus(); }
       }
     });
     wireSearch(panel, cat);
