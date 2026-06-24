@@ -522,6 +522,19 @@
         '<input type="date" id="annualDate" class="site-search" style="max-width:260px" value="'+sEsc(dv)+'">';
     }
     panel.addEventListener('click',e=>{
+      const rcAdd=e.target.closest('.rc-add');
+      if(rcAdd){
+        const region=rcAdd.dataset.region; const inp=panel.querySelector('.rc-input');
+        if(addCustomRegion(region, inp&&inp.value)){ showSchools(region); const ni=panel.querySelector('.rc-input'); if(ni) ni.focus(); }
+        else if(inp) inp.focus();
+        return;
+      }
+      const rcDel=e.target.closest('.rc-del');
+      if(rcDel){
+        const k=rcDel.dataset.key; const region=(SEL[cat]&&SEL[cat][k]&&SEL[cat][k].region)||'';
+        if(SEL[cat]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
+        saveSel(); renderSummary(); showSchools(region); return;
+      }
       if(e.target.closest('[data-etc-add]')){
         const id='__기타_'+Date.now();
         SEL[cat]=SEL[cat]||{};
@@ -541,19 +554,6 @@
       const reg=e.target.closest('button[data-region]');
       if(reg){ showSchools(reg.dataset.region); return; }
       if(e.target.closest('[data-back]')){ showRegions(); return; }
-      const rcAdd=e.target.closest('.rc-add');
-      if(rcAdd){
-        const region=rcAdd.dataset.region; const inp=panel.querySelector('.rc-input');
-        if(addCustomRegion(region, inp&&inp.value)){ showSchools(region); const ni=panel.querySelector('.rc-input'); if(ni) ni.focus(); }
-        else if(inp) inp.focus();
-        return;
-      }
-      const rcDel=e.target.closest('.rc-del');
-      if(rcDel){
-        const k=rcDel.dataset.key; const region=(SEL[cat]&&SEL[cat][k]&&SEL[cat][k].region)||'';
-        if(SEL[cat]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
-        saveSel(); renderSummary(); showSchools(region); return;
-      }
       const row=e.target.closest('.school-row');
       if(row){
         const sub=row.dataset.sub==='1', key=row.dataset.key;
