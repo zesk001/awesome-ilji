@@ -472,12 +472,24 @@
         '<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
         '<div class="school-list">'+rows+'</div>';
     }
-    // 사무 전용 화면
+    // 사무 전용 화면 — 기타업무를 한 건씩(+) 추가
+    function etcEntries(){
+      const out=[]; const s=SEL[cat]||{};
+      Object.keys(s).forEach(k=>{ if(s[k]&&s[k].type==='기타업무') out.push([k,s[k]]); });
+      return out;
+    }
+    function etcRowHTML(key,v){
+      return '<div class="etc-item" data-key="'+sEsc(key)+'" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'+
+        '<input class="etc-input recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0" value="'+sEsc(v.workText||'')+'" placeholder="예: 세금계산서 정리">'+
+        '<i class="etc-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:0 8px" title="삭제">×</i>'+
+        '</div>';
+    }
     function showEtcWork(){
-      let txt=''; if(SEL[cat]&&SEL[cat]['__기타업무']) txt=SEL[cat]['__기타업무'].workText||'';
+      const rows=etcEntries().map(p=>etcRowHTML(p[0],p[1])).join('');
       panel.innerHTML=head('기타업무')+'<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
-        '<div class="work-note">현장과 상관없는 사무 업무를 자유롭게 적으세요. 여러 줄로 적어도 됩니다.</div>'+
-        '<textarea id="etcWorkText" class="recv-input" style="min-height:120px" placeholder="예: 세금계산서 정리, 거래처 통화, 자재 발주 문의">'+sEsc(txt)+'</textarea>';
+        '<div class="work-note">현장과 상관없는 사무 업무를 <b>한 건씩</b> 적으세요. 아래 <b>＋ 업무 추가</b>를 누르면 칸이 늘어납니다.</div>'+
+        '<div class="etc-list">'+rows+'</div>'+
+        '<button class="etc-add" data-etc-add="1" style="margin-top:6px;padding:11px 14px;border:2px dashed '+color+';background:#f6f7f9;border-radius:10px;color:#444;font-weight:700;cursor:pointer;width:100%">＋ 업무 추가</button>';
     }
     function showAnnual(){
       let dv=''; if(SEL[cat]&&SEL[cat]['__연차']) dv=SEL[cat]['__연차'].leaveDate||'';
@@ -486,6 +498,20 @@
         '<input type="date" id="annualDate" class="site-search" style="max-width:260px" value="'+sEsc(dv)+'">';
     }
     panel.addEventListener('click',e=>{
+      if(e.target.closest('[data-etc-add]')){
+        const id='__기타_'+Date.now();
+        SEL[cat]=SEL[cat]||{};
+        SEL[cat][id]={region:'',name:'기타업무',type:'기타업무',workText:'',memo:''};
+        saveSel(); renderSummary(); showEtcWork();
+        const inps=panel.querySelectorAll('.etc-input'); if(inps.length) inps[inps.length-1].focus();
+        return;
+      }
+      const ed=e.target.closest('.etc-del');
+      if(ed){
+        const k=ed.dataset.key;
+        if(SEL[cat]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
+        saveSel(); renderSummary(); showEtcWork(); return;
+      }
       const sp=e.target.closest('button[data-special]');
       if(sp){ if(sp.dataset.special==='기타업무') showEtcWork(); else showAnnual(); return; }
       const reg=e.target.closest('button[data-region]');
@@ -499,12 +525,13 @@
       }
     });
     panel.addEventListener('input',e=>{
-      if(e.target.id==='etcWorkText'){
-        const v=e.target.value; SEL[cat]=SEL[cat]||{};
-        if(v.trim()) SEL[cat]['__기타업무']={region:'',name:'기타업무',type:'기타업무',workText:v,memo:''};
-        else { delete SEL[cat]['__기타업무']; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
-        saveSel(); renderSummary();
-      } else if(e.target.id==='annualDate'){
+      const ei=e.target.closest('.etc-input');
+      if(ei){
+        const k=ei.dataset.key, v=ei.value; SEL[cat]=SEL[cat]||{};
+        SEL[cat][k]={region:'',name:(v.trim()||'기타업무'),type:'기타업무',workText:v,memo:''};
+        saveSel(); renderSummary(); return;
+      }
+      if(e.target.id==='annualDate'){
         const v=e.target.value; SEL[cat]=SEL[cat]||{};
         if(v) SEL[cat]['__연차']={region:'',name:'연차 '+v,type:'연차',leaveDate:v,memo:''};
         else { delete SEL[cat]['__연차']; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
@@ -664,7 +691,7 @@
     ['점검','소독','공사','사무'].forEach(cat=>{
       Object.keys(SEL[cat]||{}).forEach(k=>{
         const v=SEL[cat][k]||{};
-        if(v.type==='기타업무'){ rows.push([dt,'사무','','','기타업무','',v.workText||'']); return; }
+        if(v.type==='기타업무'){ if(!(v.workText||'').trim()) return; rows.push([dt,'사무','','','기타업무','',v.workText||'']); return; }
         if(v.type==='연차'){ rows.push([dt,'사무','','','연차',v.leaveDate||'','']); return; }
         const item = (cat==='소독' && v.sub) ? '단타' : cat;
         rows.push([dt,cat,v.region||'',v.name||'',item,'',v.memo||'']);
