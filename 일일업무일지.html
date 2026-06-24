@@ -479,9 +479,9 @@
       return out;
     }
     function etcRowHTML(key,v){
-      return '<div class="etc-item" data-key="'+sEsc(key)+'" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'+
-        '<input class="etc-input recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0" value="'+sEsc(v.workText||'')+'" placeholder="예: 세금계산서 정리">'+
-        '<i class="etc-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:0 8px" title="삭제">×</i>'+
+      return '<div class="etc-item" data-key="'+sEsc(key)+'" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:8px">'+
+        '<textarea class="etc-input recv-input" data-key="'+sEsc(key)+'" rows="2" style="flex:1;margin:0;resize:vertical;min-height:42px;line-height:1.45;font-family:inherit" placeholder="예: 세금계산서 정리 (엔터로 줄을 늘릴 수 있어요)">'+sEsc(v.workText||'')+'</textarea>'+
+        '<i class="etc-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:6px 8px 0" title="삭제">×</i>'+
         '</div>';
     }
     function showEtcWork(){
@@ -536,19 +536,6 @@
         if(v) SEL[cat]['__연차']={region:'',name:'연차 '+v,type:'연차',leaveDate:v,memo:''};
         else { delete SEL[cat]['__연차']; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
         saveSel(); renderSummary();
-      }
-    });
-    // 기타업무 칸에서 엔터 → 다음 줄(새 칸) 추가하고 그 칸으로 이동
-    // 한글 입력 중 엔터(글자 확정)는 제외(e.isComposing / keyCode 229)
-    panel.addEventListener('keydown',e=>{
-      const ei=e.target.closest('.etc-input');
-      if(ei && (e.key==='Enter') && !e.isComposing && e.keyCode!==229){
-        e.preventDefault();
-        const id='__기타_'+Date.now();
-        SEL[cat]=SEL[cat]||{};
-        SEL[cat][id]={region:'',name:'기타업무',type:'기타업무',workText:'',memo:''};
-        saveSel(); renderSummary(); showEtcWork();
-        const inps=panel.querySelectorAll('.etc-input'); if(inps.length) inps[inps.length-1].focus();
       }
     });
     wireSearch(panel, cat);
