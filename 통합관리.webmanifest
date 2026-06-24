@@ -1,0 +1,16 @@
+{
+  "name": "어썸조경 통합 관리 시스템",
+  "short_name": "통합관리",
+  "description": "어썸조경 통합 관리 시스템 대시보드 (실시간 구글시트 연동)",
+  "start_url": "통합관리시스템.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070809",
+  "theme_color": "#15181b",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
