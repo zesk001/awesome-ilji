@@ -3045,6 +3045,8 @@ window.addEventListener('DOMContentLoaded', App.init);
     body{background:#fff;}
     .toolbar{display:none;}
     .wtabs{display:none;}
+    /* 담당자별 인쇄: 상세업무만 출력(요약 칩·요약표·도넛 숨김) */
+    body.print-detail .chips, body.print-detail .grid2{display:none;}
     .paper{box-shadow:none; border-radius:0; max-width:none; margin:0; padding:0;}
     .card,.grp{break-inside:avoid;}
     table{font-size:10.5px;}
@@ -3066,7 +3068,7 @@ window.addEventListener('DOMContentLoaded', App.init);
     <button id=&quot;viewWriter&quot; onclick=&quot;setView('writer')&quot;>담당자별</button>
   </span>
   <span id=&quot;loadMsg&quot;></span>
-  <button class=&quot;print&quot; onclick=&quot;window.print()&quot;>🖨 인쇄 (A4)</button>
+  <button class=&quot;print&quot; onclick=&quot;doPrint()&quot;>🖨 인쇄 (A4)</button>
 </div>
 
 <div class=&quot;paper&quot;>
@@ -3136,6 +3138,13 @@ function setView(m){
   if(m==='writer'){ buildWriterTabs(); bar.style.display='flex'; }
   else { bar.style.display='none'; }
   renderAll();
+}
+/* 인쇄: 담당자별 보기에서는 상세업무만 출력(요약 칩·요약표·도넛 제외) */
+function doPrint(){
+  const detail=(viewMode==='writer');
+  if(detail) document.body.classList.add('print-detail');
+  window.print();
+  if(detail) setTimeout(function(){ document.body.classList.remove('print-detail'); }, 600);
 }
 
 /* ── JSONP: action=day 를 7일치 호출 ── */
