@@ -479,9 +479,12 @@
       return out;
     }
     function etcRowHTML(key,v){
-      return '<div class="etc-item" data-key="'+sEsc(key)+'" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:8px">'+
-        '<textarea class="etc-input recv-input" data-key="'+sEsc(key)+'" rows="2" style="flex:1;margin:0;resize:vertical;min-height:42px;line-height:1.45;font-family:inherit" placeholder="예: 세금계산서 정리 (엔터로 줄을 늘릴 수 있어요)">'+sEsc(v.workText||'')+'</textarea>'+
-        '<i class="etc-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:6px 8px 0" title="삭제">×</i>'+
+      return '<div class="etc-item" data-key="'+sEsc(key)+'" style="border:1px solid #e3e7e3;border-radius:10px;padding:8px;margin-bottom:8px">'+
+        '<div style="display:flex;gap:6px;align-items:center">'+
+          '<input class="etc-title recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0;font-weight:700" placeholder="종류·제목 (예: 세금계산서 정리)" value="'+sEsc(v.title||'')+'">'+
+          '<i class="etc-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:0 6px" title="삭제">×</i>'+
+        '</div>'+
+        '<textarea class="etc-input recv-input" data-key="'+sEsc(key)+'" rows="2" style="width:100%;box-sizing:border-box;margin:6px 0 0;resize:vertical;min-height:40px;line-height:1.45;font-family:inherit" placeholder="내용 (선택 · 엔터로 줄을 늘릴 수 있어요)">'+sEsc(v.workText||'')+'</textarea>'+
         '</div>';
     }
     function showEtcWork(){
@@ -501,9 +504,9 @@
       if(e.target.closest('[data-etc-add]')){
         const id='__기타_'+Date.now();
         SEL[cat]=SEL[cat]||{};
-        SEL[cat][id]={region:'',name:'기타업무',type:'기타업무',workText:'',memo:''};
+        SEL[cat][id]={region:'',name:'기타업무',type:'기타업무',title:'',workText:'',memo:''};
         saveSel(); renderSummary(); showEtcWork();
-        const inps=panel.querySelectorAll('.etc-input'); if(inps.length) inps[inps.length-1].focus();
+        const tts=panel.querySelectorAll('.etc-title'); if(tts.length) tts[tts.length-1].focus();
         return;
       }
       const ed=e.target.closest('.etc-del');
@@ -525,11 +528,19 @@
       }
     });
     panel.addEventListener('input',e=>{
+      const et=e.target.closest('.etc-title');
+      if(et){
+        const k=et.dataset.key; SEL[cat]=SEL[cat]||{}; const cur=SEL[cat][k]||{type:'기타업무',region:'',memo:''};
+        cur.type='기타업무'; cur.title=et.value;
+        cur.name=(et.value.trim()||(cur.workText||'').trim().split('\n')[0]||'기타업무');
+        SEL[cat][k]=cur; saveSel(); renderSummary(); return;
+      }
       const ei=e.target.closest('.etc-input');
       if(ei){
-        const k=ei.dataset.key, v=ei.value; SEL[cat]=SEL[cat]||{};
-        SEL[cat][k]={region:'',name:(v.trim()||'기타업무'),type:'기타업무',workText:v,memo:''};
-        saveSel(); renderSummary(); return;
+        const k=ei.dataset.key; SEL[cat]=SEL[cat]||{}; const cur=SEL[cat][k]||{type:'기타업무',region:'',memo:''};
+        cur.type='기타업무'; cur.workText=ei.value;
+        cur.name=((cur.title||'').trim()||ei.value.trim().split('\n')[0]||'기타업무');
+        SEL[cat][k]=cur; saveSel(); renderSummary(); return;
       }
       if(e.target.id==='annualDate'){
         const v=e.target.value; SEL[cat]=SEL[cat]||{};
@@ -691,7 +702,7 @@
     ['점검','소독','공사','사무'].forEach(cat=>{
       Object.keys(SEL[cat]||{}).forEach(k=>{
         const v=SEL[cat][k]||{};
-        if(v.type==='기타업무'){ if(!(v.workText||'').trim()) return; rows.push([dt,'사무','','','기타업무','',v.workText||'']); return; }
+        if(v.type==='기타업무'){ const t=(v.title||'').trim(), c=(v.workText||'').trim(); if(!t&&!c) return; rows.push([dt,'사무','','',(t||'기타업무'),'',c]); return; }
         if(v.type==='연차'){ rows.push([dt,'사무','','','연차',v.leaveDate||'','']); return; }
         const item = (cat==='소독' && v.sub) ? '단타' : cat;
         rows.push([dt,cat,v.region||'',v.name||'',item,'',v.memo||'']);
