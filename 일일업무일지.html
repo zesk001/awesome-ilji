@@ -35,7 +35,7 @@
   .header-date .today { font-size:20px; font-weight:bold; }
   .header-date .weekday { font-size:14px; opacity:.85; margin-top:2px; }
 
-  .menu { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:22px; }
+  .menu { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:22px; }
   .menu button { border:none; border-radius:14px; padding:22px 10px 18px; cursor:pointer; background:#fff; transition:all .15s; border-bottom:5px solid transparent; text-align:center; }
   .menu button:hover { transform:translateY(-3px); }
   .menu .icon { font-size:32px; display:block; }
@@ -51,6 +51,18 @@
   .menu button.active.c2 { box-shadow:0 0 0 3px #27a36a inset, 0 6px 16px rgba(0,0,0,.16); }
   .menu button.active.c3 { box-shadow:0 0 0 3px #e8842c inset, 0 6px 16px rgba(0,0,0,.16); }
   .menu button.active.c4 { box-shadow:0 0 0 3px #8a8f98 inset, 0 6px 16px rgba(0,0,0,.16); }
+  .menu button.c5 { border-bottom-color:#1e5631; box-shadow:0 0 0 2px #1e5631 inset, 0 2px 8px rgba(0,0,0,.07); }
+  .menu button.active.c5 { box-shadow:0 0 0 3px #1e5631 inset, 0 6px 16px rgba(0,0,0,.16); }
+  #boss{--c:#1e5631;}
+  .boss-sec{margin:6px 0 16px;}
+  .boss-sec h4{margin:0 0 8px;font-size:14px;color:#1e5631;font-weight:800;}
+  .boss-sec h4 small{font-weight:600;color:#8a8f98;font-size:12px;margin-left:6px;}
+  .boss-items{display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:8px;}
+  .boss-item{border:1.5px solid #d7e3da;background:#fff;border-radius:10px;padding:13px 8px;cursor:pointer;font-weight:700;color:#225;font-size:14px;text-align:center;transition:.12s;position:relative;}
+  .boss-item:hover{border-color:#1e5631;transform:translateY(-2px);}
+  .boss-item.has{border-color:#1e5631;background:#eef6ef;}
+  .boss-item .bi-cnt{position:absolute;top:-7px;right:-7px;background:#1e5631;color:#fff;font-size:11px;min-width:18px;height:18px;border-radius:9px;display:none;align-items:center;justify-content:center;padding:0 4px;}
+  .boss-item.has .bi-cnt{display:inline-flex;}
 
   .panel { background:#fff; border-radius:14px; margin-top:18px; padding:30px; min-height:340px; box-shadow:0 2px 8px rgba(0,0,0,.07); display:none; }
   .panel.show { display:block; }
@@ -253,6 +265,7 @@
     <button class="c2" data-tab="disinfect"><span class="icon">💨</span><span class="name">소독</span></button>
     <button class="c3" data-tab="construct"><span class="icon"><svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(-45 32 32)"><rect x="24" y="2" width="16" height="6" rx="3" fill="#8d6e63"/><rect x="29.5" y="6" width="5" height="27" rx="2" fill="#8d6e63"/><path d="M23 32 h18 v8 c0 9 -9 14 -9 14 s-9 -5 -9 -14 z" fill="#78909c"/></g><g transform="rotate(45 32 32)"><rect x="29.5" y="16" width="5" height="40" rx="2" fill="#a1887f"/><rect x="19" y="6" width="26" height="12" rx="4" fill="#546e7a"/></g></svg></span><span class="name">공사</span></button>
     <button class="c4" data-tab="etc"><span class="icon">📋</span><span class="name">사무</span></button>
+    <button class="c5" data-tab="boss"><span class="icon">👔</span><span class="name">대표</span></button>
   </nav>
 
   <!-- 4개 패널 내용은 아래 스크립트(setupCategory/Construction/Etc)가 채웁니다 -->
@@ -260,6 +273,7 @@
   <section class="panel" id="disinfect"></section>
   <section class="panel" id="construct"></section>
   <section class="panel" id="etc"></section>
+  <section class="panel" id="boss"></section>
 
   <section class="summary">
     <div class="summary-head">
@@ -377,6 +391,14 @@
   const SUBGROUP={ '소독':{label:'단타', color:'#12a594', items:['단타초','단타유','단타어린이집','단타기관']} };
   const ETC_REGION={label:'기타지역', items:['기타초','기타중','기타고','기타유','기타어린이집','기타기관']};
   const CAT_COLORS={'점검':'#2f80c4','소독':'#27a36a','공사':'#e8842c','사무':'#8a8f98'};
+  const BOSS_ITEMS={
+    '실행 — 이번 주 한 일':['계약','방문','놀이시설점검','견적서','소독견적서','용역견적서','발주서','시공','공사확정','모래소독','AS작업','AS보완요청'],
+    '계획 — 다음 주':['방문요청','방문예정','통화','계약예정','예산나올곳','예산나온곳'],
+    '기타':['예산신청','신규사업','기타메모']
+  };
+  const BOSS_HINT={'실행 — 이번 주 한 일':'학교 선택','계획 — 다음 주':'학교 선택','기타':'학교 또는 직접입력'};
+  const BOSS_ORDER=Object.keys(BOSS_ITEMS).reduce(function(a,k){return a.concat(BOSS_ITEMS[k]);},[]);
+  const BOSS_FREE=['신규사업','기타메모'];
 
   // ===== 오늘의 업무 저장 (날짜별 · 이 기기) =====
   // SEL[분류][키] = {region, name, sub, memo}  또는 사무 특수: {type:'기타업무'|'연차', workText|leaveDate}
@@ -400,7 +422,7 @@
     let html=order.filter(r=>cnt[r]).map(r=>
       '<button data-region="'+r+'"><span class="rg-name">'+r+'</span><span class="rg-cnt">'+cnt[r]+'개교</span></button>'
     ).join('');
-    if(extra){ html+='<button data-region="'+extra.label+'"><span class="rg-name">'+extra.label+'</span><span class="rg-cnt">'+extra.items.length+'개</span></button>'; }
+    if(extra){ html+='<button data-region="'+extra.label+'"><span class="rg-name">'+extra.label+'</span><span class="rg-cnt">직접 작성</span></button>'; }
     grid.innerHTML=html;
   }
   function searchBarHTML(){ return '<input class="site-search" type="text" placeholder="🔍 현장 이름으로 검색 (예: 가온초)" autocomplete="off"><div class="search-results"></div>'; }
@@ -444,19 +466,6 @@
         'data-key="'+sEsc(key)+'" data-name="'+sEsc(display)+'" data-region="'+sEsc(region)+'" data-sub="'+(sub?1:'')+'"'+sty+'>'+
         '<span class="sr-name">'+sEsc(display)+'</span></div>';
     }
-    // 기타구역: 이름 직접입력 추가 / 표시 / 삭제
-    function addCustomRegion(region,nm){
-      nm=(nm||'').trim(); if(!nm) return false;
-      const key='기타:'+region+'|'+nm+'|'+Date.now();
-      SEL[cat]=SEL[cat]||{}; SEL[cat][key]={region:region,name:nm,sub:false,memo:'',custom:true};
-      saveSel(); renderSummary(); return true;
-    }
-    function customRowsHTML(region){
-      const sc=SEL[cat]||{};
-      return Object.keys(sc).filter(k=>sc[k]&&sc[k].custom&&sc[k].region===region)
-        .map(k=>'<div class="rc-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid '+color+'66;border-radius:8px;margin-top:6px;background:#f5faf6"><span class="sr-name">✏ '+sEsc(sc[k].name)+'</span><i class="rc-del" data-key="'+sEsc(k)+'" style="cursor:pointer;color:#e5484d;font-size:18px;line-height:1" title="삭제">×</i></div>')
-        .join('');
-    }
     function showRegions(){
       panel.innerHTML=head('지역 선택')+searchBarHTML()+'<div class="region-grid"></div>';
       const grid=panel.querySelector('.region-grid');
@@ -467,31 +476,23 @@
       });
     }
     function showSchools(region){
-      const isExtra = extra && region===extra.label;
-      let rows='', htxt;
+      if(extra && region===extra.label){ showCustom(region); return; }
+      const isExtra = false;
+      let rows, headCount, unit;
       if(isExtra){
-        htxt=region;                 // 기타지역: 직접 입력만
+        rows=''; headCount=0; unit='개';
       } else {
-        const sites=siteList(region).filter(n=>n!=='기타구역');   // '기타구역'은 직접입력으로 대체
-        htxt=region+' · '+sites.length+'곳';
+        const sites=siteList(region);
+        headCount=sites.length; unit='곳';
         rows=sites.map(n=>rowHTML(n, region+'|'+n, region, false)).join('');
         if(sg){
           rows+='<div class="sub-sep" style="color:'+sg.color+';border-color:'+sg.color+'55">'+sg.label+'</div>';
           rows+=sg.items.map(n=>rowHTML(n, region+'|'+n, region, true, sg.color)).join('');
         }
       }
-      const crows=customRowsHTML(region);
-      const rc='<div class="rc-wrap" style="margin-top:12px">'+
-          '<div class="work-note">목록에 없는 곳은 <b>이름을 직접 적어</b> 추가하세요 (기타구역).</div>'+
-          '<div style="display:flex;gap:6px">'+
-            '<input class="rc-input recv-input" data-region="'+sEsc(region)+'" placeholder="예: ○○공원, ○○빌라, ○○유치원" style="flex:1;margin:0">'+
-            '<button class="rc-add" data-region="'+sEsc(region)+'" style="padding:10px 16px;border:none;border-radius:8px;background:'+color+';color:#fff;font-weight:700;cursor:pointer;white-space:nowrap">추가</button>'+
-          '</div>'+
-          (crows?('<div class="rc-list">'+crows+'</div>'):'')+
-        '</div>';
-      panel.innerHTML=head(htxt)+
+      panel.innerHTML=head(region+' · '+headCount+unit)+
         '<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
-        '<div class="school-list">'+rows+'</div>'+rc;
+        '<div class="school-list">'+rows+'</div>';
     }
     // 사무 전용 화면 — 기타업무를 한 건씩(+) 추가
     function etcEntries(){
@@ -500,12 +501,9 @@
       return out;
     }
     function etcRowHTML(key,v){
-      return '<div class="etc-item" data-key="'+sEsc(key)+'" style="border:1px solid #e3e7e3;border-radius:10px;padding:8px;margin-bottom:8px">'+
-        '<div style="display:flex;gap:6px;align-items:center">'+
-          '<input class="etc-title recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0;font-weight:700" placeholder="종류·제목 (예: 세금계산서 정리)" value="'+sEsc(v.title||'')+'">'+
-          '<i class="etc-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:0 6px" title="삭제">×</i>'+
-        '</div>'+
-        '<textarea class="etc-input recv-input" data-key="'+sEsc(key)+'" rows="2" style="width:100%;box-sizing:border-box;margin:6px 0 0;resize:vertical;min-height:40px;line-height:1.45;font-family:inherit" placeholder="내용 (선택 · 엔터로 줄을 늘릴 수 있어요)">'+sEsc(v.workText||'')+'</textarea>'+
+      return '<div class="etc-item" data-key="'+sEsc(key)+'" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'+
+        '<input class="etc-input recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0" value="'+sEsc(v.workText||'')+'" placeholder="예: 세금계산서 정리">'+
+        '<i class="etc-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:0 8px" title="삭제">×</i>'+
         '</div>';
     }
     function showEtcWork(){
@@ -521,26 +519,41 @@
         '<div class="work-note">연차 날짜를 선택하세요.</div>'+
         '<input type="date" id="annualDate" class="site-search" style="max-width:260px" value="'+sEsc(dv)+'">';
     }
+    function customEntries(region){
+      const out=[]; const s=SEL[cat]||{};
+      Object.keys(s).forEach(k=>{ const v=s[k]; if(v && v.custom && v.region===region) out.push([k,v]); });
+      return out;
+    }
+    function customRowHTML(key,v){
+      return '<div class="etc-item" data-key="'+sEsc(key)+'" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'+
+        '<input class="custom-input recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0" value="'+sEsc(v.name||'')+'" placeholder="장소 이름을 직접 적으세요 (예: ○○아파트, ○○공원)">'+
+        '<i class="custom-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:0 8px" title="삭제">×</i>'+
+        '</div>';
+    }
+    function showCustom(region){
+      const rows=customEntries(region).map(p=>customRowHTML(p[0],p[1])).join('');
+      panel.innerHTML=head(region+' · 직접 작성')+'<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
+        '<div class="work-note">목록에 없는 장소는 여기서 <b>이름을 직접</b> 적으세요. 적은 이름이 그대로 현장이 됩니다. <b>＋ 장소 추가</b>로 칸이 늘어납니다.</div>'+
+        '<div class="custom-list">'+rows+'</div>'+
+        '<button class="custom-add" data-custom-add="1" style="margin-top:6px;padding:11px 14px;border:2px dashed '+color+';background:#f6f7f9;border-radius:10px;color:#444;font-weight:700;cursor:pointer;width:100%">＋ 장소 추가</button>';
+    }
     panel.addEventListener('click',e=>{
-      const rcAdd=e.target.closest('.rc-add');
-      if(rcAdd){
-        const region=rcAdd.dataset.region; const inp=panel.querySelector('.rc-input');
-        if(addCustomRegion(region, inp&&inp.value)){ showSchools(region); const ni=panel.querySelector('.rc-input'); if(ni) ni.focus(); }
-        else if(inp) inp.focus();
+      if(e.target.closest('[data-custom-add]')){
+        const id='__custom_'+Date.now(); SEL[cat]=SEL[cat]||{};
+        const rg=extra?extra.label:'기타지역';
+        SEL[cat][id]={region:rg,name:'',custom:true,sub:false,memo:''};
+        saveSel(); renderSummary(); showCustom(rg);
+        const cs=panel.querySelectorAll('.custom-input'); if(cs.length) cs[cs.length-1].focus();
         return;
       }
-      const rcDel=e.target.closest('.rc-del');
-      if(rcDel){
-        const k=rcDel.dataset.key; const region=(SEL[cat]&&SEL[cat][k]&&SEL[cat][k].region)||'';
-        if(SEL[cat]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
-        saveSel(); renderSummary(); showSchools(region); return;
-      }
+      const cdl=e.target.closest('.custom-del');
+      if(cdl){ const k=cdl.dataset.key; const rg=extra?extra.label:'기타지역'; if(SEL[cat]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; } saveSel(); renderSummary(); showCustom(rg); return; }
       if(e.target.closest('[data-etc-add]')){
         const id='__기타_'+Date.now();
         SEL[cat]=SEL[cat]||{};
-        SEL[cat][id]={region:'',name:'기타업무',type:'기타업무',title:'',workText:'',memo:''};
+        SEL[cat][id]={region:'',name:'기타업무',type:'기타업무',workText:'',memo:''};
         saveSel(); renderSummary(); showEtcWork();
-        const tts=panel.querySelectorAll('.etc-title'); if(tts.length) tts[tts.length-1].focus();
+        const inps=panel.querySelectorAll('.etc-input'); if(inps.length) inps[inps.length-1].focus();
         return;
       }
       const ed=e.target.closest('.etc-del');
@@ -562,19 +575,13 @@
       }
     });
     panel.addEventListener('input',e=>{
-      const et=e.target.closest('.etc-title');
-      if(et){
-        const k=et.dataset.key; SEL[cat]=SEL[cat]||{}; const cur=SEL[cat][k]||{type:'기타업무',region:'',memo:''};
-        cur.type='기타업무'; cur.title=et.value;
-        cur.name=(et.value.trim()||(cur.workText||'').trim().split('\n')[0]||'기타업무');
-        SEL[cat][k]=cur; saveSel(); renderSummary(); return;
-      }
+      const ci=e.target.closest('.custom-input');
+      if(ci){ const k=ci.dataset.key; if(SEL[cat]&&SEL[cat][k]){ SEL[cat][k].name=ci.value; saveSel(); renderSummary(); } return; }
       const ei=e.target.closest('.etc-input');
       if(ei){
-        const k=ei.dataset.key; SEL[cat]=SEL[cat]||{}; const cur=SEL[cat][k]||{type:'기타업무',region:'',memo:''};
-        cur.type='기타업무'; cur.workText=ei.value;
-        cur.name=((cur.title||'').trim()||ei.value.trim().split('\n')[0]||'기타업무');
-        SEL[cat][k]=cur; saveSel(); renderSummary(); return;
+        const k=ei.dataset.key, v=ei.value; SEL[cat]=SEL[cat]||{};
+        SEL[cat][k]={region:'',name:(v.trim()||'기타업무'),type:'기타업무',workText:v,memo:''};
+        saveSel(); renderSummary(); return;
       }
       if(e.target.id==='annualDate'){
         const v=e.target.value; SEL[cat]=SEL[cat]||{};
@@ -583,17 +590,114 @@
         saveSel(); renderSummary();
       }
     });
-    panel.addEventListener('keydown',e=>{
-      const ri=e.target.closest('.rc-input');
-      if(ri && e.key==='Enter' && !e.isComposing && e.keyCode!==229){
-        e.preventDefault();
-        const region=ri.dataset.region;
-        if(addCustomRegion(region, ri.value)){ showSchools(region); const ni=panel.querySelector('.rc-input'); if(ni) ni.focus(); }
-      }
-    });
     wireSearch(panel, cat);
     panel._home=showRegions;
     showRegions();
+    return panel;
+  }
+
+  function setupBoss(panelId){
+    var panel=document.getElementById(panelId);
+    var COLOR='#1e5631';
+    var curItem=null, curMode='free';
+    function bkey(item,region,name){ return item+'|'+region+'|'+name; }
+    function head(txt){ return '<h2>👔 대표 <span class="badge" style="background:'+COLOR+'">'+txt+'</span></h2>'; }
+    function itemCount(item){ var n=0,s=SEL['영업']||{}; Object.keys(s).forEach(function(k){ if(s[k].item===item) n++; }); return n; }
+    function showItems(){
+      curItem=null;
+      var html=head('항목 선택');
+      Object.keys(BOSS_ITEMS).forEach(function(sec){
+        html+='<div class="boss-sec"><h4>'+sEsc(sec)+'<small>'+sEsc(BOSS_HINT[sec]||'')+'</small></h4><div class="boss-items">';
+        html+=BOSS_ITEMS[sec].map(function(it){
+          var c=itemCount(it);
+          return '<div class="boss-item'+(c?' has':'')+'" data-item="'+sEsc(it)+'">'+sEsc(it)+'<span class="bi-cnt">'+c+'</span></div>';
+        }).join('');
+        html+='</div></div>';
+      });
+      panel.innerHTML=html;
+    }
+    function showRegions(item){
+      curItem=item;
+      panel.innerHTML=head(item+' · 지역 선택')+
+        '<button class="back-btn" data-bback="1">← 항목 선택으로</button>'+
+        searchBarHTML()+'<div class="region-grid"></div>';
+      renderRegionsInto(panel.querySelector('.region-grid'), ETC_REGION);
+    }
+    function schoolRow(item,region,name,withRegion){
+      var k=bkey(item,region,name);
+      var sel=(SEL['영업']&&SEL['영업'][k])?' selected':'';
+      return '<div class="school-row'+sel+'" data-bk="'+sEsc(k)+'" data-region="'+sEsc(region)+'" data-name="'+sEsc(name)+'"><span class="sr-name">'+sEsc(name)+'</span>'+(withRegion?'<span class="sr-region">'+sEsc(region)+'</span>':'')+'</div>';
+    }
+    function showSchools(region){
+      var sites=siteList(region);
+      var rows=sites.map(function(n){ return schoolRow(curItem,region,n,false); }).join('');
+      panel.innerHTML=head(curItem+' · '+region+' · '+sites.length+'곳')+
+        '<button class="back-btn" data-bback2="1">← 지역 선택으로</button>'+
+        '<div class="school-list">'+rows+'</div>';
+    }
+    function addListHTML(title, note, filterFn){
+      var s=SEL['영업']||{};
+      var rows=Object.keys(s).filter(filterFn).map(function(k){
+        return '<div class="etc-item" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'+
+          '<input class="bfree-input" data-bk="'+sEsc(k)+'" style="flex:1;margin:0" value="'+sEsc(s[k].name||'')+'" placeholder="이름을 직접 적으세요">'+
+          '<i class="bfree-del" data-bk="'+sEsc(k)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:0 8px">×</i></div>';
+      }).join('');
+      panel.innerHTML=head(title)+'<button class="back-btn" data-bback'+(curMode==='custom'?'2':'')+'="1">← 뒤로</button>'+
+        '<div class="work-note">'+note+'</div>'+
+        '<div class="bfree-list">'+rows+'</div>'+
+        '<button class="bfree-add" data-bfree-add="1" style="margin-top:6px;padding:11px 14px;border:2px dashed '+COLOR+';background:#f6f7f9;border-radius:10px;color:#444;font-weight:700;cursor:pointer;width:100%">＋ 추가</button>';
+    }
+    function showFree(item){
+      curItem=item; curMode='free';
+      addListHTML(item, '현장과 상관없는 내용을 <b>한 건씩</b> 적으세요. <b>＋ 추가</b>로 칸이 늘어납니다.',
+        function(k){ return SEL['영업'][k].item===item && SEL['영업'][k].free; });
+    }
+    function showBossCustom(){
+      curMode='custom';
+      addListHTML(curItem+' · 기타지역 · 직접 작성', '목록에 없는 장소는 <b>이름을 직접</b> 적으세요. 적은 이름이 그대로 현장이 됩니다.',
+        function(k){ return SEL['영업'][k].item===curItem && SEL['영업'][k].region===ETC_REGION.label; });
+    }
+    function reAdd(){ if(curMode==='custom') showBossCustom(); else showFree(curItem); }
+    function toggleSchool(region,name){
+      var k=bkey(curItem,region,name);
+      SEL['영업']=SEL['영업']||{};
+      if(SEL['영업'][k]) delete SEL['영업'][k];
+      else SEL['영업'][k]={item:curItem,region:region,name:name,memo:''};
+      if(!Object.keys(SEL['영업']).length) delete SEL['영업'];
+      saveSel(); renderSummary();
+    }
+    panel.addEventListener('click',function(e){
+      var it=e.target.closest('.boss-item');
+      if(it){ var item=it.dataset.item; if(BOSS_FREE.indexOf(item)>=0) showFree(item); else showRegions(item); return; }
+      if(e.target.closest('[data-bback]')){ showItems(); return; }
+      if(e.target.closest('[data-bback2]')){ showRegions(curItem); return; }
+      if(e.target.closest('[data-bfree-add]')){
+        var id='__'+curItem+'_'+Date.now(); SEL['영업']=SEL['영업']||{};
+        SEL['영업'][id]={item:curItem,region:(curMode==='custom'?ETC_REGION.label:''),name:'',memo:'',free:(curMode!=='custom')};
+        saveSel(); renderSummary(); reAdd();
+        var ins=panel.querySelectorAll('.bfree-input'); if(ins.length) ins[ins.length-1].focus(); return;
+      }
+      var bd=e.target.closest('.bfree-del');
+      if(bd){ var dk=bd.dataset.bk; if(SEL['영업']){ delete SEL['영업'][dk]; if(!Object.keys(SEL['영업']).length) delete SEL['영업']; } saveSel(); renderSummary(); reAdd(); return; }
+      var reg=e.target.closest('button[data-region]');
+      if(reg){ if(reg.dataset.region===ETC_REGION.label){ showBossCustom(); } else { showSchools(reg.dataset.region); } return; }
+      var row=e.target.closest('.school-row');
+      if(row){ toggleSchool(row.dataset.region,row.dataset.name); row.classList.toggle('selected'); return; }
+    });
+    panel.addEventListener('input',function(e){
+      var bf=e.target.closest('.bfree-input');
+      if(bf){ var k=bf.dataset.bk; if(SEL['영업']&&SEL['영업'][k]){ SEL['영업'][k].name=bf.value; saveSel(); renderSummary(); } return; }
+      if(e.target.closest('.site-search')){
+        var grid=panel.querySelector('.region-grid'), res=panel.querySelector('.search-results');
+        if(!res) return; var q=e.target.value.trim();
+        if(!q){ res.innerHTML=''; if(grid) grid.style.display=''; return; }
+        if(grid) grid.style.display='none';
+        var list=matchSchools(q);
+        res.innerHTML = list.length? list.map(function(s){ return schoolRow(curItem,s.지역,s.학교명,true); }).join('') : '<div class="sum-empty">검색 결과 없음</div>';
+      }
+    });
+    panel._home=showItems;
+    showItems();
     return panel;
   }
 
@@ -617,6 +721,13 @@
         push(cat,cat,CAT_COLORS[cat],()=>true);
       }
     });
+    if(SEL['영업']){
+      BOSS_ORDER.forEach(function(item){
+        var entries=Object.keys(SEL['영업']).filter(function(k){return SEL['영업'][k].item===item;})
+          .map(function(k){var v=SEL['영업'][k]||{}; return {cat:'영업',key:k,name:v.name||'',region:v.region||'',memo:v.memo||'',type:''};});
+        if(entries.length) groups.push({label:item,color:'#1e5631',cat:'영업',entries:entries});
+      });
+    }
     return groups;
   }
   const sumBody=document.getElementById('summaryBody');
@@ -654,7 +765,7 @@
     if(SEL[cat]&&SEL[cat][key]){ SEL[cat][key].memo=inp.value; saveSel(); }
   });
   document.getElementById('clearSummary').addEventListener('click',()=>{
-    if(confirm('오늘 작성한 내용(점검·소독·공사·사무)을 모두 지울까요?')){
+    if(confirm('오늘 작성한 내용(점검·소독·공사·사무·대표)을 모두 지울까요?')){
       SEL={}; saveSel(); renderSummary();
       Object.values(panels).forEach(pp=>pp.querySelectorAll('.school-row.selected').forEach(x=>x.classList.remove('selected')));
     }
@@ -663,8 +774,9 @@
   // ===== 4개 탭 구성 =====
   const ICON_GONGSA="<svg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'><g transform='rotate(-45 32 32)'><rect x='24' y='2' width='16' height='6' rx='3' fill='#8d6e63'/><rect x='29.5' y='6' width='5' height='27' rx='2' fill='#8d6e63'/><path d='M23 32 h18 v8 c0 9 -9 14 -9 14 s-9 -5 -9 -14 z' fill='#78909c'/></g><g transform='rotate(45 32 32)'><rect x='29.5' y='16' width='5' height='40' rx='2' fill='#a1887f'/><rect x='19' y='6' width='26' height='12' rx='4' fill='#546e7a'/></g></svg>";
   const panels={};
-  panels['점검']=setupCategory('inspect','점검','#2f80c4','🔍',{});
-  panels['소독']=setupCategory('disinfect','소독','#27a36a','💨',{subgroup:SUBGROUP['소독']});
+  panels['점검']=setupCategory('inspect','점검','#2f80c4','🔍',{extra:ETC_REGION});
+  panels['소독']=setupCategory('disinfect','소독','#27a36a','💨',{subgroup:SUBGROUP['소독'], extra:ETC_REGION});
+  panels['영업']=setupBoss('boss');
   panels['공사']=setupCategory('construct','공사','#e8842c',ICON_GONGSA,{extra:ETC_REGION});
   panels['사무']=setupCategory('etc','사무','#8a8f98','📋',{extra:ETC_REGION, specials:['기타업무','연차']});
 
@@ -744,11 +856,19 @@
     ['점검','소독','공사','사무'].forEach(cat=>{
       Object.keys(SEL[cat]||{}).forEach(k=>{
         const v=SEL[cat][k]||{};
-        if(v.type==='기타업무'){ const t=(v.title||'').trim(), c=(v.workText||'').trim(); if(!t&&!c) return; rows.push([dt,'사무','','',(t||'기타업무'),'',c]); return; }
+        if(v.type==='기타업무'){ if(!(v.workText||'').trim()) return; rows.push([dt,'사무','','','기타업무','',v.workText||'']); return; }
         if(v.type==='연차'){ rows.push([dt,'사무','','','연차',v.leaveDate||'','']); return; }
+        const nm0=(v.name||'').trim();
+        if(v.custom && !nm0) return;
         const item = (cat==='소독' && v.sub) ? '단타' : cat;
         rows.push([dt,cat,v.region||'',v.name||'',item,'',v.memo||'']);
       });
+    });
+    Object.keys(SEL['영업']||{}).forEach(function(k){
+      var v=SEL['영업'][k]||{};
+      var nm=(v.name||'').trim(), mm=(v.memo||'').trim();
+      if(!nm && !mm) return;
+      rows.push([dt,'영업',v.region||'',nm,v.item||'','',mm]);
     });
     return rows;
   }
