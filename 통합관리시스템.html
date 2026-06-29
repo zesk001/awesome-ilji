@@ -3100,8 +3100,8 @@ window.addEventListener('DOMContentLoaded', App.init);
 
 <script>
 const APPS_URL='https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
-const CATS=['점검','소독','공사','사무'];
-const CATCOLOR={'점검':'#2e7d32','소독':'#0277bd','공사':'#ef6c00','사무':'#6a1b9a'};
+const CATS=['점검','소독','공사','사무','대표'];
+const CATCOLOR={'점검':'#2e7d32','소독':'#0277bd','공사':'#ef6c00','사무':'#6a1b9a','대표':'#c2185b'};
 
 /* 담당자 표시 순서(직급순) — 이름(성명) 기준으로 매칭 */
 const ORDER=['신현철 대표','김재성 이사','김남일 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','김지훈 주임','원채아 대리'];
@@ -3177,7 +3177,7 @@ async function loadWeek(){
       const rows=await fetchDay(fmt(days[i]));
       rows.forEach(function(r){
         all.push({date:fmt(days[i]), dateK:fmtK(days[i]),
-          cat:String(r[0]||''), region:String(r[1]||''), site:String(r[2]||''),
+          cat:(String(r[0]||'')==='영업'?'대표':String(r[0]||'')), region:String(r[1]||''), site:String(r[2]||''),
           item:String(r[3]||''), stage:String(r[4]||''), memo:String(r[5]||''),
           writer:String(r[6]||''), time:Number(r[7])||0});
       });
@@ -3253,7 +3253,7 @@ function renderSummary(scope){
   const box=document.getElementById('secSum');
   if(!scope.length){ box.innerHTML='<div class=&quot;empty&quot;>기록 없음</div>'; return; }
   if(viewMode==='writer'){
-    const cc={점검:0,소독:0,공사:0,사무:0}; scope.forEach(r=>{ if(cc[r.cat]!==undefined) cc[r.cat]++; });
+    const cc={점검:0,소독:0,공사:0,사무:0,대표:0}; scope.forEach(r=>{ if(cc[r.cat]!==undefined) cc[r.cat]++; });
     let h='<table><tr><th>분류</th><th class=&quot;tnum&quot;>건수</th><th class=&quot;tnum&quot;>비율</th></tr>';
     CATS.forEach(c=>{ const n=cc[c]; const pct=Math.round(n/scope.length*100);
       h+='<tr><td><span class=&quot;badge&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;>'+c+'</span></td><td class=&quot;tnum&quot;>'+n+'</td><td class=&quot;tnum&quot;>'+pct+'%</td></tr>'; });
@@ -3261,15 +3261,15 @@ function renderSummary(scope){
     box.innerHTML=h;
   }else{
     const byW={};
-    scope.forEach(r=>{ const w=r.writer||'(미상)'; byW[w]=byW[w]||{점검:0,소독:0,공사:0,사무:0,합:0};
+    scope.forEach(r=>{ const w=r.writer||'(미상)'; byW[w]=byW[w]||{점검:0,소독:0,공사:0,사무:0,대표:0,합:0};
       if(byW[w][r.cat]!==undefined) byW[w][r.cat]++; byW[w].합++; });
-    let h='<table><tr><th>작성자</th><th class=&quot;tnum&quot;>점검</th><th class=&quot;tnum&quot;>소독</th><th class=&quot;tnum&quot;>공사</th><th class=&quot;tnum&quot;>사무</th><th class=&quot;tnum&quot;>합계</th></tr>';
+    let h='<table><tr><th>작성자</th><th class=&quot;tnum&quot;>점검</th><th class=&quot;tnum&quot;>소독</th><th class=&quot;tnum&quot;>공사</th><th class=&quot;tnum&quot;>사무</th><th class=&quot;tnum&quot;>대표</th><th class=&quot;tnum&quot;>합계</th></tr>';
     const wkeys=Object.keys(byW).sort(cmpWriter);
     wkeys.forEach(w=>{ const o=byW[w];
-      h+='<tr><td><b>'+esc(w)+'</b></td><td class=&quot;tnum&quot;>'+(o.점검||'')+'</td><td class=&quot;tnum&quot;>'+(o.소독||'')+'</td><td class=&quot;tnum&quot;>'+(o.공사||'')+'</td><td class=&quot;tnum&quot;>'+(o.사무||'')+'</td><td class=&quot;tnum&quot;><b>'+o.합+'</b></td></tr>'; });
-    const t={점검:0,소독:0,공사:0,사무:0,합:0};
+      h+='<tr><td><b>'+esc(w)+'</b></td><td class=&quot;tnum&quot;>'+(o.점검||'')+'</td><td class=&quot;tnum&quot;>'+(o.소독||'')+'</td><td class=&quot;tnum&quot;>'+(o.공사||'')+'</td><td class=&quot;tnum&quot;>'+(o.사무||'')+'</td><td class=&quot;tnum&quot;>'+(o.대표||'')+'</td><td class=&quot;tnum&quot;><b>'+o.합+'</b></td></tr>'; });
+    const t={점검:0,소독:0,공사:0,사무:0,대표:0,합:0};
     wkeys.forEach(w=>{CATS.forEach(c=>t[c]+=byW[w][c]); t.합+=byW[w].합;});
-    h+='<tr class=&quot;sum-row&quot;><td>합계</td><td class=&quot;tnum&quot;>'+t.점검+'</td><td class=&quot;tnum&quot;>'+t.소독+'</td><td class=&quot;tnum&quot;>'+t.공사+'</td><td class=&quot;tnum&quot;>'+t.사무+'</td><td class=&quot;tnum&quot;>'+t.합+'</td></tr></table>';
+    h+='<tr class=&quot;sum-row&quot;><td>합계</td><td class=&quot;tnum&quot;>'+t.점검+'</td><td class=&quot;tnum&quot;>'+t.소독+'</td><td class=&quot;tnum&quot;>'+t.공사+'</td><td class=&quot;tnum&quot;>'+t.사무+'</td><td class=&quot;tnum&quot;>'+t.대표+'</td><td class=&quot;tnum&quot;>'+t.합+'</td></tr></table>';
     box.innerHTML=h;
   }
 }
@@ -3277,7 +3277,7 @@ function renderSummary(scope){
 /* ── 분류별 비율 도넛 ── */
 function renderDonut(scope){
   const box=document.getElementById('secCat');
-  const byC={점검:0,소독:0,공사:0,사무:0}; scope.forEach(r=>{ if(byC[r.cat]!==undefined) byC[r.cat]++; });
+  const byC={점검:0,소독:0,공사:0,사무:0,대표:0}; scope.forEach(r=>{ if(byC[r.cat]!==undefined) byC[r.cat]++; });
   const tot=scope.length;
   if(!tot){ box.innerHTML='<div class=&quot;empty&quot;>기록 없음</div>'; return; }
   const R=42, C=2*Math.PI*R; let off=0; let segs='';
@@ -4382,12 +4382,4 @@ async function flushMat(){
 function toggleFull(){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}else{document.exitFullscreen&&document.exitFullscreen();}}
 function tick(){const n=new Date();
   document.getElementById('clockT').textContent=n.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  document.getElementById('clockD').textContent=n.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
-}
-tick();setInterval(tick,1000);
-history.replaceState({tab:'overview'},'');
-load();renderAll();
-loadGoogle();  // 시작 시 구글 시트(일일업무일지)에서 실제 데이터 자동 연동
-</script>
-</body>
-</html>
+  document.getElementById('clockD').textContent=n.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',week
