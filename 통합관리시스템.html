@@ -3540,10 +3540,10 @@ function careShiftMonth(d){careMonthOffset=(d===0?0:careMonthOffset+d);renderCar
 function careSetMode(m){careCalMode=m;document.querySelectorAll('#careModeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));renderCareCalendar();}
 function careEventsByDate(){
   const map={};
-  const add=(date,name,type,done,solid,mgr)=>{if(!date)return;(map[date]=map[date]||[]).push({name:name||'',type,done,solid:!!solid,mgr:mgr||''});};
+  const add=(date,name,type,done,solid,mgr,sid)=>{if(!date)return;(map[date]=map[date]||[]).push({name:name||'',type,done,solid:!!solid,mgr:mgr||'',sid:sid||''});};
   (gData.logs||[]).forEach(l=>{if(l.type==='점검'||l.type==='소독')add(l.date,l.site||l.content||'',l.type,true,false,l.writer||'');});  // 완료(일지)
   (sites||[]).forEach(s=>{if((s.type==='점검'||s.type==='소독')&&s.planDate)add(s.planDate,s.name,s.type,false,false,s.manager||'');});   // 예정(현장)
-  (careSites||[]).forEach(s=>{if(s.date)add(s.date,s.name,s.type,false,true,s.mgr||'');});   // 현장 추가로 등록한 일정
+  (careSites||[]).forEach(s=>{if(s.date)add(s.date,s.name,s.type,false,true,s.mgr||'',s.id);});   // 현장 추가로 등록한 일정
   return map;
 }
 function renderCareCalendar(){
@@ -3586,7 +3586,7 @@ function openDayDetail(ds){
       const list=byMgr[mgr];const cnt={};list.forEach(e=>cnt[e.type]=(cnt[e.type]||0)+1);
       const cntStr=Object.keys(cnt).map(t=>t+' '+cnt[t]).join(' · ');
       const rows=list.slice().sort((a,b)=>a.type.localeCompare(b.type)||(a.name||'').localeCompare(b.name||'')).map(e=>
-        `<tr><td style="width:60px;">${careTypeBadge(e.type)}</td><td>${e.done?'✓ ':'○ '}${esc(e.name||'')}</td><td class="small" style="color:var(--muted);width:46px;">${e.done?'완료':'예정'}</td></tr>`).join('');
+        `<tr><td style="width:60px;">${careTypeBadge(e.type)}</td><td>${e.done?'✓ ':'○ '}${esc(e.name||'')}</td><td class="small" style="color:var(--muted);width:46px;">${e.done?'완료':'예정'}</td><td style="width:96px;white-space:nowrap;text-align:right;">${e.sid?`<button onclick="editCareFromDay('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;margin-right:4px;border:1px solid #3a8a5a;background:#163b29;color:#bfe49a;border-radius:6px;cursor:pointer;">수정</button><button onclick="delCareFromDay('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;border:1px solid #a3484c;background:#3b1618;color:#f3b6b8;border-radius:6px;cursor:pointer;">삭제</button>`:''}</td></tr>`).join('');
       return `<div style="margin-bottom:15px;"><div style="font-weight:800;color:#fff;margin-bottom:6px;">${esc(mgr)} <span class="small" style="color:var(--muted);font-weight:600;">(${list.length}개소 · ${cntStr})</span></div><table><tbody>${rows}</tbody></table></div>`;
     }).join('');
   }
@@ -3855,6 +3855,13 @@ function deleteCareSite(){
   const id=document.getElementById('cs_id').value;if(!id)return;
   if(!confirm('이 현장을 삭제할까요?'))return;
   careSites=careSites.filter(x=>x.id!==id);careSitesSave();postShared('caresite:'+id,'');closeModal('careSiteModal');renderCarePanels();
+}
+/* 달력 상세 팝업에서 예정 일정 수정/삭제 */
+function editCareFromDay(id,ds){ closeModal('dayDetailModal'); openCareSiteModal(id); }
+function delCareFromDay(id,ds){
+  if(!confirm('이 예정 일정을 삭제할까요?'))return;
+  careSites=careSites.filter(x=>x.id!==id); careSitesSave(); postShared('caresite:'+id,'');
+  renderCareCalendar(); renderCarePanels(); openDayDetail(ds);
 }
 function careTypeBadge(t){const c=t==='공사'?'b-gong':t==='점검'?'b-jeom':t==='소독'?'b-so':'b-etc';return `<span class="badge ${c}">${t||'-'}</span>`;}
 function renderCarePanels(){
@@ -4382,4 +4389,12 @@ async function flushMat(){
 function toggleFull(){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}else{document.exitFullscreen&&document.exitFullscreen();}}
 function tick(){const n=new Date();
   document.getElementById('clockT').textContent=n.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  document.getElementById('clockD').textContent=n.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',week
+  document.getElementById('clockD').textContent=n.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+}
+tick();setInterval(tick,1000);
+history.replaceState({tab:'overview'},'');
+load();renderAll();
+loadGoogle();  // 시작 시 구글 시트(일일업무일지)에서 실제 데이터 자동 연동
+</script>
+</body>
+</html>
