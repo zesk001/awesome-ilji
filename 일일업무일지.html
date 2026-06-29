@@ -785,8 +785,10 @@
   const APPS_URL=(window.__APPS_URL)||'https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
 
   const wsel=document.getElementById('writerSel');
-  wsel.innerHTML='<option value="">(이름 선택)</option>'+NAMES.map(n=>'<option>'+n+'</option>').join('');
-  try{ wsel.value=localStorage.getItem('ilji_writer')||''; }catch(e){}
+  // 비번은 직함 뺀 '이름'만으로 식별 → 직함(이사·부장 등)이 바뀌어도 비번이 안 깨짐. value=이름, 표시=직함포함
+  function nameKey(n){ return String(n||'').split(' ')[0]; }
+  wsel.innerHTML='<option value="">(이름 선택)</option>'+NAMES.map(n=>'<option value="'+nameKey(n)+'">'+n+'</option>').join('');
+  try{ wsel.value=nameKey(localStorage.getItem('ilji_writer')||''); }catch(e){}
 
   // 이름 + 4자리 PIN (처음 입력한 번호가 등록됨. 잊으면 김재성님이 구글시트 _PIN 탭에서 줄 삭제 → 초기화)
   var PINOK=false;
@@ -902,7 +904,7 @@
   // 현황지도(외부 페이지)
   (function(){ var mb=document.getElementById('btnMap'); if(mb) mb.addEventListener('click', function(){ var u='https://zesk001.github.io/awesome-ilji/2026_점검소독_현황지도.html'; var w=null; try{ w=window.open(u,'_blank'); }catch(e){} if(!w) location.href=u; }); })();
   // ===== 앱 버전 표시 + 🔄 최신버전 받기(캐시 비우고 새로고침) =====
-  var APP_VER='2026-06-16';
+  var APP_VER='2026-06-29';
   (function(){ var fo=document.getElementById('appFooter'); if(fo) fo.innerHTML='어썸조경 전체 업무 관리 시스템 · 일일업무일지 &nbsp;<span style="opacity:.55">v'+APP_VER+'</span>'; })();
   function appUpdate(){
     if(!confirm('최신 버전으로 새로고침할까요?\n(작성 화면에 적던 내용은 그대로 남아 있어요)')) return;
@@ -1094,7 +1096,7 @@
   function aeOpen(){
     if(!PINOK || (wsel.value||'').indexOf('김재성')!==0){ alert('김재성님 본인 확인 후 사용할 수 있어요.'); return; }
     var sel=document.getElementById('aeWriter');
-    sel.innerHTML=NAMES.filter(function(n){return n.indexOf('김재성')!==0;}).map(function(n){return '<option>'+aeEsc(n)+'</option>';}).join('');
+    sel.innerHTML=NAMES.filter(function(n){return n.indexOf('김재성')!==0;}).map(function(n){return '<option value="'+aeEsc(nameKey(n))+'">'+aeEsc(n)+'</option>';}).join('');
     document.getElementById('aeDate').value=dateStr();
     document.getElementById('aeRows').innerHTML='';
     document.getElementById('aeMsg').textContent='직원과 날짜를 고르고 「불러오기」를 누르세요.';
