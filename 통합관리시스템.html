@@ -3445,11 +3445,17 @@ function gEstList(){
 function load(){
   try{sites=JSON.parse(localStorage.getItem('aws_sites')||'[]');}catch(e){sites=[];}
   try{logs=JSON.parse(localStorage.getItem('aws_logs')||'[]');}catch(e){logs=[];}
-  if(sites.length===0) seed();
+  // 초기 배포에 들어있던 샘플(데모) 현장·일지를 PC마다 1회 자동 제거
+  if(!localStorage.getItem('aws_demo_cleared_v1')){
+    const DEMO=['한빛아파트 화단 조경공사','그린빌 정원 보수','센트럴파크 수목 점검','행복마을 방역 소독','동백초교 운동장 조경','별빛타운 가로수 점검','푸른숲아파트 정기 소독','해오름빌라 진입로 조경'];
+    sites=(sites||[]).filter(s=>DEMO.indexOf(s.name)<0);
+    logs=(logs||[]).filter(l=>!l.site||DEMO.indexOf(l.site)<0);
+    localStorage.setItem('aws_demo_cleared_v1','1'); save();
+  }
 }
 function save(){localStorage.setItem('aws_sites',JSON.stringify(sites));localStorage.setItem('aws_logs',JSON.stringify(logs));}
 
-function seed(){
+function seed(){ sites=[]; logs=[]; save(); return; /* 샘플(데모) 데이터 제거됨 — 더 이상 생성 안 함 */
   const t=new Date();const d=o=>{const x=new Date(t);x.setDate(x.getDate()+o);return x.toISOString().slice(0,10);};
   sites=[
     {id:id(),name:"한빛아파트 화단 조경공사",type:"공사",region:"수원시 영통구",manager:"김재성",planDate:d(3),realDate:"",amount:18500000,contract:"서류계약",bill:{tax:false,photo:false,doc:false},stages:[2,2,2,2,2,1,0,0,0,0],memo:"가공 진행중"},
