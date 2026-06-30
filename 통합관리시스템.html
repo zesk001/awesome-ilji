@@ -3303,6 +3303,7 @@ function entryRows(list){
   });
   return r+'</table>';
 }
+function entryRowsW(list){var seen={},rows='',n=0;list.forEach(function(x){var site=siteLabel(x),item=x.item||'',memo=x.memo||'';var key=JSON.stringify([site,item,memo]);if(seen[key])return;seen[key]=1;n++;rows+='<tr><td>'+esc(site)+'</td><td style=&quot;white-space:pre-wrap;word-break:break-word&quot;><b>'+esc(item)+'</b></td><td style=&quot;white-space:pre-wrap;word-break:break-word&quot;>'+esc(memo)+'</td></tr>';});return {html:'<table><tr><th>현장</th><th>내용</th><th>비고</th></tr>'+rows+'</table>',n:n};}
 function catBadges(list){ const cc={}; list.forEach(r=>cc[r.cat]=(cc[r.cat]||0)+1);
   let b=''; CATS.forEach(c=>{ if(cc[c]) b+='<span class=&quot;badge&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;>'+c+' '+cc[c]+'</span>'; }); return b; }
 
@@ -3314,7 +3315,8 @@ function renderDetail(scope){
   if(viewMode==='writer'){
     html+='<div class=&quot;grp&quot;><div class=&quot;grp-head&quot;><span class=&quot;name&quot;>'+esc(selWriter)+'</span>'+catBadges(scope)+'<span class=&quot;cnt&quot;>총 '+scope.length+'건</span></div><div class=&quot;sub&quot;>';
     CATS.forEach(c=>{ const sub=scope.filter(r=>r.cat===c); if(!sub.length) return;
-      html+='<div class=&quot;sub-head&quot;><span class=&quot;bar&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;></span>'+c+' ('+sub.length+')</div>'+entryRows(sub); });
+      var w=entryRowsW(sub);
+      html+='<div class=&quot;sub-head&quot;><span class=&quot;bar&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;></span>'+c+' ('+w.n+')</div>'+w.html; });
     html+='</div></div>';
   }else{
     CATS.forEach(c=>{
