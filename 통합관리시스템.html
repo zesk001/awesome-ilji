@@ -2765,7 +2765,14 @@ const App = (function(){
     if(!curEmpId || !state.employees.find(e=>e.id===curEmpId)) curEmpId=state.employees[0].id;
     sel.innerHTML = state.employees.map(e=>`<option value=&quot;${e.id}&quot; ${e.id===curEmpId?'selected':''}>${esc(e.name)} ${e.dept?'· '+esc(e.dept):''}</option>`).join('');
   }
-  function renderAll(){ sortEmps(); updateAdminBtn(); updateMasterBtn(); applyAccessUI(); renderYearSel(); renderEmpSel(); renderOverview(); renderEmpDetail(); }
+  function autoCompletePastLeaves(){
+    if(READ_ONLY) return;
+    var t=new Date(); t.setHours(0,0,0,0);
+    var ch=[];
+    (state.records||[]).forEach(function(r){ if(r&amp;&amp;r.status==='계획'&amp;&amp;r.date){ var d=new Date(r.date); if(!isNaN(d.getTime())&amp;&amp;d&lt;t){ r.status='사용'; ch.push(r); } } });
+    if(ch.length){ save(); ch.forEach(pushRec); }
+  }
+  function renderAll(){ autoCompletePastLeaves(); sortEmps(); updateAdminBtn(); updateMasterBtn(); applyAccessUI(); renderYearSel(); renderEmpSel(); renderOverview(); renderEmpDetail(); }
 
   function init(){
     if(READ_ONLY) document.body.classList.add('readonly');
@@ -3548,7 +3555,8 @@ function careShiftMonth(d){careMonthOffset=(d===0?0:careMonthOffset+d);renderCar
 function careSetMode(m){careCalMode=m;document.querySelectorAll('#careModeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));renderCareCalendar();}
 function careEventsByDate(){
   const map={};
-  const add=(date,name,type,done,solid,mgr,sid,src)=>{if(!date)return;(map[date]=map[date]||[]).push({name:name||'',type,done,solid:!!solid,mgr:mgr||'',sid:sid||'',src:src||''});};
+  const ts=todayStr();
+  const add=(date,name,type,done,solid,mgr,sid,src)=>{if(!date)return;(map[date]=map[date]||[]).push({name:name||'',type,done,solid:!!solid,mgr:mgr||'',sid:sid||'',src:src||'',late:(!done && String(date)<ts)});};
   (gData.logs||[]).forEach(l=>{if(l.type==='점검'||l.type==='소독')add(l.date,l.site||l.content||'',l.type,true,false,l.writer||'');});  // 완료(일지)
   (sites||[]).forEach(s=>{if((s.type==='점검'||s.type==='소독')&&s.planDate)add(s.planDate,s.name,s.type,false,false,s.manager||'',s.id,'site');});   // 예정(현장)
   (careSites||[]).forEach(s=>{if(s.date)add(s.date,s.name,s.type,false,true,s.mgr||'',s.id,'care');});   // 현장 추가로 등록한 일정
@@ -3570,9 +3578,9 @@ function renderCareCalendar(){
     const evs=(evmap[ds]||[]).filter(e=>careCalMode==='both'||(careCalMode==='insp'&&e.type==='점검')||(careCalMode==='dis'&&e.type==='소독')||(careCalMode==='con'&&e.type==='공사'));
     // 담당자+구분별로 묶어 개수 칩으로 압축 표시
     const groups={};
-    evs.forEach(e=>{const k=(mgrName(e.mgr)||'미지정')+''+e.type;(groups[k]=groups[k]||{mgr:mgrName(e.mgr)||'미지정',type:e.type,n:0,done:0}).n++;if(e.done)groups[k].done++;});
+    evs.forEach(e=>{const k=(mgrName(e.mgr)||'미지정')+''+e.type;(groups[k]=groups[k]||{mgr:mgrName(e.mgr)||'미지정',type:e.type,n:0,done:0,late:0}).n++;if(e.done)groups[k].done++;if(e.late)groups[k].late++;});
     const garr=Object.values(groups).sort((a,b)=>a.mgr.localeCompare(b.mgr)||a.type.localeCompare(b.type));
-    const chips=garr.map(g=>{const c=g.type==='소독'?'so':g.type==='공사'?'gong':g.type==='기타'?'etc':'jeom';const tc=g.type.charAt(0);const dchk=g.done>0?(g.done>=g.n?'✓':g.done+'/'):'';return `<div class="cev ${c}" title="${esc(g.mgr)} · ${g.type} ${g.n}건${g.done?(' (완료 '+g.done+')'):''}">${esc(g.mgr)} ${tc}${dchk}${g.n}</div>`;}).join('');
+    const chips=garr.map(g=>{const c=g.type==='소독'?'so':g.type==='공사'?'gong':g.type==='기타'?'etc':'jeom';const tc=g.type.charAt(0);const isLate=(g.done<g.n&&(g.late||0)>0);const dchk=g.done>=g.n?'✓':(g.done>0?g.done+'/':'');const lm=isLate?'⚠':'';return `<div class="cev ${c}" style="${isLate?'outline:2px solid #e0a82e;outline-offset:-2px;':''}" title="${esc(g.mgr)} · ${g.type} ${g.n}건${g.done?(' (완료 '+g.done+')'):''}${isLate?(' (지연 '+g.late+')'):''}">${esc(g.mgr)} ${tc}${dchk}${lm}${g.n}</div>`;}).join('');
     const inner=evs.length?`<div class="cevscroll">${chips}</div>`:'';
     const click=evs.length?`openDayDetail('${ds}')`:`openCareSiteModal(null,'${ds}')`;
     html+=`<div class="cell ${ds===ts?'today':''} ${dow===0?'sun':dow===6?'sat':''}" onclick="${click}" style="cursor:pointer" title="클릭하여 현장 추가 / 상세 보기"><div class="dnum">${dn}</div>${inner}</div>`;
@@ -3594,7 +3602,7 @@ function openDayDetail(ds){
       const list=byMgr[mgr];const cnt={};list.forEach(e=>cnt[e.type]=(cnt[e.type]||0)+1);
       const cntStr=Object.keys(cnt).map(t=>t+' '+cnt[t]).join(' · ');
       const rows=list.slice().sort((a,b)=>a.type.localeCompare(b.type)||(a.name||'').localeCompare(b.name||'')).map(e=>
-        `<tr><td style="width:60px;">${careTypeBadge(e.type)}</td><td>${e.done?'✓ ':'○ '}${esc(e.name||'')}</td><td class="small" style="color:var(--muted);width:46px;">${e.done?'완료':'예정'}</td><td style="width:96px;white-space:nowrap;text-align:right;">${(e.src==='care'||e.src==='site')?`<button onclick="${e.src==='care'?'editCareFromDay':'editSiteFromDay'}('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;margin-right:4px;border:1px solid #3a8a5a;background:#163b29;color:#bfe49a;border-radius:6px;cursor:pointer;">수정</button><button onclick="${e.src==='care'?'delCareFromDay':'delSitePlanFromDay'}('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;border:1px solid #a3484c;background:#3b1618;color:#f3b6b8;border-radius:6px;cursor:pointer;">삭제</button>`:''}</td></tr>`).join('');
+        `<tr><td style="width:60px;">${careTypeBadge(e.type)}</td><td>${e.done?'✓ ':(e.late?'⚠ ':'○ ')}${esc(e.name||'')}</td><td class="small" style="color:${e.late?'#e0a82e':'var(--muted)'};width:46px;font-weight:${e.late?700:400};">${e.done?'완료':(e.late?'지연':'예정')}</td><td style="width:96px;white-space:nowrap;text-align:right;">${(e.src==='care'||e.src==='site')?`<button onclick="${e.src==='care'?'editCareFromDay':'editSiteFromDay'}('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;margin-right:4px;border:1px solid #3a8a5a;background:#163b29;color:#bfe49a;border-radius:6px;cursor:pointer;">수정</button><button onclick="${e.src==='care'?'delCareFromDay':'delSitePlanFromDay'}('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;border:1px solid #a3484c;background:#3b1618;color:#f3b6b8;border-radius:6px;cursor:pointer;">삭제</button>`:''}</td></tr>`).join('');
       return `<div style="margin-bottom:15px;"><div style="font-weight:800;color:#fff;margin-bottom:6px;">${esc(mgr)} <span class="small" style="color:var(--muted);font-weight:600;">(${list.length}개소 · ${cntStr})</span></div><table><tbody>${rows}</tbody></table></div>`;
     }).join('');
   }
