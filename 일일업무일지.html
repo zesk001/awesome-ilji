@@ -709,7 +709,7 @@
     function push(cat,label,color,filterFn){
       if(!SEL[cat]) return;
       const entries=Object.keys(SEL[cat]).filter(k=>filterFn(SEL[cat][k]))
-        .map(k=>{const v=SEL[cat][k]||{}; return {cat:cat,key:k,name:v.name||k,region:v.region||'',memo:v.memo||'',type:v.type||''};});
+        .map(k=>{const v=SEL[cat][k]||{}; return {cat:cat,key:k,name:v.name||k,region:(v.region===ETC_REGION.label?'':(v.region||'')),memo:v.memo||'',type:v.type||''};});
       if(entries.length) groups.push({label:label,color:color,cat:cat,entries:entries});
     }
     order.forEach(cat=>{
@@ -724,7 +724,7 @@
     if(SEL['영업']){
       BOSS_ORDER.forEach(function(item){
         var entries=Object.keys(SEL['영업']).filter(function(k){return SEL['영업'][k].item===item;})
-          .map(function(k){var v=SEL['영업'][k]||{}; return {cat:'영업',key:k,name:v.name||'',region:v.region||'',memo:v.memo||'',type:''};});
+          .map(function(k){var v=SEL['영업'][k]||{}; return {cat:'영업',key:k,name:v.name||'',region:(v.region===ETC_REGION.label?'':(v.region||'')),memo:v.memo||'',type:''};});
         if(entries.length) groups.push({label:item,color:'#1e5631',cat:'영업',entries:entries});
       });
     }
@@ -863,14 +863,14 @@
         const nm0=(v.name||'').trim();
         if(v.custom && !nm0) return;
         const item = (cat==='소독' && v.sub) ? '단타' : cat;
-        rows.push([dt,cat,v.region||'',v.name||'',item,'',v.memo||'']);
+        rows.push([dt,cat,(v.region===ETC_REGION.label?'':(v.region||'')),v.name||'',item,'',v.memo||'']);
       });
     });
     Object.keys(SEL['영업']||{}).forEach(function(k){
       var v=SEL['영업'][k]||{};
       var nm=(v.name||'').trim(), mm=(v.memo||'').trim();
       if(!nm && !mm) return;
-      rows.push([dt,'영업',v.region||'',nm,v.item||'','',mm]);
+      rows.push([dt,'영업',(v.region===ETC_REGION.label?'':(v.region||'')),nm,v.item||'','',mm]);
     });
     return rows;
   }

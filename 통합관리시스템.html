@@ -3193,7 +3193,7 @@ async function loadWeek(){
 }
 
 function esc(s){return String(s).replace(/&amp;/g,'&amp;amp;').replace(/</g,'&amp;lt;').replace(/>/g,'&amp;gt;');}
-function siteLabel(r){ return [r.region,r.site].filter(Boolean).join(' ') || '-'; }
+function siteLabel(r){ var rg=(r.region==='기타지역'?'':r.region); return [rg,r.site].filter(Boolean).join(' ') || '-'; }
 
 /* ── 담당자 이름 탭 만들기 ── */
 function buildWriterTabs(){
