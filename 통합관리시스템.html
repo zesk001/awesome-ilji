@@ -3303,7 +3303,7 @@ function entryRows(list){
   });
   return r+'</table>';
 }
-function entryRowsW(list){var seen={},rows='',n=0;list.forEach(function(x){var site=siteLabel(x),item=x.item||'',memo=x.memo||'';var key=JSON.stringify([site,item,memo]);if(seen[key])return;seen[key]=1;n++;rows+='<tr><td>'+esc(site)+'</td><td style=&quot;white-space:pre-wrap;word-break:break-word&quot;><b>'+esc(item)+'</b></td><td style=&quot;white-space:pre-wrap;word-break:break-word&quot;>'+esc(memo)+'</td></tr>';});return {html:'<table><tr><th>현장</th><th>내용</th><th>비고</th></tr>'+rows+'</table>',n:n};}
+function entryRowsW(list){var seen={},rows='',n=0;var cs='white-space:pre-wrap;word-break:break-word;vertical-align:top';list.forEach(function(x){var site=siteLabel(x),item=x.item||'',memo=x.memo||'';var key=JSON.stringify([site,item,memo]);if(seen[key])return;seen[key]=1;n++;rows+='<tr><td style=&quot;'+cs+'&quot;>'+esc(site)+'</td><td style=&quot;'+cs+'&quot;><b>'+esc(item)+'</b></td><td style=&quot;'+cs+'&quot;>'+esc(memo)+'</td></tr>';});return {html:'<table style=&quot;width:100%;table-layout:fixed&quot;><colgroup><col style=&quot;width:34%&quot;><col style=&quot;width:16%&quot;><col style=&quot;width:50%&quot;></colgroup><tr><th>현장</th><th>내용</th><th>비고</th></tr>'+rows+'</table>',n:n};}
 function catBadges(list){ const cc={}; list.forEach(r=>cc[r.cat]=(cc[r.cat]||0)+1);
   let b=''; CATS.forEach(c=>{ if(cc[c]) b+='<span class=&quot;badge&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;>'+c+' '+cc[c]+'</span>'; }); return b; }
 
