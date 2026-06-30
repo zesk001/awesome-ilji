@@ -858,7 +858,7 @@
     ['점검','소독','공사','사무'].forEach(cat=>{
       Object.keys(SEL[cat]||{}).forEach(k=>{
         const v=SEL[cat][k]||{};
-        if(v.type==='기타업무'){ if(!(v.workText||'').trim()) return; rows.push([dt,'사무','','','기타업무','',v.workText||'']); return; }
+        if(v.type==='기타업무'){ if(!(v.workText||'').trim()) return; rows.push([dt,'사무','','',v.workText||'','','']); return; }
         if(v.type==='연차'){ rows.push([dt,'사무','','','연차',v.leaveDate||'','']); return; }
         const nm0=(v.name||'').trim();
         if(v.custom && !nm0) return;
@@ -966,11 +966,14 @@
   function wvEntryHTML(e){
     // e=[분류,지역,현장,항목,단계,비고]
     var cat=e[0]||'', region=e[1]||'', site=e[2]||'', item=e[3]||cat, stage=e[4]||'', memo=e[5]||'';
-    var color=wvColor(cat,item), badge=wvBadge(cat,item);
-    var attrs=' data-kind="exist" data-cat="'+sEsc(cat)+'" data-region="'+sEsc(region)+'" data-site="'+sEsc(site)+'" data-item="'+sEsc(item)+'" data-stage="'+sEsc(stage)+'"';
+    var isEtc=(cat==='사무' && !region && !site && item!=='연차');
+    var etcContent=isEtc?(item==='기타업무'?memo:item):'';
+    var color=isEtc?wvColor('사무','기타업무'):wvColor(cat,item), badge=isEtc?'기타업무':wvBadge(cat,item);
+    var attrs=' data-kind="exist"'+(isEtc?' data-etc="1"':'')+' data-cat="'+sEsc(cat)+'" data-region="'+sEsc(region)+'" data-site="'+sEsc(site)+'" data-item="'+sEsc(item)+'" data-stage="'+sEsc(stage)+'"';
     var place=[region,site].filter(Boolean).join(' ');
     var field;
     if(item==='연차'){ field='<input class="wv-memo" type="date" value="'+sEsc(stage)+'">'; }
+    else if(isEtc){ field='<input class="wv-memo" value="'+sEsc(etcContent)+'" placeholder="내용">'; }
     else { field='<input class="wv-memo" value="'+sEsc(memo)+'" placeholder="내용">'; }
     return '<div class="wv-entry"'+attrs+'>'
       +'<span class="wv-cat" style="background:'+color+'">'+sEsc(badge)+'</span>'
@@ -1036,8 +1039,8 @@
     }
     var cat=el.dataset.cat, region=el.dataset.region||'', site=el.dataset.site||'', item=el.dataset.item||cat, stage=el.dataset.stage||'';
     var val=(el.querySelector('.wv-memo')||{}).value||'';
+    if(el.dataset.etc==='1') return val.trim()?[dt,'사무','','',val,'','']:null;
     if(item==='연차') return [dt,'사무','','','연차',val,''];
-    if(item==='기타업무') return [dt,'사무','','','기타업무','',val];
     return [dt,cat,region,site,item,stage,val];
   }
   function wvSaveDay(card, skipConfirm){
