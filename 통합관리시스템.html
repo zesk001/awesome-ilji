@@ -1644,6 +1644,11 @@ loadFromIlji();
       </label>
     </div>
     <p class="small" style="color:var(--muted);margin-bottom:8px;">📁 사진대지가 들어온 현장은 <b>사진대지</b> 항목이 자동으로 ✓ 체크됩니다(관리자가 사진대지 추출기로 올린 목록 기준).</p>
+    <div id="conCatTabs" style="display:flex;gap:8px;margin:4px 0 12px;">
+      <button class="ccat" data-cat="공사" onclick="setConCat('공사')" style="padding:7px 18px;border:1px solid #3a8a5a;border-radius:8px;cursor:pointer;font-size:14px;background:linear-gradient(135deg,#74c244,#3f8a2a);color:#06210a;font-weight:800;">공사</button>
+      <button class="ccat" data-cat="점검" onclick="setConCat('점검')" style="padding:7px 18px;border:1px solid #2c3a30;border-radius:8px;cursor:pointer;font-size:14px;background:transparent;color:var(--muted);font-weight:600;">점검</button>
+      <button class="ccat" data-cat="소독" onclick="setConCat('소독')" style="padding:7px 18px;border:1px solid #2c3a30;border-radius:8px;cursor:pointer;font-size:14px;background:transparent;color:var(--muted);font-weight:600;">소독</button>
+    </div>
     <div class="miniwrap" id="conStats"></div>
     <div class="glass"><h3>완료보고 현장 <span class="cnt" id="conCnt"></span></h3><div class="scroll" style="max-height:62vh;"><table id="conTable"></table></div></div>
   </section>
@@ -3996,6 +4001,20 @@ function repStepsHtml(key,autoPhoto,tx,site,estDate){
       html+=`<span style="margin-left:4px;color:var(--g1);font-variant-numeric:tabular-nums;cursor:pointer;text-decoration:underline dotted;" title="누르면 세금계산서 상세 보기" onclick="event.stopPropagation();showTaxDetail('${encS}','${estDate||''}')">${taxDate} 🔍</span>`;}
     return html;}).join('')+'</div>';
 }
+// 완료보고 세부 분류(공사·점검·소독). 기본=공사. (현재 견적엔 분류값이 없어 전부 공사로 잡힘)
+let conCat='공사';
+function conCatOf(e){ return (e&&e.cat)||'공사'; }
+function setConCat(c){
+  conCat=c;
+  var bs=document.querySelectorAll('#conCatTabs .ccat');
+  for(var i=0;i<bs.length;i++){ var b=bs[i],on=(b.getAttribute('data-cat')===c);
+    b.style.background=on?'linear-gradient(135deg,#74c244,#3f8a2a)':'transparent';
+    b.style.color=on?'#06210a':'var(--muted)';
+    b.style.fontWeight=on?'800':'600';
+    b.style.borderColor=on?'#3a8a5a':'#2c3a30';
+  }
+  renderConstruction();
+}
 // 완료보고 대상 = 견적및계약현황에서 계약된 현장(계약 또는 발주 성사)
 function conList(){
   return (gData.est||[])
@@ -4007,6 +4026,7 @@ function renderConstruction(){
   const wi=document.getElementById('conWho');if(wi&&!wi.value)wi.value=conWho();
   let list=conList();
   if(q)list=list.filter(e=>(e.site||'').includes(q)||(e.work||'').includes(q)||(e.region||'').includes(q));
+  list=list.filter(e=>conCatOf(e)===conCat);
   list.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(a.site||'').localeCompare(b.site||''));
   const done=list.filter(e=>{const r=repRec(e.key);return (r.photo||pbHasSite(e.site,e.work))&&(r.tax||!!taxPick(e.site,e.date,e.work))&&r.deposit;}).length;
   const cs=document.getElementById('conStats');
