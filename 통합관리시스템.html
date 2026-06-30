@@ -3369,7 +3369,7 @@ function applyShared(res){
   const serverIds=new Set();const cs=[];let hasC=false;
   Object.keys(map).forEach(k=>{if(k.indexOf('caresite:')===0){hasC=true;serverIds.add(k.slice(9));if(map[k]){try{cs.push(JSON.parse(map[k]));}catch(e){}}}});
   if(hasC){careSites=cs;careSitesSave();}
-  else if((careSites||[]).length){careSites.forEach(s=>postShared('caresite:'+s.id,JSON.stringify(s)));}
+  else if(Object.keys(map).length){careSites=[];careSitesSave();}   // 공유데이터가 정답: 공유에 일정 없으면 로컬도 비움(삭제분 되살리지 않음). 단 공유조회 실패(map 빈) 시엔 로컬 유지
   // 메모
   if('carememo' in map){localStorage.setItem('aws_carememo',map['carememo']);const el=document.getElementById('careMemoBox');if(el&&document.activeElement!==el)el.value=map['carememo'];}
   else{const lm=localStorage.getItem('aws_carememo')||'';if(lm)postShared('carememo',lm);}
