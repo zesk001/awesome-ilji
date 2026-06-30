@@ -2810,6 +2810,11 @@ window.addEventListener('DOMContentLoaded', App.init);
       </select>
       <button class="btn sm" onclick="openEstAddModal()">+ 견적 추가</button>
     </div>
+    <div id="estCatTabs" style="display:flex;gap:8px;margin:4px 0 12px;">
+      <button class="ecat" data-cat="공사" onclick="setEstCat('공사')" style="padding:7px 18px;border:1px solid #3a8a5a;border-radius:8px;cursor:pointer;font-size:14px;background:linear-gradient(135deg,#74c244,#3f8a2a);color:#06210a;font-weight:800;">공사</button>
+      <button class="ecat" data-cat="점검" onclick="setEstCat('점검')" style="padding:7px 18px;border:1px solid #2c3a30;border-radius:8px;cursor:pointer;font-size:14px;background:transparent;color:var(--muted);font-weight:600;">점검</button>
+      <button class="ecat" data-cat="소독" onclick="setEstCat('소독')" style="padding:7px 18px;border:1px solid #2c3a30;border-radius:8px;cursor:pointer;font-size:14px;background:transparent;color:var(--muted);font-weight:600;">소독</button>
+    </div>
     <div class="miniwrap" id="estStats"></div>
     <div class="glass"><h3>견적 목록 <span class="cnt" id="estCnt"></span></h3><div class="scroll" style="max-height:60vh;"><table id="estTable"></table></div></div>
   </section>
@@ -4171,11 +4176,26 @@ function renderOrders(){
   }
   document.getElementById('ordTable').innerHTML=body?head+'<tbody>'+body+'</tbody>':'<tr><td class="empty">발주·자재가 없습니다. 발주추출기로 올리거나 + 수기 추가로 넣으세요.</td></tr>';
 }
+// 견적 세부 분류(공사·점검·소독). 기본=공사. (현재 견적엔 분류값이 없어 전부 공사로 잡힘)
+let estCat='공사';
+function estCatOf(e){ return (e&&e.cat)||'공사'; }
+function setEstCat(c){
+  estCat=c;
+  var bs=document.querySelectorAll('#estCatTabs .ecat');
+  for(var i=0;i<bs.length;i++){ var b=bs[i],on=(b.getAttribute('data-cat')===c);
+    b.style.background=on?'linear-gradient(135deg,#74c244,#3f8a2a)':'transparent';
+    b.style.color=on?'#06210a':'var(--muted)';
+    b.style.fontWeight=on?'800':'600';
+    b.style.borderColor=on?'#3a8a5a':'#2c3a30';
+  }
+  renderEstimates();
+}
 function renderEstimates(){
   const box=document.getElementById('estStats');if(!box)return;
   const q=(document.getElementById('estSearch')?document.getElementById('estSearch').value:'').trim();
   const filter=document.getElementById('estFilter')?document.getElementById('estFilter').value:'all';
-  const list=(gData.est||[]).map(e=>{const won=!!(e.deal||gHasOrder(e));return Object.assign({},e,{won});});
+  let list=(gData.est||[]).map(e=>{const won=!!(e.deal||gHasOrder(e));return Object.assign({},e,{won});});
+  list=list.filter(e=>estCatOf(e)===estCat);
   const total=list.length, wonCnt=list.filter(e=>e.won).length;
   const rate=total?Math.round(wonCnt/total*1000)/10:0;
   box.innerHTML=`
