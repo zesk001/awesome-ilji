@@ -803,6 +803,9 @@
 
   // ===== 작성자 · PIN · 전송 =====
   const NAMES=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','원채아 대리','김지훈 주임'];
+  // 작성자를 항상 공식 '이름 직책'으로 맞춰 저장(이름만/직책 섞임 방지)
+  const CANON_W=(function(){ var m={}; NAMES.forEach(function(n){ m[n.split(/\s+/)[0]]=n; }); return m; })();
+  function canonWriter(w){ var s=String(w==null?'':w).trim(); return CANON_W[s.split(/\s+/)[0]]||s; }
   const APPS_URL=(window.__APPS_URL)||'https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
 
   const wsel=document.getElementById('writerSel');
@@ -905,7 +908,7 @@
   }
   function submitData(writer){
     return fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'submit', writer:writer, pinHash:myPinHash(), date:todayStr(), delta:{est:[],stage:[],recv:[],doc:[]}, rows:collectRows(), sel:SEL})});
+      body:JSON.stringify({action:'submit', writer:canonWriter(writer), pinHash:myPinHash(), date:todayStr(), delta:{est:[],stage:[],recv:[],doc:[]}, rows:collectRows(), sel:SEL})});
   }
   function send(){
     var writer=wsel.value;
@@ -1069,7 +1072,7 @@
     if(!skipConfirm && !confirm(dt+' 일지를 '+rows.length+'건으로 저장(덮어쓰기)할까요?\n(0건이면 그 날 기록을 모두 지웁니다)')) return;
     var btn=card.querySelector('.wv-save'); btn.disabled=true; btn.textContent='저장 중...';
     return fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'submit', writer:wsel.value, pinHash:myPinHash(), date:dt, delta:{est:[],stage:[],recv:[],doc:[]}, rows:rows, sel:{}})})
+      body:JSON.stringify({action:'submit', writer:canonWriter(wsel.value), pinHash:myPinHash(), date:dt, delta:{est:[],stage:[],recv:[],doc:[]}, rows:rows, sel:{}})})
       .then(function(){ card.classList.remove('dirty'); wvUpdateSaveAll(); btn.textContent='저장됨 ✓'; setTimeout(function(){ btn.textContent='저장'; btn.disabled=false; },1800);
         if(dt===dateStr()){ try{ localStorage.setItem(sentKey(), nowStamp()); }catch(e){} renderSentStatus(); } })
       .catch(function(){ alert('저장 실패 — 인터넷 연결을 확인하세요.'); btn.textContent='저장'; btn.disabled=false; });
@@ -1165,7 +1168,7 @@
     if(!confirm(w+' 님 명의로 ['+dt+'] 기록 '+rows.length+'건을 저장할까요?\n(빈 표로 저장하면 그 날 기록을 모두 지운 것으로 처리돼요)')) return;
     var btn=document.getElementById('aeSave'); btn.disabled=true; btn.textContent='저장 중...';
     fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'submit', writer:w, pinHash:'', adminHash:myPinHash(), date:dt, delta:{est:[],stage:[],recv:[],doc:[]}, rows:rows, sel:{}})})
+      body:JSON.stringify({action:'submit', writer:canonWriter(w), pinHash:'', adminHash:myPinHash(), date:dt, delta:{est:[],stage:[],recv:[],doc:[]}, rows:rows, sel:{}})})
       .then(function(){
         btn.textContent='저장 완료 ✓'; setTimeout(function(){btn.textContent='저장(직원 명의)';btn.disabled=false;},2500);
         document.getElementById('aeMsg').textContent='저장됐어요. 해당 직원의 그 날짜 기록이 새 내용으로 반영됩니다.';
