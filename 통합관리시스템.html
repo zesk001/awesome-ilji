@@ -3056,20 +3056,29 @@ window.addEventListener('DOMContentLoaded', App.init);
 
   @media (max-width:700px){ .grid2{grid-template-columns:1fr;} .chips{grid-template-columns:repeat(2,1fr);} }
 
+  /* ── 통합 심플뷰 ── */
+  .sim-blk{display:flex; align-items:flex-start; gap:10px; padding:7px 0; border-bottom:1px solid var(--line);}
+  .sim-blk:last-child{border-bottom:none;}
+  .sim-title{font-size:13px; font-weight:bold; min-width:38px; flex:none; padding-top:2px;}
+  .sim-body{font-size:12px; color:#333; flex:1; line-height:1.8;}
+  .sim-row{margin:1px 0;}
+  .sim-w{color:#888; font-size:11px;}
+
   /* ── 인쇄: A4 ── */
-  @page{ size:A4 portrait; margin:9mm; }
+  @page{ size:A4 portrait; margin:10mm 12mm; }
   @media print{
-    body{background:#fff;}
+    body{background:#fff; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
     .toolbar{display:none;}
-    .wtabs{display:none;}
+    .wtabs{display:none !important;}
     /* 담당자별 인쇄: 상세업무만 출력(요약 칩·요약표·도넛 숨김) */
     body.print-detail .chips, body.print-detail .grid2{display:none;}
-    .paper{box-shadow:none; border-radius:0; max-width:none; margin:0; padding:0;}
+    .paper{box-shadow:none; border-radius:0; max-width:700px; margin:0 auto; padding:12px 16px;}
     .card,.grp{break-inside:avoid;}
-    table{font-size:10.5px;}
-    th{font-size:10px;}
-    .chip .num{font-size:17px;}
-    .rpt-head h1{font-size:19px;}
+    table{font-size:10px;}
+    th{font-size:9.5px;}
+    td{padding:3px 4px;}
+    .chip .num{font-size:15px;}
+    .rpt-head h1{font-size:17px;}
   }
 </style>
 </head>
@@ -3117,12 +3126,15 @@ window.addEventListener('DOMContentLoaded', App.init);
 
 <script>
 const APPS_URL='https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
-const CATS=['점검','소독','공사','사무','대표'];
-const CATCOLOR={'점검':'#2e7d32','소독':'#0277bd','공사':'#ef6c00','사무':'#6a1b9a','대표':'#c2185b'};
+const CATS=['점검','소독','공사','견적','계약','사무','대표'];
+const CATCOLOR={'점검':'#2e7d32','소독':'#0277bd','공사':'#ef6c00','견적':'#00acc1','계약':'#8d6e63','사무':'#6a1b9a','대표':'#c2185b'};
 
-/* 담당자 표시 순서(직급순) — 이름(성명) 기준으로 매칭 */
-const ORDER=['신현철 대표','김재성 이사','김남일 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','김지훈 주임','원채아 대리'];
-function nameKey(w){ return String(w).trim().split(/\s+/)[0]; }
+/* 담당자 표시 순서(직급순) — 일일업무일지 명단과 동일 */
+const ORDER=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','원채아 대리','김지훈 주임'];
+function nameKey(w){ return String(w==null?'':w).trim().split(/\s+/)[0]; }
+/* 같은 사람인데 '김재성'·'김재성 이사'·오타 등으로 나뉘는 것을 하나로 → 공식 '이름 직책'으로 정규화 */
+const WRITER_CANON=(function(){ const m={}; ORDER.forEach(function(full){ m[nameKey(full)]=full; }); return m; })();
+function canonWriter(w){ const s=String(w==null?'':w).trim(); if(!s) return ''; return WRITER_CANON[nameKey(s)]||s; }
 function wRank(w){ const k=nameKey(w); for(let i=0;i<ORDER.length;i++){ if(nameKey(ORDER[i])===k) return i; } return 999; }
 function cmpWriter(a,b){ const ra=wRank(a), rb=wRank(b); if(ra!==rb) return ra-rb; return a<b?-1:(a>b?1:0); }
 
@@ -3132,6 +3144,7 @@ let viewMode='all';     // 'all'=통합 | 'writer'=담당자별
 let selWriter='';       // 담당자별에서 선택된 담당자
 let WLIST=[];           // 현재 주의 담당자 목록(정렬됨)
 let DATA=[];            // 마지막으로 불러온 주간 데이터
+let ESTCOUNT=0, DEALCOUNT=0;  // 이번 주 견적·계약 건수(부모창 gData.est)
 
 function pad(n){return String(n).padStart(2,'0');}
 function fmt(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
@@ -3156,12 +3169,27 @@ function setView(m){
   else { bar.style.display='none'; }
   renderAll();
 }
-/* 인쇄: 담당자별 보기에서는 상세업무만 출력(요약 칩·요약표·도넛 제외) */
+/* 인쇄: 새 창에서 주간업무일지만 출력(컬러 유지·한 장에 맞게 축소) */
 function doPrint(){
-  const detail=(viewMode==='writer');
-  if(detail) document.body.classList.add('print-detail');
-  window.print();
-  if(detail) setTimeout(function(){ document.body.classList.remove('print-detail'); }, 600);
+  var paperEl=document.querySelector('.paper');
+  var styleEl=document.querySelector('style');
+  var pw=window.open('','_blank','width=900,height=750');
+  if(!pw){alert('팝업 차단을 해제해 주세요(주소창 오른쪽 팝업 허용)'); return;}
+  var css='@page{size:A4 portrait;margin:10mm 12mm}'+
+    'body{background:#fff;margin:0;padding:8px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'+
+    '.toolbar,.wtabs{display:none!important}'+
+    '.paper{box-shadow:none!important;border-radius:0!important;max-width:700px!important;width:100%!important;margin:0 auto!important;padding:12px 16px!important}'+
+    'table{font-size:10px!important}th{font-size:9.5px!important}td{padding:3px 4px!important}'+
+    '.chip .num{font-size:15px!important}.rpt-head h1{font-size:17px!important}';
+  pw.document.write(
+    '<!DOCTYPE html><html><head><meta charset=\'UTF-8\'>'+
+    '<style>'+styleEl.textContent+'</style>'+
+    '<style>'+css+'</style>'+
+    '</head><body>'+paperEl.outerHTML+
+    '<script>window.onload=function(){setTimeout(function(){window.print();window.close();},400);}<\/script>'+
+    '</body></html>'
+  );
+  pw.document.close();
 }
 
 /* ── JSONP: action=day 를 7일치 호출 ── */
@@ -3196,12 +3224,25 @@ async function loadWeek(){
         all.push({date:fmt(days[i]), dateK:fmtK(days[i]),
           cat:(String(r[0]||'')==='영업'?'대표':String(r[0]||'')), region:String(r[1]||''), site:String(r[2]||''),
           item:String(r[3]||''), stage:String(r[4]||''), memo:String(r[5]||''),
-          writer:String(r[6]||''), time:Number(r[7])||0});
+          writer:canonWriter(r[6]), time:Number(r[7])||0});
       });
     }
     msg.textContent='';
   }catch(e){ msg.textContent='⚠ 불러오기 오류 — 인터넷 연결을 확인하세요'; }
   DATA=all;
+  /* ── 견적·계약 건수: 부모창 gData.est에서 이번 주 날짜 기준 집계 ── */
+  ESTCOUNT=0; DEALCOUNT=0;
+  try{
+    const pe=window.parent&&window.parent.gData&&window.parent.gData.est;
+    if(pe){
+      const ws=fmt(days[0]), we=fmt(days[6]);
+      pe.forEach(function(e){
+        const d=String(e.date||'').slice(0,10);
+        if(d>=ws&&d<=we) ESTCOUNT++;
+        if(e.deal&&e.dealTime){const dt=String(e.dealTime||'').slice(0,10);if(dt>=ws&&dt<=we) DEALCOUNT++;}
+      });
+    }
+  }catch(err){}
   const now=new Date();
   document.getElementById('genTxt').innerHTML='생성: '+fmt(now)+' '+pad(now.getHours())+':'+pad(now.getMinutes())+'<br>어썸조경 일일업무일지 자동취합';
   if(viewMode==='writer') buildWriterTabs();
@@ -3270,7 +3311,7 @@ function renderSummary(scope){
   const box=document.getElementById('secSum');
   if(!scope.length){ box.innerHTML='<div class=&quot;empty&quot;>기록 없음</div>'; return; }
   if(viewMode==='writer'){
-    const cc={점검:0,소독:0,공사:0,사무:0,대표:0}; scope.forEach(r=>{ if(cc[r.cat]!==undefined) cc[r.cat]++; });
+    const cc={};CATS.forEach(c=>cc[c]=0); scope.forEach(r=>{ if(cc[r.cat]!==undefined) cc[r.cat]++; });
     let h='<table><tr><th>분류</th><th class=&quot;tnum&quot;>건수</th><th class=&quot;tnum&quot;>비율</th></tr>';
     CATS.forEach(c=>{ const n=cc[c]; const pct=Math.round(n/scope.length*100);
       h+='<tr><td><span class=&quot;badge&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;>'+c+'</span></td><td class=&quot;tnum&quot;>'+n+'</td><td class=&quot;tnum&quot;>'+pct+'%</td></tr>'; });
@@ -3278,15 +3319,14 @@ function renderSummary(scope){
     box.innerHTML=h;
   }else{
     const byW={};
-    scope.forEach(r=>{ const w=r.writer||'(미상)'; byW[w]=byW[w]||{점검:0,소독:0,공사:0,사무:0,대표:0,합:0};
-      if(byW[w][r.cat]!==undefined) byW[w][r.cat]++; byW[w].합++; });
-    let h='<table><tr><th>작성자</th><th class=&quot;tnum&quot;>점검</th><th class=&quot;tnum&quot;>소독</th><th class=&quot;tnum&quot;>공사</th><th class=&quot;tnum&quot;>사무</th><th class=&quot;tnum&quot;>대표</th><th class=&quot;tnum&quot;>합계</th></tr>';
+    const activeCats=CATS.filter(c=>scope.some(r=>r.cat===c));
+    scope.forEach(r=>{ const w=r.writer||'(미상)'; if(!byW[w]){byW[w]={합:0};CATS.forEach(c=>byW[w][c]=0);} if(byW[w][r.cat]!==undefined) byW[w][r.cat]++; byW[w].합++; });
+    let h='<table><tr><th>작성자</th>'+activeCats.map(c=>'<th class=&quot;tnum&quot;>'+c+'</th>').join('')+'<th class=&quot;tnum&quot;>합계</th></tr>';
     const wkeys=Object.keys(byW).sort(cmpWriter);
-    wkeys.forEach(w=>{ const o=byW[w];
-      h+='<tr><td><b>'+esc(w)+'</b></td><td class=&quot;tnum&quot;>'+(o.점검||'')+'</td><td class=&quot;tnum&quot;>'+(o.소독||'')+'</td><td class=&quot;tnum&quot;>'+(o.공사||'')+'</td><td class=&quot;tnum&quot;>'+(o.사무||'')+'</td><td class=&quot;tnum&quot;>'+(o.대표||'')+'</td><td class=&quot;tnum&quot;><b>'+o.합+'</b></td></tr>'; });
-    const t={점검:0,소독:0,공사:0,사무:0,대표:0,합:0};
+    wkeys.forEach(w=>{ const o=byW[w]; h+='<tr><td><b>'+esc(w)+'</b></td>'+activeCats.map(c=>'<td class=&quot;tnum&quot;>'+(o[c]||'')+'</td>').join('')+'<td class=&quot;tnum&quot;><b>'+o.합+'</b></td></tr>'; });
+    const t={합:0};CATS.forEach(c=>t[c]=0);
     wkeys.forEach(w=>{CATS.forEach(c=>t[c]+=byW[w][c]); t.합+=byW[w].합;});
-    h+='<tr class=&quot;sum-row&quot;><td>합계</td><td class=&quot;tnum&quot;>'+t.점검+'</td><td class=&quot;tnum&quot;>'+t.소독+'</td><td class=&quot;tnum&quot;>'+t.공사+'</td><td class=&quot;tnum&quot;>'+t.사무+'</td><td class=&quot;tnum&quot;>'+t.대표+'</td><td class=&quot;tnum&quot;>'+t.합+'</td></tr></table>';
+    h+='<tr class=&quot;sum-row&quot;><td>합계</td>'+activeCats.map(c=>'<td class=&quot;tnum&quot;>'+t[c]+'</td>').join('')+'<td class=&quot;tnum&quot;>'+t.합+'</td></tr></table>';
     box.innerHTML=h;
   }
 }
@@ -3294,8 +3334,10 @@ function renderSummary(scope){
 /* ── 분류별 비율 도넛 ── */
 function renderDonut(scope){
   const box=document.getElementById('secCat');
-  const byC={점검:0,소독:0,공사:0,사무:0,대표:0}; scope.forEach(r=>{ if(byC[r.cat]!==undefined) byC[r.cat]++; });
-  const tot=scope.length;
+  const byC={};CATS.forEach(c=>byC[c]=0); scope.forEach(r=>{ if(byC[r.cat]!==undefined) byC[r.cat]++; });
+  /* 통합 보기에서만 견적·계약 건수 추가(담당자별은 개인 일일기록만 표시) */
+  if(viewMode==='all'){ byC['견적']=ESTCOUNT; byC['계약']=DEALCOUNT; }
+  const tot=scope.length+(viewMode==='all'?ESTCOUNT+DEALCOUNT:0);
   if(!tot){ box.innerHTML='<div class=&quot;empty&quot;>기록 없음</div>'; return; }
   const R=42, C=2*Math.PI*R; let off=0; let segs='';
   CATS.forEach(c=>{ const frac=byC[c]/tot; if(frac<=0) return;
@@ -3336,17 +3378,61 @@ function renderDetail(scope){
       html+='<div class=&quot;sub-head&quot;><span class=&quot;bar&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;></span>'+c+' ('+w.n+')</div>'+w.html; });
     html+='</div></div>';
   }else{
+    /* ── 통합 심플뷰 ── */
+    html+='<div style=&quot;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 14px;&quot;>';
     CATS.forEach(c=>{
       const list=scope.filter(r=>r.cat===c);
       if(!list.length) return;
-      const wc={}; list.forEach(r=>{ const w=r.writer||'(미상)'; wc[w]=(wc[w]||0)+1; });
-      const wsorted=Object.keys(wc).sort(cmpWriter);
-      let badges=wsorted.map(w=>'<span class=&quot;badge&quot; style=&quot;background:#6b7d72&quot;>'+esc(w)+' '+wc[w]+'</span>').join('');
-      html+='<div class=&quot;grp&quot;><div class=&quot;grp-head&quot;><span class=&quot;name&quot; style=&quot;color:'+CATCOLOR[c]+'&quot;>'+c+'</span>'+badges+'<span class=&quot;cnt&quot;>총 '+list.length+'건</span></div><div class=&quot;sub&quot;>';
-      wsorted.forEach(w=>{ const sub=list.filter(r=>(r.writer||'(미상)')===w);
-        html+='<div class=&quot;sub-head&quot;><span class=&quot;bar&quot; style=&quot;background:#6b7d72&quot;></span>'+esc(w)+' ('+sub.length+')</div>'+entryRows(sub); });
-      html+='</div></div>';
+      let body='';
+      if(c==='점검'||c==='소독'){
+        /* 현장명(담당이름) 목록 */
+        const sw={};
+        list.forEach(r=>{const s=siteLabel(r)||'(미기재)';const w=r.writer||'(미상)';if(!sw[s])sw[s]=new Set();sw[s].add(w);});
+        const parts=Object.keys(sw).map(s=>'<b>'+esc(s)+'</b>(<span class=&quot;sim-w&quot;>'+esc([...sw[s]].sort(cmpWriter).map(nameKey).join(', '))+'</span>)');
+        body='<div>'+parts.join('&ensp;&middot;&ensp;')+'</div>';
+      }else if(c==='공사'){
+        /* 현장명(담당들) — 공사내역(비고) */
+        const sd={};
+        list.forEach(r=>{
+          const s=siteLabel(r)||'(미기재)';
+          if(!sd[s])sd[s]={ws:new Set(),cont:[]};
+          sd[s].ws.add(r.writer||'(미상)');
+          const di=(r.item==='기타업무')?(r.memo||r.item):r.item;
+          const dm=(r.item==='기타업무')?'':r.memo;
+          const key=di+'|'+dm;
+          if(!sd[s].cont.some(x=>x.k===key))sd[s].cont.push({k:key,di:di,dm:dm});
+        });
+        body=Object.keys(sd).map(s=>{
+          const d=sd[s];
+          const ws=esc([...d.ws].sort(cmpWriter).map(nameKey).join(', '));
+          const items=d.cont.filter(x=>x.di).map(x=>esc(x.di)+(x.dm?'<span class=&quot;sim-w&quot;>('+esc(x.dm)+')</span>':'')).join(', ');
+          return '<div class=&quot;sim-row&quot;><b>'+esc(s)+'</b> <span class=&quot;sim-w&quot;>('+ws+')</span>'+(items?' — '+items:'')+'</div>';
+        }).join('');
+      }else{
+        /* 사무·대표: 담당이름 N건 + 현장있을시 현장명, 내용(담당) */
+        const noSite=list.filter(r=>{const s=siteLabel(r);return !s||s==='-';});
+        const hasSite=list.filter(r=>{const s=siteLabel(r);return s&&s!=='-';});
+        if(noSite.length){
+          const wc={};noSite.forEach(r=>{const w=r.writer||'(미상)';wc[w]=(wc[w]||0)+1;});
+          const parts=Object.keys(wc).sort(cmpWriter).map(w=>'<b>'+esc(nameKey(w))+'</b> '+wc[w]+'건');
+          body+='<div>'+parts.join('&ensp;&middot;&ensp;')+'</div>';
+        }
+        if(hasSite.length){
+          const seen=new Set();
+          hasSite.forEach(r=>{
+            const s=siteLabel(r);
+            const di=(r.item==='기타업무')?(r.memo||r.item):r.item;
+            const dm=(r.item==='기타업무')?'':r.memo;
+            const w=r.writer||'(미상)';
+            const key=s+'|'+di+'|'+dm+'|'+w;
+            if(seen.has(key))return; seen.add(key);
+            body+='<div class=&quot;sim-row&quot;>'+esc(s)+(di?', <i>'+esc(di)+'</i>':'')+(dm?' ('+esc(dm)+')':'')+'<span class=&quot;sim-w&quot;> '+esc(nameKey(w))+'</span></div>';
+          });
+        }
+      }
+      html+='<div class=&quot;sim-blk&quot;><span class=&quot;sim-title&quot; style=&quot;color:'+CATCOLOR[c]+'&quot;>'+c+'</span><div class=&quot;sim-body&quot;>'+body+'</div></div>';
     });
+    html+='</div>';
   }
   box.innerHTML=html;
 }
@@ -3516,7 +3602,17 @@ function showTab(t){
   document.querySelectorAll('.tab-btn').forEach(x=>x.classList.toggle('active',x.dataset.tab===t));
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+t).classList.add('active');
-  if(t==='care')ensureCareMap();   // 지도 먼저 로드(다른 화면 그리기 오류와 무관하게 항상 실행)
+  if(t==='care'){
+    ensureCareMap();   // 지도 먼저 로드(다른 화면 그리기 오류와 무관하게 항상 실행)
+    // 오늘 일지 자동 갱신(대시보드 로딩 후 제출된 점검·소독 반영)
+    const _cd=todayStr();
+    jsonp('action=day&date='+_cd).then(function(r){
+      const rows=(r&&r.rows)||[];
+      gData.logs=(gData.logs||[]).filter(function(l){return l.date!==_cd;});
+      rows.forEach(function(row){gData.logs.push({date:_cd,type:row[0]||'',region:row[1]||'',site:row[2]||'',content:row[3]||'',stage:row[4]||'',note:row[5]||'',writer:row[6]||''}); });
+      renderCare();
+    }).catch(function(){});
+  }
   if(t==='leave'){ const f=document.getElementById('leaveFrame'); if(f&&!f.getAttribute('srcdoc')&&f.dataset.doc) f.srcdoc=f.dataset.doc; }
   try{ renderAll(); }catch(err){ console.error('renderAll 오류:', err); }
 }
