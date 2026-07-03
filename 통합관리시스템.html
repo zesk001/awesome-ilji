@@ -3366,17 +3366,42 @@ function entryRowsW(list){var seen={},rows='',n=0;var cs='white-space:pre-wrap;w
 function catBadges(list){ const cc={}; list.forEach(r=>cc[r.cat]=(cc[r.cat]||0)+1);
   let b=''; CATS.forEach(c=>{ if(cc[c]) b+='<span class=&quot;badge&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;>'+c+' '+cc[c]+'</span>'; }); return b; }
 
+/* ── 담당자별: 유형별 정리(금주/차주/기타) — 기존 주간업무일지 정리 방식 ── */
+var WR_NEXT=['방문요청','방문예정','통화','계약예정','예산나올곳','예산나온곳'];
+var WR_ETC=['예산신청','신규사업','기타메모'];
+function wrSite(r){ var rg=(r.region==='기타지역'?'':r.region); return [rg,r.site].filter(Boolean).join(' '); }
+function wkSave(el){ try{ localStorage.setItem(el.getAttribute('data-k'), el.value); }catch(e){} }
+function writerReport(scope){
+  var sec={금주:{},차주:{},기타:{}}, ord={금주:[],차주:[],기타:[]};
+  function add(s,lab,val){ if(!val) return; if(!sec[s][lab]){ sec[s][lab]=[]; ord[s].push(lab); } if(sec[s][lab].indexOf(val)<0) sec[s][lab].push(val); }
+  scope.forEach(function(r){
+    var it=r.item||'', memo=r.memo||'', st=wrSite(r);
+    if(r.cat==='점검'){ add('금주','놀이시설점검', st); }
+    else if(r.cat==='소독'){ add('금주','소독', st); }
+    else if(r.cat==='공사'){ add('금주','시공', st+(memo?'('+memo+')':'')); }
+    else if(r.cat==='사무'){ var lab=(it==='기타업무')?'기타업무':(it||'사무'); add('금주', lab, memo||st); }
+    else if(r.cat==='대표'){ var s2=(WR_NEXT.indexOf(it)>=0)?'차주':((WR_ETC.indexOf(it)>=0)?'기타':'금주'); var v=st+(memo?'('+memo+')':''); if(!v){ v=memo; } add(s2, it||'영업', v); }
+    else { add('금주', r.cat||'기타', st); }
+  });
+  var wkStart=fmt(weekDays()[0]);
+  function lines(s){ return ord[s].map(function(lab){ return '<div style=&quot;font-size:12.5px;line-height:1.7;margin:2px 0&quot;>ㆍ<b>'+esc(lab)+'</b> – '+esc(sec[s][lab].join(', '))+'</div>'; }).join(''); }
+  function edit(s,ph){ var k='wk_'+selWriter+'_'+wkStart+'_'+s; var sv=''; try{ sv=localStorage.getItem(k)||''; }catch(e){} return '<textarea data-k=&quot;'+esc(k)+'&quot; oninput=&quot;wkSave(this)&quot; placeholder=&quot;'+ph+'&quot; style=&quot;width:100%;min-height:52px;border:1px solid #cbd5cf;border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:inherit;margin-top:4px;box-sizing:border-box&quot;>'+esc(sv)+'</textarea>'; }
+  function box(title,color,s,ed,ph){ var body=lines(s); if(ed){ body+=edit(s,ph); } if(!body){ body='<div style=&quot;font-size:12.5px;color:#999&quot;>기록 없음</div>'; } return '<div style=&quot;margin-bottom:10px&quot;><div style=&quot;color:#fff;font-weight:bold;padding:5px 10px;border-radius:4px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div><div style=&quot;padding:6px 4px 2px&quot;>'+body+'</div></div>'; }
+  var h='<div style=&quot;background:#fff;border:1px solid #e5e9e6;border-radius:8px;padding:10px 14px&quot;>';
+  h+='<div class=&quot;grp-head&quot;><span class=&quot;name&quot;>'+esc(selWriter)+'</span>'+catBadges(scope)+'<span class=&quot;cnt&quot;>총 '+scope.length+'건</span></div>';
+  h+=box('금주업무보고','#1e5631','금주',false,'');
+  h+=box('차주업무보고','#2f6f9f','차주',true,'다음 주 계획을 적으세요');
+  h+=box('기타','#8a6d1f','기타',true,'기타 사항을 적으세요');
+  return h+'</div>';
+}
+
 /* ── 상세 (통합=분류별 묶음 / 담당자별=선택자 분류별) ── */
 function renderDetail(scope){
   const box=document.getElementById('secDetail');
   if(!scope.length){ box.innerHTML='<div class=&quot;empty&quot;>이번 주 전송된 기록이 없습니다</div>'; return; }
   let html='';
   if(viewMode==='writer'){
-    html+='<div class=&quot;grp&quot;><div class=&quot;grp-head&quot;><span class=&quot;name&quot;>'+esc(selWriter)+'</span>'+catBadges(scope)+'<span class=&quot;cnt&quot;>총 '+scope.length+'건</span></div><div class=&quot;sub&quot;>';
-    CATS.forEach(c=>{ const sub=scope.filter(r=>r.cat===c); if(!sub.length) return;
-      var w=entryRowsW(sub);
-      html+='<div class=&quot;sub-head&quot;><span class=&quot;bar&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;></span>'+c+' ('+w.n+')</div>'+w.html; });
-    html+='</div></div>';
+    html+=writerReport(scope);
   }else{
     /* ── 통합 심플뷰 ── */
     html+='<div style=&quot;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 14px;&quot;>';
