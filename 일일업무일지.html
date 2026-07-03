@@ -390,6 +390,9 @@
   const SCHOOLS = window.SCHOOLS;  // 학교DB.js 에서 로드
   const SUBGROUP={ '소독':{label:'단타', color:'#12a594', items:['단타초','단타유','단타어린이집','단타기관']} };
   const ETC_REGION={label:'기타지역', items:['기타초','기타중','기타고','기타유','기타어린이집','기타기관']};
+  // 사무 탭: 학교 선택 없이 자주 쓰는 업무별로 묶어 한 건씩 입력
+  const OFFICE_CATS=['견적서','계약','발주서','검사신청','사진대지','대금청구','기타업무'];
+  const OFFICE_HINT={'견적서':'직접 작성','계약':'나라장터·학교장터·수기 등','발주서':'직접 작성','검사신청':'설치검사·기생충검사 등','사진대지':'직접 작성','대금청구':'청구서·계산서·세금계산서','기타업무':'그 밖의 업무'};
   const CAT_COLORS={'점검':'#2f80c4','소독':'#27a36a','공사':'#e8842c','사무':'#8a8f98'};
   const BOSS_ITEMS={
     '실행 — 이번 주 한 일':['계약','방문','놀이시설점검','견적서','소독견적서','용역견적서','발주서','시공','공사확정','모래소독','AS작업','AS보완요청'],
@@ -458,7 +461,8 @@
   function setupCategory(panelId, cat, color, icon, opts){
     opts=opts||{};
     const panel=document.getElementById(panelId);
-    const extra=opts.extra||null, sg=opts.subgroup||null, specials=opts.specials||[];
+    const extra=opts.extra||null, sg=opts.subgroup||null, specials=opts.specials||[], office=opts.office||null;
+    let curOffice='기타업무';
     function head(txt){ return '<h2>'+icon+' '+cat+' <span class="badge" style="background:'+color+'">'+txt+'</span></h2>'; }
     function rowHTML(display,key,region,sub,subColor){
       const sty = sub ? (' style="--c:'+subColor+'"') : '';
@@ -467,6 +471,17 @@
         '<span class="sr-name">'+sEsc(display)+'</span></div>';
     }
     function showRegions(){
+      if(office){
+        let btns=office.map(oc=>{
+          const cnt=officeEntries(oc).filter(p=>(p[1].workText||'').trim()).length;
+          const rc=cnt?('<b style="color:'+color+'">'+cnt+'건</b>'):(OFFICE_HINT[oc]||'직접 작성');
+          return '<button class="region-special" data-special="'+oc+'"><span class="rg-name">'+oc+'</span><span class="rg-cnt">'+rc+'</span></button>';
+        }).join('');
+        const av=(SEL[cat]&&SEL[cat]['__연차'])?'<b style="color:'+color+'">선택됨</b>':'날짜 선택';
+        btns+='<button class="region-special" data-special="연차"><span class="rg-name">연차</span><span class="rg-cnt">'+av+'</span></button>';
+        panel.innerHTML=head('업무 선택')+'<div class="work-note">학교 선택 없이, 자주 하는 업무별로 <b>한 건씩</b> 적으세요.</div><div class="region-grid">'+btns+'</div>';
+        return;
+      }
       panel.innerHTML=head('지역 선택')+searchBarHTML()+'<div class="region-grid"></div>';
       const grid=panel.querySelector('.region-grid');
       renderRegionsInto(grid, extra);
@@ -494,28 +509,34 @@
         '<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
         '<div class="school-list">'+rows+'</div>';
     }
-    // 사무 전용 화면 — 기타업무를 한 건씩(+) 추가
-    function etcEntries(){
+    // 사무 화면 — 업무 카테고리별로 한 건씩(+) 추가
+    const OFFICE_PH={'견적서':'예: ○○초 놀이시설 견적','계약':'예: ○○초 나라장터 계약','발주서':'예: ○○업체 그네줄 발주','검사신청':'예: ○○초 설치검사 신청','사진대지':'예: ○○초 사진대지 작성','대금청구':'예: ○○초 세금계산서 발행','기타업무':'예: 사무실 정리'};
+    function officeEntries(oc){
       const out=[]; const s=SEL[cat]||{};
-      Object.keys(s).forEach(k=>{ if(s[k]&&s[k].type==='기타업무') out.push([k,s[k]]); });
+      Object.keys(s).forEach(k=>{ const v=s[k]; if(!v) return;
+        if(v.type==='사무항목' && v.item===oc) out.push([k,v]);
+        else if(v.type==='기타업무' && oc==='기타업무') out.push([k,v]);
+      });
       return out;
     }
-    function etcRowHTML(key,v){
+    function etcRowHTML(key,v,ph){
       return '<div class="etc-item" data-key="'+sEsc(key)+'" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'+
-        '<input class="etc-input recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0" value="'+sEsc(v.workText||'')+'" placeholder="예: 세금계산서 정리">'+
+        '<input class="etc-input recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0" value="'+sEsc(v.workText||'')+'" placeholder="'+sEsc(ph||'내용을 적으세요')+'">'+
         '<i class="etc-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:0 8px" title="삭제">×</i>'+
         '</div>';
     }
-    function showEtcWork(){
-      const rows=etcEntries().map(p=>etcRowHTML(p[0],p[1])).join('');
-      panel.innerHTML=head('기타업무')+'<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
-        '<div class="work-note">현장과 상관없는 사무 업무를 <b>한 건씩</b> 적으세요. 아래 <b>＋ 업무 추가</b>를 누르면 칸이 늘어납니다.</div>'+
+    function showEtcWork(oc){
+      oc=oc||curOffice||'기타업무'; curOffice=oc;
+      const ph=OFFICE_PH[oc]||'내용을 적으세요';
+      const rows=officeEntries(oc).map(p=>etcRowHTML(p[0],p[1],ph)).join('');
+      panel.innerHTML=head(oc)+'<button class="back-btn" data-back="1">← 업무 선택으로</button>'+
+        '<div class="work-note"><b>'+sEsc(oc)+'</b> 업무를 <b>한 건씩</b> 적으세요. 아래 <b>＋ 업무 추가</b>를 누르면 칸이 늘어납니다.</div>'+
         '<div class="etc-list">'+rows+'</div>'+
         '<button class="etc-add" data-etc-add="1" style="margin-top:6px;padding:11px 14px;border:2px dashed '+color+';background:#f6f7f9;border-radius:10px;color:#444;font-weight:700;cursor:pointer;width:100%">＋ 업무 추가</button>';
     }
     function showAnnual(){
       let dv=''; if(SEL[cat]&&SEL[cat]['__연차']) dv=SEL[cat]['__연차'].leaveDate||'';
-      panel.innerHTML=head('연차')+'<button class="back-btn" data-back="1">← 지역 선택으로</button>'+
+      panel.innerHTML=head('연차')+'<button class="back-btn" data-back="1">← 업무 선택으로</button>'+
         '<div class="work-note">연차 날짜를 선택하세요.</div>'+
         '<input type="date" id="annualDate" class="site-search" style="max-width:260px" value="'+sEsc(dv)+'">';
     }
@@ -549,10 +570,10 @@
       const cdl=e.target.closest('.custom-del');
       if(cdl){ const k=cdl.dataset.key; const rg=extra?extra.label:'기타지역'; if(SEL[cat]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; } saveSel(); renderSummary(); showCustom(rg); return; }
       if(e.target.closest('[data-etc-add]')){
-        const id='__기타_'+Date.now();
+        const id='__'+curOffice+'_'+Date.now();
         SEL[cat]=SEL[cat]||{};
-        SEL[cat][id]={region:'',name:'기타업무',type:'기타업무',workText:'',memo:''};
-        saveSel(); renderSummary(); showEtcWork();
+        SEL[cat][id]={region:'',name:curOffice,type:'사무항목',item:curOffice,workText:'',memo:''};
+        saveSel(); renderSummary(); showEtcWork(curOffice);
         const inps=panel.querySelectorAll('.etc-input'); if(inps.length) inps[inps.length-1].focus();
         return;
       }
@@ -560,10 +581,10 @@
       if(ed){
         const k=ed.dataset.key;
         if(SEL[cat]){ delete SEL[cat][k]; if(!Object.keys(SEL[cat]).length) delete SEL[cat]; }
-        saveSel(); renderSummary(); showEtcWork(); return;
+        saveSel(); renderSummary(); showEtcWork(curOffice); return;
       }
       const sp=e.target.closest('button[data-special]');
-      if(sp){ if(sp.dataset.special==='기타업무') showEtcWork(); else showAnnual(); return; }
+      if(sp){ if(sp.dataset.special==='연차') showAnnual(); else showEtcWork(sp.dataset.special); return; }
       const reg=e.target.closest('button[data-region]');
       if(reg){ showSchools(reg.dataset.region); return; }
       if(e.target.closest('[data-back]')){ showRegions(); return; }
@@ -580,7 +601,7 @@
       const ei=e.target.closest('.etc-input');
       if(ei){
         const k=ei.dataset.key, v=ei.value; SEL[cat]=SEL[cat]||{};
-        SEL[cat][k]={region:'',name:(v.trim()||'기타업무'),type:'기타업무',workText:v,memo:''};
+        SEL[cat][k]={region:'',name:(curOffice+(v.trim()?' · '+v.trim():'')),type:'사무항목',item:curOffice,workText:v,memo:''};
         saveSel(); renderSummary(); return;
       }
       if(e.target.id==='annualDate'){
@@ -709,7 +730,7 @@
     function push(cat,label,color,filterFn){
       if(!SEL[cat]) return;
       const entries=Object.keys(SEL[cat]).filter(k=>filterFn(SEL[cat][k]))
-        .map(k=>{const v=SEL[cat][k]||{}; return {cat:cat,key:k,name:v.name||k,region:(v.region===ETC_REGION.label?'':(v.region||'')),memo:v.memo||'',type:v.type||''};});
+        .map(k=>{const v=SEL[cat][k]||{}; return {cat:cat,key:k,name:v.name||k,region:v.region||'',memo:v.memo||'',type:v.type||''};});
       if(entries.length) groups.push({label:label,color:color,cat:cat,entries:entries});
     }
     order.forEach(cat=>{
@@ -724,7 +745,7 @@
     if(SEL['영업']){
       BOSS_ORDER.forEach(function(item){
         var entries=Object.keys(SEL['영업']).filter(function(k){return SEL['영업'][k].item===item;})
-          .map(function(k){var v=SEL['영업'][k]||{}; return {cat:'영업',key:k,name:v.name||'',region:(v.region===ETC_REGION.label?'':(v.region||'')),memo:v.memo||'',type:''};});
+          .map(function(k){var v=SEL['영업'][k]||{}; return {cat:'영업',key:k,name:v.name||'',region:v.region||'',memo:v.memo||'',type:''};});
         if(entries.length) groups.push({label:item,color:'#1e5631',cat:'영업',entries:entries});
       });
     }
@@ -739,7 +760,7 @@
     if(total===0){ sumBody.innerHTML='<div class="sum-empty">현장을 클릭하면 여기에 오늘 업무가 쌓입니다.</div>'; return; }
     sumBody.innerHTML=groups.map(g=>{
       const items=g.entries.map(e=>{
-        if(e.type==='기타업무' || e.type==='연차'){
+        if(e.type==='사무항목' || e.type==='기타업무' || e.type==='연차'){
           return '<div class="sum-item" data-cat="'+e.cat+'" data-key="'+sEsc(e.key)+'"><span class="sum-place">'+sEsc(e.name)+'</span> <i data-del="1">×</i></div>';
         }
         const place=[e.region,e.name].filter(Boolean).join(' ');
@@ -778,17 +799,15 @@
   panels['소독']=setupCategory('disinfect','소독','#27a36a','💨',{subgroup:SUBGROUP['소독'], extra:ETC_REGION});
   panels['영업']=setupBoss('boss');
   panels['공사']=setupCategory('construct','공사','#e8842c',ICON_GONGSA,{extra:ETC_REGION});
-  panels['사무']=setupCategory('etc','사무','#8a8f98','📋',{extra:ETC_REGION, specials:['기타업무','연차']});
+  panels['사무']=setupCategory('etc','사무','#8a8f98','📋',{office:OFFICE_CATS});
 
   // ===== 작성자 · PIN · 전송 =====
   const NAMES=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','원채아 대리','김지훈 주임'];
   const APPS_URL=(window.__APPS_URL)||'https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
 
   const wsel=document.getElementById('writerSel');
-  // 비번은 직함 뺀 '이름'만으로 식별 → 직함(이사·부장 등)이 바뀌어도 비번이 안 깨짐. value=이름, 표시=직함포함
-  function nameKey(n){ return String(n||'').split(' ')[0]; }
-  wsel.innerHTML='<option value="">(이름 선택)</option>'+NAMES.map(n=>'<option value="'+nameKey(n)+'">'+n+'</option>').join('');
-  try{ wsel.value=nameKey(localStorage.getItem('ilji_writer')||''); }catch(e){}
+  wsel.innerHTML='<option value="">(이름 선택)</option>'+NAMES.map(n=>'<option>'+n+'</option>').join('');
+  try{ wsel.value=localStorage.getItem('ilji_writer')||''; }catch(e){}
 
   // 이름 + 4자리 PIN (처음 입력한 번호가 등록됨. 잊으면 김재성님이 구글시트 _PIN 탭에서 줄 삭제 → 초기화)
   var PINOK=false;
@@ -858,19 +877,20 @@
     ['점검','소독','공사','사무'].forEach(cat=>{
       Object.keys(SEL[cat]||{}).forEach(k=>{
         const v=SEL[cat][k]||{};
-        if(v.type==='기타업무'){ if(!(v.workText||'').trim()) return; rows.push([dt,'사무','','',v.workText||'','','']); return; }
+        if(v.type==='사무항목'){ if(!(v.workText||'').trim()) return; rows.push([dt,'사무','','',v.item||'기타업무','',v.workText||'']); return; }
+        if(v.type==='기타업무'){ if(!(v.workText||'').trim()) return; rows.push([dt,'사무','','','기타업무','',v.workText||'']); return; }
         if(v.type==='연차'){ rows.push([dt,'사무','','','연차',v.leaveDate||'','']); return; }
         const nm0=(v.name||'').trim();
         if(v.custom && !nm0) return;
         const item = (cat==='소독' && v.sub) ? '단타' : cat;
-        rows.push([dt,cat,(v.region===ETC_REGION.label?'':(v.region||'')),v.name||'',item,'',v.memo||'']);
+        rows.push([dt,cat,v.region||'',v.name||'',item,'',v.memo||'']);
       });
     });
     Object.keys(SEL['영업']||{}).forEach(function(k){
       var v=SEL['영업'][k]||{};
       var nm=(v.name||'').trim(), mm=(v.memo||'').trim();
       if(!nm && !mm) return;
-      rows.push([dt,'영업',(v.region===ETC_REGION.label?'':(v.region||'')),nm,v.item||'','',mm]);
+      rows.push([dt,'영업',v.region||'',nm,v.item||'','',mm]);
     });
     return rows;
   }
@@ -904,7 +924,7 @@
   // 현황지도(외부 페이지)
   (function(){ var mb=document.getElementById('btnMap'); if(mb) mb.addEventListener('click', function(){ var u='https://zesk001.github.io/awesome-ilji/2026_점검소독_현황지도.html'; var w=null; try{ w=window.open(u,'_blank'); }catch(e){} if(!w) location.href=u; }); })();
   // ===== 앱 버전 표시 + 🔄 최신버전 받기(캐시 비우고 새로고침) =====
-  var APP_VER='2026-06-29';
+  var APP_VER='2026-06-16';
   (function(){ var fo=document.getElementById('appFooter'); if(fo) fo.innerHTML='어썸조경 전체 업무 관리 시스템 · 일일업무일지 &nbsp;<span style="opacity:.55">v'+APP_VER+'</span>'; })();
   function appUpdate(){
     if(!confirm('최신 버전으로 새로고침할까요?\n(작성 화면에 적던 내용은 그대로 남아 있어요)')) return;
@@ -966,14 +986,11 @@
   function wvEntryHTML(e){
     // e=[분류,지역,현장,항목,단계,비고]
     var cat=e[0]||'', region=e[1]||'', site=e[2]||'', item=e[3]||cat, stage=e[4]||'', memo=e[5]||'';
-    var isEtc=(cat==='사무' && !region && !site && item!=='연차');
-    var etcContent=isEtc?(item==='기타업무'?memo:item):'';
-    var color=isEtc?wvColor('사무','기타업무'):wvColor(cat,item), badge=isEtc?'기타업무':wvBadge(cat,item);
-    var attrs=' data-kind="exist"'+(isEtc?' data-etc="1"':'')+' data-cat="'+sEsc(cat)+'" data-region="'+sEsc(region)+'" data-site="'+sEsc(site)+'" data-item="'+sEsc(item)+'" data-stage="'+sEsc(stage)+'"';
+    var color=wvColor(cat,item), badge=wvBadge(cat,item);
+    var attrs=' data-kind="exist" data-cat="'+sEsc(cat)+'" data-region="'+sEsc(region)+'" data-site="'+sEsc(site)+'" data-item="'+sEsc(item)+'" data-stage="'+sEsc(stage)+'"';
     var place=[region,site].filter(Boolean).join(' ');
     var field;
     if(item==='연차'){ field='<input class="wv-memo" type="date" value="'+sEsc(stage)+'">'; }
-    else if(isEtc){ field='<input class="wv-memo" value="'+sEsc(etcContent)+'" placeholder="내용">'; }
     else { field='<input class="wv-memo" value="'+sEsc(memo)+'" placeholder="내용">'; }
     return '<div class="wv-entry"'+attrs+'>'
       +'<span class="wv-cat" style="background:'+color+'">'+sEsc(badge)+'</span>'
@@ -1039,8 +1056,8 @@
     }
     var cat=el.dataset.cat, region=el.dataset.region||'', site=el.dataset.site||'', item=el.dataset.item||cat, stage=el.dataset.stage||'';
     var val=(el.querySelector('.wv-memo')||{}).value||'';
-    if(el.dataset.etc==='1') return val.trim()?[dt,'사무','','',val,'','']:null;
     if(item==='연차') return [dt,'사무','','','연차',val,''];
+    if(item==='기타업무') return [dt,'사무','','','기타업무','',val];
     return [dt,cat,region,site,item,stage,val];
   }
   function wvSaveDay(card, skipConfirm){
@@ -1099,7 +1116,7 @@
   function aeOpen(){
     if(!PINOK || (wsel.value||'').indexOf('김재성')!==0){ alert('김재성님 본인 확인 후 사용할 수 있어요.'); return; }
     var sel=document.getElementById('aeWriter');
-    sel.innerHTML=NAMES.filter(function(n){return n.indexOf('김재성')!==0;}).map(function(n){return '<option value="'+aeEsc(nameKey(n))+'">'+aeEsc(n)+'</option>';}).join('');
+    sel.innerHTML=NAMES.filter(function(n){return n.indexOf('김재성')!==0;}).map(function(n){return '<option>'+aeEsc(n)+'</option>';}).join('');
     document.getElementById('aeDate').value=dateStr();
     document.getElementById('aeRows').innerHTML='';
     document.getElementById('aeMsg').textContent='직원과 날짜를 고르고 「불러오기」를 누르세요.';
