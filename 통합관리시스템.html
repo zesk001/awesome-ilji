@@ -3372,26 +3372,40 @@ var WR_ETC=['예산신청','신규사업','기타메모'];
 function wrSite(r){ var rg=(r.region==='기타지역'?'':r.region); return [rg,r.site].filter(Boolean).join(' '); }
 function wkSave(el){ try{ localStorage.setItem(el.getAttribute('data-k'), el.value); }catch(e){} }
 function writerReport(scope){
-  var sec={금주:{},차주:{},기타:{}}, ord={금주:[],차주:[],기타:[]};
-  function add(s,lab,val){ if(!val) return; if(!sec[s][lab]){ sec[s][lab]=[]; ord[s].push(lab); } if(sec[s][lab].indexOf(val)<0) sec[s][lab].push(val); }
+  var data={금주:{},차주:{},기타:{}}, ord={금주:[],차주:[],기타:[]};
+  function ensure(s,lab,color,geo){ if(!data[s][lab]){ data[s][lab]={type:(geo?'geo':'list'),color:color,geo:{},go:[],list:[],n:0}; ord[s].push(lab); } return data[s][lab]; }
+  function addGeo(s,lab,color,region,site){ if(!site) return; var d=ensure(s,lab,color,true); var rg=region||'기타'; if(!d.geo[rg]){ d.geo[rg]=[]; d.go.push(rg); } if(d.geo[rg].indexOf(site)<0){ d.geo[rg].push(site); d.n++; } }
+  function addList(s,lab,color,val){ if(!val) return; var d=ensure(s,lab,color,false); if(d.list.indexOf(val)<0){ d.list.push(val); d.n++; } }
   scope.forEach(function(r){
-    var it=r.item||'', memo=r.memo||'', st=wrSite(r);
-    if(r.cat==='점검'){ add('금주','놀이시설점검', st); }
-    else if(r.cat==='소독'){ add('금주','소독', st); }
-    else if(r.cat==='공사'){ add('금주','시공', st+(memo?'('+memo+')':'')); }
-    else if(r.cat==='사무'){ var lab=(it==='기타업무')?'기타업무':(it||'사무'); add('금주', lab, memo||st); }
-    else if(r.cat==='대표'){ var s2=(WR_NEXT.indexOf(it)>=0)?'차주':((WR_ETC.indexOf(it)>=0)?'기타':'금주'); var v=st+(memo?'('+memo+')':''); if(!v){ v=memo; } add(s2, it||'영업', v); }
-    else { add('금주', r.cat||'기타', st); }
+    var it=r.item||'', memo=r.memo||'';
+    if(r.cat==='점검'){ addGeo('금주','놀이시설점검',CATCOLOR['점검'], r.region, r.site); }
+    else if(r.cat==='소독'){ addGeo('금주','소독',CATCOLOR['소독'], r.region, r.site); }
+    else if(r.cat==='공사'){ addList('금주','시공',CATCOLOR['공사'], wrSite(r)+(memo?' — '+memo:'')); }
+    else if(r.cat==='사무'){ var lab=(it==='기타업무')?'기타업무':(it||'사무'); addList('금주', lab, CATCOLOR['사무'], memo||wrSite(r)); }
+    else if(r.cat==='대표'){ var s2=(WR_NEXT.indexOf(it)>=0)?'차주':((WR_ETC.indexOf(it)>=0)?'기타':'금주'); var v=wrSite(r); if(memo){ v=v?(v+' ('+memo+')'):memo; } addList(s2, it||'영업', CATCOLOR['대표'], v); }
+    else { addList('금주', r.cat||'기타', '#8a8f98', wrSite(r)); }
   });
   var wkStart=fmt(weekDays()[0]);
-  function lines(s){ return ord[s].map(function(lab){ return '<div style=&quot;font-size:12.5px;line-height:1.7;margin:2px 0&quot;>ㆍ<b>'+esc(lab)+'</b> – '+esc(sec[s][lab].join(', '))+'</div>'; }).join(''); }
-  function edit(s,ph){ var k='wk_'+selWriter+'_'+wkStart+'_'+s; var sv=''; try{ sv=localStorage.getItem(k)||''; }catch(e){} return '<textarea data-k=&quot;'+esc(k)+'&quot; oninput=&quot;wkSave(this)&quot; placeholder=&quot;'+ph+'&quot; style=&quot;width:100%;min-height:52px;border:1px solid #cbd5cf;border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:inherit;margin-top:4px;box-sizing:border-box&quot;>'+esc(sv)+'</textarea>'; }
-  function box(title,color,s,ed,ph){ var body=lines(s); if(ed){ body+=edit(s,ph); } if(!body){ body='<div style=&quot;font-size:12.5px;color:#999&quot;>기록 없음</div>'; } return '<div style=&quot;margin-bottom:10px&quot;><div style=&quot;color:#fff;font-weight:bold;padding:5px 10px;border-radius:4px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div><div style=&quot;padding:6px 4px 2px&quot;>'+body+'</div></div>'; }
-  var h='<div style=&quot;background:#fff;border:1px solid #e5e9e6;border-radius:8px;padding:10px 14px&quot;>';
-  h+='<div class=&quot;grp-head&quot;><span class=&quot;name&quot;>'+esc(selWriter)+'</span>'+catBadges(scope)+'<span class=&quot;cnt&quot;>총 '+scope.length+'건</span></div>';
-  h+=box('금주업무보고','#1e5631','금주',false,'');
-  h+=box('차주업무보고','#2f6f9f','차주',true,'다음 주 계획을 적으세요');
-  h+=box('기타','#8a6d1f','기타',true,'기타 사항을 적으세요');
+  function blockHTML(s,lab){
+    var d=data[s][lab];
+    var head='<div style=&quot;display:flex;align-items:center;gap:6px;margin:7px 0 2px&quot;><span style=&quot;width:9px;height:9px;border-radius:2px;background:'+d.color+';display:inline-block&quot;></span><b style=&quot;font-size:13px&quot;>'+esc(lab)+'</b><span style=&quot;background:#eef1ef;color:#556;font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px&quot;>'+d.n+'건</span></div>';
+    var body='';
+    if(d.type==='geo'){
+      body=d.go.map(function(rg){ return '<div style=&quot;font-size:12px;line-height:1.6;margin:1px 0 1px 15px&quot;><b style=&quot;color:#444&quot;>'+esc(rg)+'</b> <span style=&quot;color:#888&quot;>('+d.geo[rg].length+')</span> '+d.geo[rg].map(esc).join(' · ')+'</div>'; }).join('');
+    } else {
+      body=d.list.map(function(v){ return '<div style=&quot;font-size:12px;line-height:1.55;margin:1px 0 1px 15px&quot;>· '+esc(v)+'</div>'; }).join('');
+    }
+    return head+body;
+  }
+  function blocks(s){ return ord[s].map(function(lab){ return blockHTML(s,lab); }).join(''); }
+  function edit(s,ph){ var k='wk_'+selWriter+'_'+wkStart+'_'+s; var sv=''; try{ sv=localStorage.getItem(k)||''; }catch(e){} return '<textarea data-k=&quot;'+esc(k)+'&quot; oninput=&quot;wkSave(this)&quot; placeholder=&quot;'+ph+'&quot; style=&quot;width:100%;min-height:48px;border:1px solid #cbd5cf;border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:inherit;margin-top:6px;box-sizing:border-box&quot;>'+esc(sv)+'</textarea>'; }
+  function catSummary(){ var cc={}; scope.forEach(function(r){ cc[r.cat]=(cc[r.cat]||0)+1; }); return CATS.filter(function(c){return cc[c];}).map(function(c){ return '<span style=&quot;color:'+CATCOLOR[c]+';font-weight:700&quot;>'+c+' '+cc[c]+'</span>'; }).join(' <span style=&quot;color:#ccc&quot;>|</span> '); }
+  function sec(title,color,s,ed,ph){ var body=blocks(s); if(ed){ body+=edit(s,ph); } if(!body){ body='<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>'; } return '<div style=&quot;margin-bottom:12px&quot;><div style=&quot;color:#fff;font-weight:bold;padding:5px 11px;border-radius:5px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div><div style=&quot;padding:5px 4px 2px&quot;>'+body+'</div></div>'; }
+  var h='<div style=&quot;background:#fff;border:1px solid #e5e9e6;border-radius:8px;padding:12px 16px&quot;>';
+  h+='<div style=&quot;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:8px&quot;><b style=&quot;font-size:16px&quot;>'+esc(selWriter)+'</b><span style=&quot;font-size:12.5px&quot;>'+catSummary()+'</span><span style=&quot;margin-left:auto;font-size:12px;color:#666&quot;>총 '+scope.length+'건</span></div>';
+  h+=sec('금주업무보고','#1e5631','금주',false,'');
+  h+=sec('차주업무보고','#2f6f9f','차주',true,'다음 주 계획을 적으세요 (예: 방문예정, 계약예정 …)');
+  h+=sec('기타','#8a6d1f','기타',true,'기타 사항을 적으세요');
   return h+'</div>';
 }
 
