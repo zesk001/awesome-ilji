@@ -1180,6 +1180,35 @@
   document.getElementById('aeClose').addEventListener('click',function(){ aeOv.style.display='none'; });
   aeOv.addEventListener('click',function(e){ if(e.target===aeOv) aeOv.style.display='none'; });
 
+  // ===== 뒤로가기(마우스 뒷버튼·키보드 Alt←/백스페이스·모바일 뒤로가기) =====
+  // 세 경우 모두 브라우저 popstate로 들어옴 → 앱을 나가는 대신 한 단계 뒤로.
+  (function(){
+    var armed=false;
+    function shown(el,val){ return !!(el && el.style.display===val); }
+    function activePanel(){ return document.querySelector('.panel.show'); }
+    function isDeep(){
+      if(shown(aeOv,'flex')) return true;      // 관리자 수정창
+      if(shown(wvEl,'block')) return true;      // 내 일지
+      var ap=activePanel();
+      return !!(ap && ap.querySelector('.back-btn'));  // 지역/업무 선택 안쪽 화면
+    }
+    function stepBack(){
+      if(shown(aeOv,'flex')){ aeOv.style.display='none'; return true; }
+      if(shown(wvEl,'block')){ wvEl.style.display='none'; return true; }
+      var ap=activePanel();
+      if(ap){ var bb=ap.querySelector('.back-btn'); if(bb){ bb.click(); return true; } }
+      return false;
+    }
+    function arm(){ if(!armed){ try{ history.pushState({ilji:1},''); }catch(e){} armed=true; } }
+    // 더 깊은 화면으로 들어가면 뒤로가기를 잡을 수 있도록 히스토리 항목을 심어둠
+    document.addEventListener('click', function(){ setTimeout(function(){ if(isDeep()) arm(); },0); }, false);
+    window.addEventListener('popstate', function(){
+      armed=false;
+      stepBack();
+      if(isDeep()) arm();   // 아직 더 깊은 화면이 남아 있으면 다시 무장
+    });
+  })();
+
   // ===== 초기화 =====
   renderSummary();
   buttons[0].click();
