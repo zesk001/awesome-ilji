@@ -3169,23 +3169,35 @@ function setView(m){
   else { bar.style.display='none'; }
   renderAll();
 }
-/* 인쇄: 새 창에서 주간업무일지만 출력(컬러 유지·한 장에 맞게 축소) */
+/* ── 인쇄 압축(담당자별): 점검·소독=현장 나열, 공사·사무·대표=한 줄, 2단 배치 ── */
+function pcListSD(list){ var seen={},arr=[]; list.forEach(function(x){ var s=siteLabel(x)||'(미기재)'; if(seen[s]) return; seen[s]=1; arr.push(esc(s)); }); return {html:'<div style=&quot;font-size:12px;line-height:1.55&quot;>'+arr.join('   ·   ')+'</div>', n:arr.length}; }
+function pcRows(list){ var seen={},out=[],n=0; list.forEach(function(x){ var site=siteLabel(x), item=x.item||'', memo=x.memo||''; var di=(item==='기타업무')?(memo||item):item; var dm=(item==='기타업무')?'':memo; var key=site+'|'+di+'|'+dm; if(seen[key]) return; seen[key]=1; n++; var t=''; if(site){ if(site!=='-'){ t='<b>'+esc(site)+'</b>'; } } if(di){ if(t){ t=t+' — '; } t=t+esc(di); } if(dm){ t=t+' <span style=&quot;color:#666&quot;>('+esc(dm)+')</span>'; } out.push('<div style=&quot;margin:1.5px 0;line-height:1.45&quot;>'+t+'</div>'); }); return {html:'<div style=&quot;font-size:12px&quot;>'+out.join('')+'</div>', n:n}; }
+function buildCompactWriter(scope){ var blocks=''; CATS.forEach(function(c){ var sub=scope.filter(function(r){ return r.cat===c; }); if(!sub.length) return; var r=(c==='점검')?pcListSD(sub):((c==='소독')?pcListSD(sub):pcRows(sub)); blocks=blocks+'<div style=&quot;break-inside:avoid;margin-bottom:8px&quot;><div style=&quot;font-size:12.5px;font-weight:bold;color:'+CATCOLOR[c]+';border-left:4px solid '+CATCOLOR[c]+';padding-left:6px;margin-bottom:3px&quot;>'+c+' ('+r.n+')</div>'+r.html+'</div>'; }); return '<div style=&quot;column-count:2;column-gap:18px&quot;>'+blocks+'</div>'; }
+/* 인쇄: 새 창에서 주간업무일지만 출력(컬러 유지). 담당자별은 한 장 압축본. */
 function doPrint(){
-  var paperEl=document.querySelector('.paper');
   var styleEl=document.querySelector('style');
   var pw=window.open('','_blank','width=900,height=750');
   if(!pw){alert('팝업 차단을 해제해 주세요(주소창 오른쪽 팝업 허용)'); return;}
+  var bodyHtml;
+  if(viewMode==='writer'){
+    var scope=DATA.filter(function(r){ return (r.writer||'(미상)')===selWriter; });
+    var per=esc(document.getElementById('periodTxt').textContent);
+    var head='<div style=&quot;text-align:center;margin:0 0 8px&quot;><div style=&quot;font-size:18px;font-weight:bold&quot;>어썸조경 주간업무일지</div><div style=&quot;font-size:11px;color:#555;margin-top:2px&quot;>'+per+'</div><div style=&quot;font-size:13px;margin-top:4px&quot;><b>'+esc(selWriter)+'</b> · 총 '+scope.length+'건</div></div>';
+    bodyHtml='<div class=&quot;paper&quot; style=&quot;max-width:720px;margin:0 auto;padding:10px 14px&quot;>'+head+buildCompactWriter(scope)+'</div>';
+  } else {
+    bodyHtml=document.querySelector('.paper').outerHTML;
+  }
   var css='@page{size:A4 portrait;margin:10mm 12mm}'+
     'body{background:#fff;margin:0;padding:8px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'+
     '.toolbar,.wtabs{display:none!important}'+
-    '.paper{box-shadow:none!important;border-radius:0!important;max-width:700px!important;width:100%!important;margin:0 auto!important;padding:12px 16px!important}'+
+    '.paper{box-shadow:none!important;border-radius:0!important;width:100%!important;margin:0 auto!important}'+
     'table{font-size:10px!important}th{font-size:9.5px!important}td{padding:3px 4px!important}'+
     '.chip .num{font-size:15px!important}.rpt-head h1{font-size:17px!important}';
   pw.document.write(
     '<!DOCTYPE html><html><head><meta charset=\'UTF-8\'>'+
     '<style>'+styleEl.textContent+'</style>'+
     '<style>'+css+'</style>'+
-    '</head><body>'+paperEl.outerHTML+
+    '</head><body>'+bodyHtml+
     '<script>window.onload=function(){setTimeout(function(){window.print();window.close();},400);}<\/script>'+
     '</body></html>'
   );
