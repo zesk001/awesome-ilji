@@ -3079,6 +3079,12 @@ window.addEventListener('DOMContentLoaded', App.init);
     td{padding:3px 4px;}
     .chip .num{font-size:15px;}
     .rpt-head h1{font-size:17px;}
+    /* 담당자별: 본문 2단(좌우)으로 나눠 글씨 축소 없이 한 페이지에 */
+    .wr-cols{column-count:2; column-gap:20px;}
+    .wr-item{break-inside:avoid;}
+    .wr-head{break-after:avoid;}
+    .pbreak{page-break-after:always;}
+    .pbreak:last-child{page-break-after:auto;}
   }
 </style>
 </head>
@@ -3094,7 +3100,7 @@ window.addEventListener('DOMContentLoaded', App.init);
     <button id=&quot;viewWriter&quot; onclick=&quot;setView('writer')&quot;>담당자별</button>
   </span>
   <span id=&quot;loadMsg&quot;></span>
-  <button class=&quot;print&quot; onclick=&quot;doPrint()&quot;>🖨 인쇄 (A4)</button>
+  <button class=&quot;print&quot; onclick=&quot;onPrintClick()&quot;>🖨 인쇄 (A4)</button>
 </div>
 
 <div class=&quot;paper&quot;>
@@ -3170,8 +3176,7 @@ function setView(m){
   renderAll();
 }
 /* 인쇄: 새 창에서 주간업무일지를 화면 그대로 출력(컬러 유지) */
-function doPrint(){
-  var paperEl=document.querySelector('.paper');
+function printHTML(bodyHTML){
   var styleEl=document.querySelector('style');
   var pw=window.open('','_blank','width=900,height=750');
   if(!pw){alert('팝업 차단을 해제해 주세요(주소창 오른쪽 팝업 허용)'); return;}
@@ -3179,17 +3184,61 @@ function doPrint(){
     'body{background:#fff;margin:0;padding:8px 0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'+
     '.toolbar,.wtabs{display:none!important}'+
     '.paper{box-shadow:none!important;border-radius:0!important;max-width:700px!important;width:100%!important;margin:0 auto!important;padding:12px 16px!important}'+
+    '.wr-cols{column-count:2!important;column-gap:20px!important}.wr-item{break-inside:avoid}.wr-head{break-after:avoid}'+
+    '.pbreak{page-break-after:always}.pbreak:last-child{page-break-after:auto}'+
     'table{font-size:10px!important}th{font-size:9.5px!important}td{padding:3px 4px!important}'+
     '.chip .num{font-size:15px!important}.rpt-head h1{font-size:17px!important}';
   pw.document.write(
     '<!DOCTYPE html><html><head><meta charset=\'UTF-8\'>'+
     '<style>'+styleEl.textContent+'</style>'+
     '<style>'+css+'</style>'+
-    '</head><body>'+paperEl.outerHTML+
+    '</head><body>'+bodyHTML+
     '<script>window.onload=function(){setTimeout(function(){window.print();window.close();},400);}<\/script>'+
     '</body></html>'
   );
   pw.document.close();
+}
+/* 현재 담당자(또는 통합)만 인쇄 */
+function doPrint(){ var p=document.querySelector('.paper'); if(p) printHTML(p.outerHTML); }
+/* 인쇄 버튼: 담당자별 보기면 선택창, 통합 보기면 바로 인쇄 */
+function onPrintClick(){ if(viewMode!=='writer'){ doPrint(); return; } showPrintDialog(); }
+/* 전체 인원(기록 있는 사람) 순서대로 인쇄 — 전체를 reps벌 반복 */
+function doPrintAll(reps){
+  reps=Math.max(1,parseInt(reps,10)||1);
+  if(!WLIST.length){ alert('이번 주 기록이 있는 담당자가 없습니다.'); return; }
+  var saved=selWriter, papers=[];
+  WLIST.forEach(function(w){ selWriter=w; renderAll(); var p=document.querySelector('.paper'); if(p) papers.push(p.outerHTML); });
+  selWriter=saved; renderAll();
+  var body='';
+  for(var i=0;i<reps;i++){ papers.forEach(function(h){ body+='<div class=pbreak>'+h+'</div>'; }); }
+  printHTML(body);
+}
+function hidePrintDialog(){ var ov=document.getElementById('printDlg'); if(ov) ov.remove(); }
+function showPrintDialog(){
+  hidePrintDialog();
+  var ov=document.createElement('div'); ov.id='printDlg';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999';
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:10px;padding:18px 20px;min-width:300px;box-shadow:0 12px 34px rgba(0,0,0,.3);font-family:inherit';
+  var t=document.createElement('div'); t.textContent='인쇄 방식'; t.style.cssText='font-weight:800;font-size:15px;margin-bottom:14px;color:#1e5631'; box.appendChild(t);
+  var b1=document.createElement('button'); b1.textContent='현재 담당자만 인쇄 ('+(selWriter||'-')+')';
+  b1.style.cssText='display:block;width:100%;padding:9px;margin-bottom:14px;border:1px solid #cbd5cf;border-radius:7px;background:#f4f7f4;font-size:13px;cursor:pointer;font-family:inherit';
+  b1.onclick=function(){ hidePrintDialog(); doPrint(); }; box.appendChild(b1);
+  var row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:2px';
+  var lab=document.createElement('span'); lab.textContent='반복(장수)'; lab.style.cssText='font-size:12.5px;color:#444'; row.appendChild(lab);
+  var inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.value='1';
+  inp.style.cssText='width:64px;padding:6px 8px;border:1px solid #cbd5cf;border-radius:6px;font-size:13px'; row.appendChild(inp);
+  var cnt=document.createElement('span'); cnt.textContent='· 전체 '+WLIST.length+'명 (총 '+WLIST.length+'장씩)'; cnt.style.cssText='font-size:12px;color:#888'; row.appendChild(cnt);
+  box.appendChild(row);
+  var b2=document.createElement('button'); b2.textContent='전체 순서대로 인쇄';
+  b2.style.cssText='display:block;width:100%;padding:9px;margin:10px 0 4px;border:none;border-radius:7px;background:#1e5631;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit';
+  b2.onclick=function(){ var n=parseInt(inp.value,10)||1; hidePrintDialog(); doPrintAll(n); }; box.appendChild(b2);
+  var b3=document.createElement('button'); b3.textContent='취소';
+  b3.style.cssText='display:block;width:100%;padding:7px;margin-top:8px;border:none;background:none;color:#888;font-size:12.5px;cursor:pointer;font-family:inherit';
+  b3.onclick=hidePrintDialog; box.appendChild(b3);
+  ov.appendChild(box);
+  ov.onclick=function(e){ if(e.target===ov) hidePrintDialog(); };
+  document.body.appendChild(ov);
 }
 
 /* ── JSONP: action=day 를 7일치 호출 ── */
@@ -3388,12 +3437,12 @@ function writerReport(scope){
   var wkStart=fmt(weekDays()[0]);
   function blockHTML(s,lab){
     var d=data[s][lab];
-    var head='<div style=&quot;display:flex;align-items:center;gap:6px;margin:7px 0 2px&quot;><span style=&quot;width:9px;height:9px;border-radius:2px;background:'+d.color+';display:inline-block&quot;></span><b style=&quot;font-size:13px&quot;>'+esc(lab)+'</b><span style=&quot;background:#eef1ef;color:#556;font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px&quot;>'+d.n+'건</span></div>';
+    var head='<div class=&quot;wr-item wr-head&quot; style=&quot;display:flex;align-items:center;gap:6px;margin:7px 0 2px&quot;><span style=&quot;width:9px;height:9px;border-radius:2px;background:'+d.color+';display:inline-block&quot;></span><b style=&quot;font-size:13px&quot;>'+esc(lab)+'</b><span style=&quot;background:#eef1ef;color:#556;font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px&quot;>'+d.n+'건</span></div>';
     var body='';
     if(d.type==='geo'){
-      body=d.go.map(function(rg){ return '<div style=&quot;font-size:12px;line-height:1.6;margin:1px 0 1px 15px&quot;><b style=&quot;color:#444&quot;>'+esc(rg)+'</b> <span style=&quot;color:#888&quot;>('+d.geo[rg].length+')</span> '+d.geo[rg].map(esc).join(' · ')+'</div>'; }).join('');
+      body=d.go.map(function(rg){ return '<div class=&quot;wr-item&quot; style=&quot;font-size:12px;line-height:1.6;margin:1px 0 1px 15px&quot;><b style=&quot;color:#444&quot;>'+esc(rg)+'</b> <span style=&quot;color:#888&quot;>('+d.geo[rg].length+')</span> '+d.geo[rg].map(esc).join(' · ')+'</div>'; }).join('');
     } else {
-      body=d.list.map(function(v){ return '<div style=&quot;font-size:12px;line-height:1.55;margin:1px 0 1px 15px&quot;>· '+esc(v)+'</div>'; }).join('');
+      body=d.list.map(function(v){ return '<div class=&quot;wr-item&quot; style=&quot;font-size:12px;line-height:1.55;margin:1px 0 1px 15px&quot;>· '+esc(v)+'</div>'; }).join('');
     }
     return head+body;
   }
@@ -3403,9 +3452,11 @@ function writerReport(scope){
   function sec(title,color,s,ed,ph){ var body=blocks(s); if(ed){ body+=edit(s,ph); } if(!body){ body='<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>'; } return '<div style=&quot;margin-bottom:12px&quot;><div style=&quot;color:#fff;font-weight:bold;padding:5px 11px;border-radius:5px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div><div style=&quot;padding:5px 4px 2px&quot;>'+body+'</div></div>'; }
   var h='<div style=&quot;background:#fff;border:1px solid #e5e9e6;border-radius:8px;padding:12px 16px&quot;>';
   h+='<div style=&quot;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:8px&quot;><b style=&quot;font-size:16px&quot;>'+esc(selWriter)+'</b><span style=&quot;font-size:12.5px&quot;>'+catSummary()+'</span><span style=&quot;margin-left:auto;font-size:12px;color:#666&quot;>총 '+scope.length+'건</span></div>';
+  h+='<div class=&quot;wr-cols&quot;>';
   h+=sec('금주업무보고','#1e5631','금주',false,'');
   h+=sec('차주업무보고','#2f6f9f','차주',true,'다음 주 계획을 적으세요 (예: 방문예정, 계약예정 …)');
   h+=sec('기타','#8a6d1f','기타',true,'기타 사항을 적으세요');
+  h+='</div>';
   return h+'</div>';
 }
 
