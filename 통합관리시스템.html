@@ -3704,12 +3704,12 @@ function careEnsureMonth(){
   loadCareMonth(base.getFullYear(),base.getMonth());
 }
 function loadCareMonth(y,m){
-  const key=y+'-'+pad(m+1);
+  const key=y+'-'+String(m+1).padStart(2,'0');
   if(careMonthCache[key]||careMonthLoading[key])return;   // 이미 있으면 재요청 안 함
   if(!gData.connected)return;                             // 구글 연동 전이면 스킵(연동 후 다시 그릴 때 로드)
   careMonthLoading[key]=true;
   const today=todayStr();const dim=new Date(y,m+1,0).getDate();const days=[];
-  for(let dn=1;dn<=dim;dn++){const ds=y+'-'+pad(m+1)+'-'+pad(dn);if(ds<=today)days.push(ds);}   // 미래 날짜는 기록 없으니 생략
+  for(let dn=1;dn<=dim;dn++){const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(dn).padStart(2,'0');if(ds<=today)days.push(ds);}   // 미래 날짜는 기록 없으니 생략
   Promise.all(days.map(ds=>jsonp('action=day&date='+ds).then(r=>({ds,rows:(r&&r.rows)||[]})).catch(()=>({ds,rows:[]}))))
     .then(res=>{const out=[];
       res.forEach(o=>o.rows.forEach(r=>out.push({date:o.ds,type:r[0]||'',region:r[1]||'',site:r[2]||'',content:r[3]||'',stage:r[4]||'',note:r[5]||'',writer:r[6]||''})));
