@@ -3696,19 +3696,43 @@ function renderCalendar(){
 /* ===== 점검·소독 달력 (완료=일지 기록 / 예정=등록 현장) ===== */
 let careMonthOffset=0;
 let careCalMode='both';   // both 통합 · insp 점검 · dis 소독
+/* ===== 달력이 '보고 있는 달' 전체의 일지 기록을 불러오기 (이번 주 밖 점검·소독도 표시) ===== */
+let careMonthCache={};     // 'YYYY-MM' -> 그 달 일지 기록 배열
+let careMonthLoading={};    // 'YYYY-MM' -> 불러오는 중 표시(중복 호출 방지)
+function careEnsureMonth(){
+  const base=new Date();base.setDate(1);base.setMonth(base.getMonth()+careMonthOffset);
+  loadCareMonth(base.getFullYear(),base.getMonth());
+}
+function loadCareMonth(y,m){
+  const key=y+'-'+pad(m+1);
+  if(careMonthCache[key]||careMonthLoading[key])return;   // 이미 있으면 재요청 안 함
+  if(!gData.connected)return;                             // 구글 연동 전이면 스킵(연동 후 다시 그릴 때 로드)
+  careMonthLoading[key]=true;
+  const today=todayStr();const dim=new Date(y,m+1,0).getDate();const days=[];
+  for(let dn=1;dn<=dim;dn++){const ds=y+'-'+pad(m+1)+'-'+pad(dn);if(ds<=today)days.push(ds);}   // 미래 날짜는 기록 없으니 생략
+  Promise.all(days.map(ds=>jsonp('action=day&date='+ds).then(r=>({ds,rows:(r&&r.rows)||[]})).catch(()=>({ds,rows:[]}))))
+    .then(res=>{const out=[];
+      res.forEach(o=>o.rows.forEach(r=>out.push({date:o.ds,type:r[0]||'',region:r[1]||'',site:r[2]||'',content:r[3]||'',stage:r[4]||'',note:r[5]||'',writer:r[6]||''})));
+      careMonthCache[key]=out;careMonthLoading[key]=false;renderCareCalendar();})
+    .catch(()=>{careMonthLoading[key]=false;});
+}
 function careShiftMonth(d){careMonthOffset=(d===0?0:careMonthOffset+d);renderCareCalendar();}
 function careSetMode(m){careCalMode=m;document.querySelectorAll('#careModeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));renderCareCalendar();}
 function careEventsByDate(){
   const map={};
   const ts=todayStr();
   const add=(date,name,type,done,solid,mgr,sid,src)=>{if(!date)return;(map[date]=map[date]||[]).push({name:name||'',type,done,solid:!!solid,mgr:mgr||'',sid:sid||'',src:src||'',late:(!done && String(date)<ts)});};
-  (gData.logs||[]).forEach(l=>{if(l.type==='점검'||l.type==='소독')add(l.date,l.site||l.content||'',l.type,true,false,l.writer||'');});  // 완료(일지)
+  const ws=weekDates()[0];const seen={};
+  const _lkey=l=>l.date+'|'+l.type+'|'+(l.site||l.content||'')+'|'+(l.writer||'');
+  (gData.logs||[]).forEach(l=>{if(l.type==='점검'||l.type==='소독'){seen[_lkey(l)]=1;add(l.date,l.site||l.content||'',l.type,true,false,l.writer||'');}});   // 완료(일지) — 이번 주(실시간, 기존과 동일)
+  Object.keys(careMonthCache).forEach(k=>careMonthCache[k].forEach(l=>{if((l.type==='점검'||l.type==='소독')&&l.date<ws){const kk=_lkey(l);if(seen[kk])return;seen[kk]=1;add(l.date,l.site||l.content||'',l.type,true,false,l.writer||'');}}));   // 완료(일지) — 이번 주 이전(보고 있는 달)
   (sites||[]).forEach(s=>{if((s.type==='점검'||s.type==='소독')&&s.planDate)add(s.planDate,s.name,s.type,false,false,s.manager||'',s.id,'site');});   // 예정(현장)
   (careSites||[]).forEach(s=>{if(s.date)add(s.date,s.name,s.type,false,true,s.mgr||'',s.id,'care');});   // 현장 추가로 등록한 일정
   return map;
 }
 function renderCareCalendar(){
   const grid=document.getElementById('careCalGrid');if(!grid)return;
+  careEnsureMonth();   // 보고 있는 달의 일지 기록 확보(없으면 불러온 뒤 다시 그림)
   const base=new Date();base.setDate(1);base.setMonth(base.getMonth()+careMonthOffset);
   const y=base.getFullYear(),m=base.getMonth();
   const tt=document.getElementById('careCalTitle');if(tt)tt.innerHTML=`${y}년 <span>${m+1}월</span>`;
