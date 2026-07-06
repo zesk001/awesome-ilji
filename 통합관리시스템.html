@@ -3727,7 +3727,7 @@ function careEventsByDate(){
   (gData.logs||[]).forEach(l=>{if(l.type==='점검'||l.type==='소독'){seen[_lkey(l)]=1;add(l.date,l.site||l.content||'',l.type,true,false,l.writer||'');}});   // 완료(일지) — 이번 주(실시간, 기존과 동일)
   Object.keys(careMonthCache).forEach(k=>careMonthCache[k].forEach(l=>{if((l.type==='점검'||l.type==='소독')&&l.date<ws){const kk=_lkey(l);if(seen[kk])return;seen[kk]=1;add(l.date,l.site||l.content||'',l.type,true,false,l.writer||'');}}));   // 완료(일지) — 이번 주 이전(보고 있는 달)
   (sites||[]).forEach(s=>{if((s.type==='점검'||s.type==='소독')&&s.planDate)add(s.planDate,s.name,s.type,false,false,s.manager||'',s.id,'site');});   // 예정(현장)
-  (careSites||[]).forEach(s=>{if(s.date)add(s.date,s.name,s.type,false,true,s.mgr||'',s.id,'care');});   // 현장 추가로 등록한 일정
+  (careSites||[]).forEach(s=>{if(s.date)add(s.date,s.name,s.type,s.status==='완료',true,s.mgr||'',s.id,'care');});   // 현장 추가로 등록한 일정(완료 수동표시 반영)
   return map;
 }
 function renderCareCalendar(){
@@ -3770,8 +3770,12 @@ function openDayDetail(ds){
     body.innerHTML=Object.keys(byMgr).sort((a,b)=>a.localeCompare(b)).map(mgr=>{
       const list=byMgr[mgr];const cnt={};list.forEach(e=>cnt[e.type]=(cnt[e.type]||0)+1);
       const cntStr=Object.keys(cnt).map(t=>t+' '+cnt[t]).join(' · ');
-      const rows=list.slice().sort((a,b)=>a.type.localeCompare(b.type)||(a.name||'').localeCompare(b.name||'')).map(e=>
-        `<tr><td style="width:60px;">${careTypeBadge(e.type)}</td><td>${e.done?'✓ ':(e.late?'⚠ ':'○ ')}${esc(e.name||'')}</td><td class="small" style="color:${e.late?'#e0a82e':'var(--muted)'};width:46px;font-weight:${e.late?700:400};">${e.done?'완료':(e.late?'지연':'예정')}</td><td style="width:96px;white-space:nowrap;text-align:right;">${(e.src==='care'||e.src==='site')?`<button onclick="${e.src==='care'?'editCareFromDay':'editSiteFromDay'}('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;margin-right:4px;border:1px solid #3a8a5a;background:#163b29;color:#bfe49a;border-radius:6px;cursor:pointer;">수정</button><button onclick="${e.src==='care'?'delCareFromDay':'delSitePlanFromDay'}('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;border:1px solid #a3484c;background:#3b1618;color:#f3b6b8;border-radius:6px;cursor:pointer;">삭제</button>`:''}</td></tr>`).join('');
+      const _past=ds<todayStr();
+      const rows=list.slice().sort((a,b)=>a.type.localeCompare(b.type)||(a.name||'').localeCompare(b.name||'')).map(e=>{
+        const editBtns=(e.src==='care'||e.src==='site')?`<button onclick="${e.src==='care'?'editCareFromDay':'editSiteFromDay'}('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;margin-right:4px;border:1px solid #3a8a5a;background:#163b29;color:#bfe49a;border-radius:6px;cursor:pointer;">수정</button><button onclick="${e.src==='care'?'delCareFromDay':'delSitePlanFromDay'}('${e.sid}','${ds}')" style="font-size:12px;padding:3px 8px;border:1px solid #a3484c;background:#3b1618;color:#f3b6b8;border-radius:6px;cursor:pointer;">삭제</button>`:'';
+        const statBtns=(e.src==='care'&&_past)?`<button onclick="setCarePlanStatus('${e.sid}','완료','${ds}')" title="완료로 표시" style="font-size:12px;padding:3px 9px;margin-right:4px;border:1px solid ${e.done?'#3a8a5a':'#555'};background:${e.done?'#1c5c38':'#242424'};color:${e.done?'#e3f6cf':'#9aa2a6'};border-radius:6px;cursor:pointer;font-weight:${e.done?700:400};">완료</button><button onclick="setCarePlanStatus('${e.sid}','지연','${ds}')" title="지연으로 표시" style="font-size:12px;padding:3px 9px;margin-right:8px;border:1px solid ${e.late?'#e0a82e':'#555'};background:${e.late?'#4a3a12':'#242424'};color:${e.late?'#f2d68c':'#9aa2a6'};border-radius:6px;cursor:pointer;font-weight:${e.late?700:400};">지연</button>`:'';
+        return `<tr><td style="width:60px;">${careTypeBadge(e.type)}</td><td>${e.done?'✓ ':(e.late?'⚠ ':'○ ')}${esc(e.name||'')}</td><td class="small" style="color:${e.late?'#e0a82e':'var(--muted)'};width:46px;font-weight:${e.late?700:400};">${e.done?'완료':(e.late?'지연':'예정')}</td><td style="white-space:nowrap;text-align:right;">${statBtns}${editBtns}</td></tr>`;
+      }).join('');
       return `<div style="margin-bottom:15px;"><div style="font-weight:800;color:#fff;margin-bottom:6px;">${esc(mgr)} <span class="small" style="color:var(--muted);font-weight:600;">(${list.length}개소 · ${cntStr})</span></div><table><tbody>${rows}</tbody></table></div>`;
     }).join('');
   }
@@ -4046,6 +4050,13 @@ function editCareFromDay(id,ds){ closeModal('dayDetailModal'); openCareSiteModal
 function delCareFromDay(id,ds){
   if(!confirm('이 예정 일정을 삭제할까요?'))return;
   careSites=careSites.filter(x=>x.id!==id); careSitesSave(); postShared('caresite:'+id,'');
+  renderCareCalendar(); renderCarePanels(); openDayDetail(ds);
+}
+/* 날짜 지난 예정 항목: 완료/지연 클릭 선택(같은 상태 다시 누르면 예정으로 되돌림). 달력·상세 표시용, 공유 저장 */
+function setCarePlanStatus(id,st,ds){
+  const i=careSites.findIndex(x=>x.id===id); if(i<0)return;
+  careSites[i].status=(careSites[i].status===st)?'':st;
+  careSitesSave(); postShared('caresite:'+id,JSON.stringify(careSites[i]));
   renderCareCalendar(); renderCarePanels(); openDayDetail(ds);
 }
 /* 옛 현장(sites) 예정 — 달력에서 수정/예정일 삭제 */
