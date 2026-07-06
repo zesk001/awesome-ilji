@@ -3424,10 +3424,10 @@ function renderDetail(scope){
       if(!list.length) return;
       let body='';
       if(c==='점검'||c==='소독'){
-        /* 현장명(담당이름) 목록 */
-        const sw={};
-        list.forEach(r=>{const s=siteLabel(r)||'(미기재)';const w=r.writer||'(미상)';if(!sw[s])sw[s]=new Set();sw[s].add(w);});
-        const parts=Object.keys(sw).map(s=>'<b>'+esc(s)+'</b>(<span class=&quot;sim-w&quot;>'+esc([...sw[s]].sort(cmpWriter).map(nameKey).join(', '))+'</span>)');
+        /* 지역별 총 수량만 표시 (천안, 아산, 서천 … · 건수 많은 순) */
+        const rc={};
+        list.forEach(r=>{const rg=r.region||'기타';rc[rg]=(rc[rg]||0)+1;});
+        const parts=Object.keys(rc).sort((a,b)=>rc[b]-rc[a]||a.localeCompare(b)).map(rg=>'<b>'+esc(rg)+'</b> <span class=&quot;sim-w&quot;>'+rc[rg]+'</span>');
         body='<div>'+parts.join('&ensp;&middot;&ensp;')+'</div>';
       }else if(c==='공사'){
         /* 현장명(담당들) — 공사내역(비고) */
