@@ -368,8 +368,11 @@
   (function(){ var st=document.createElement('style');
     st.textContent='.sum-item{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid #eef1ef;border-radius:10px;padding:8px 10px;margin:6px 0;background:#fafcfb;}'
       +'.sum-item .sum-place{font-weight:bold;color:#2b3a30;}'
-      +'.sum-item .sum-memo{flex:1;min-width:150px;border:1px solid #d9e2dc;border-radius:8px;padding:6px 9px;font-size:13px;font-family:inherit;}'
+      +'.sum-item .sum-memo{flex:1;min-width:150px;border:1px solid #d9e2dc;border-radius:8px;padding:6px 9px;font-size:13px;font-family:inherit;line-height:1.45;resize:none;overflow:hidden;min-height:34px;white-space:pre-wrap;word-break:break-word;box-sizing:border-box;}'
       +'.sum-item .sum-memo:focus{outline:none;border-color:#3f9d5a;}'
+      +'.sum-item .sum-done{flex:0 0 auto;cursor:pointer;border:1px solid #3f9d5a;background:#eef8f1;color:#2f7d47;font-size:12px;font-weight:700;border-radius:8px;padding:6px 10px;white-space:nowrap;}'
+      +'.sum-item .sum-done:hover{background:#3f9d5a;color:#fff;}'
+      +'.sum-item .sum-done.done{background:#3f9d5a;color:#fff;border-color:#3f9d5a;}'
       +'.sum-item i[data-del]{cursor:pointer;color:#c0392b;font-style:normal;font-weight:bold;margin-left:auto;padding:0 4px;}'
       +'.sr-region{margin-left:auto;font-size:12px;color:#8a9a90;}';
     document.head.appendChild(st); })();
@@ -766,13 +769,25 @@
         const place=[e.region,e.name].filter(Boolean).join(' ');
         return '<div class="sum-item" data-cat="'+e.cat+'" data-key="'+sEsc(e.key)+'">'+
           '<span class="sum-place">'+sEsc(place)+'</span>'+
-          '<input class="sum-memo" data-cat="'+e.cat+'" data-key="'+sEsc(e.key)+'" value="'+sEsc(e.memo)+'" placeholder="한 줄 메모(선택)">'+
+          '<textarea class="sum-memo" rows="1" data-cat="'+e.cat+'" data-key="'+sEsc(e.key)+'" placeholder="내용을 적으세요 (엔터로 줄바꿈)">'+sEsc(e.memo)+'</textarea>'+
+          '<button type="button" class="sum-done">입력완료</button>'+
           '<i data-del="1">×</i></div>';
       }).join('');
       return '<div class="sum-cat"><span class="sum-tag" style="background:'+g.color+'">'+g.label+' '+g.entries.length+'</span>'+items+'</div>';
     }).join('');
+    sumBody.querySelectorAll('.sum-memo').forEach(autoGrow);
   }
+  function autoGrow(t){ if(!t) return; t.style.height='auto'; t.style.height=(t.scrollHeight)+'px'; }
   sumBody.addEventListener('click',e=>{
+    const done=e.target.closest('.sum-done');
+    if(done){
+      const it=done.closest('.sum-item'); if(!it) return;
+      const ta=it.querySelector('.sum-memo');
+      if(ta){ ta.blur(); }
+      done.classList.add('done'); const old=done.textContent; done.textContent='✓ 완료';
+      setTimeout(()=>{ done.classList.remove('done'); done.textContent=old; },1200);
+      return;
+    }
     const del=e.target.closest('[data-del]'); if(!del) return;
     const it=del.closest('.sum-item'); if(!it) return;
     const cat=it.dataset.cat, key=it.dataset.key;
@@ -782,6 +797,7 @@
   });
   sumBody.addEventListener('input',e=>{
     const inp=e.target.closest('.sum-memo'); if(!inp) return;
+    autoGrow(inp);
     const cat=inp.dataset.cat, key=inp.dataset.key;
     if(SEL[cat]&&SEL[cat][key]){ SEL[cat][key].memo=inp.value; saveSel(); }
   });
