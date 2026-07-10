@@ -89,6 +89,10 @@
   .school-row { border:1px solid color-mix(in srgb,var(--c) 22%,#fff); border-radius:10px; padding:14px 8px; background:color-mix(in srgb,var(--c) 4%,#fff); cursor:pointer; transition:all .12s; text-align:center; }
   .school-row:hover { background:color-mix(in srgb,var(--c) 12%,#fff); border-color:color-mix(in srgb,var(--c) 45%,#fff); }
   .school-row.selected { background:#f6faf7; border-color:var(--c); box-shadow:inset 4px 0 0 var(--c); }
+  .school-row.mdone, .school-row.mdone:hover { background:#f1f2f4; border-color:#e2e4e8; box-shadow:none; cursor:default; opacity:.92; }
+  .school-row.mdone .sr-name { color:#9aa0a6; text-decoration:line-through; }
+  .school-row.mdone .sr-name::after { content:'' !important; }
+  .school-row.mdone .mdone-tag { display:block; margin-top:4px; font-size:11px; color:#7a8088; text-decoration:none; }
   .sub-sep { grid-column:1/-1; font-size:12px; font-weight:bold; padding:6px 2px 2px; border-top:1px dashed; margin-top:4px; }
   .work-note { background:#fff7ef; border:1px dashed #e8b58a; color:#a96a2c; font-size:13px; padding:10px 14px; border-radius:10px; margin-bottom:14px; }
   .work-list { display:flex; flex-direction:column; gap:10px; }
@@ -469,9 +473,10 @@
     function head(txt){ return '<h2>'+icon+' '+cat+' <span class="badge" style="background:'+color+'">'+txt+'</span></h2>'; }
     function rowHTML(display,key,region,sub,subColor){
       const sty = sub ? (' style="--c:'+subColor+'"') : '';
-      return '<div class="school-row'+(sub?' sub':'')+(isSel(cat,key)?' selected':'')+'" '+
+      const locked = !sub && monthDoneKey(cat,key);
+      return '<div class="school-row'+(sub?' sub':'')+(isSel(cat,key)?' selected':'')+(locked?' mdone':'')+'" '+
         'data-key="'+sEsc(key)+'" data-name="'+sEsc(display)+'" data-region="'+sEsc(region)+'" data-sub="'+(sub?1:'')+'"'+sty+'>'+
-        '<span class="sr-name">'+sEsc(display)+'</span></div>';
+        '<span class="sr-name">'+sEsc(display)+'</span>'+(locked?'<span class="mdone-tag">이번 달 완료</span>':'')+'</div>';
     }
     function showRegions(){
       if(office){
@@ -593,6 +598,7 @@
       if(e.target.closest('[data-back]')){ showRegions(); return; }
       const row=e.target.closest('.school-row');
       if(row){
+        if(row.classList.contains('mdone')){ alert('이 현장은 이번 달에 이미 완료됐어요. 다음 달부터 다시 체크할 수 있어요.'); return; }
         const sub=row.dataset.sub==='1', key=row.dataset.key;
         if(isSel(cat,key)){ toggleSel(cat,key); row.classList.remove('selected'); }
         else { toggleSel(cat,key,{region:row.dataset.region,name:row.dataset.name,sub:sub,memo:''}); row.classList.add('selected'); }
@@ -824,6 +830,50 @@
   function canonWriter(w){ var s=String(w==null?'':w).trim(); return CANON_W[s.split(/\s+/)[0]]||s; }
   const APPS_URL=(window.__APPS_URL)||'https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
 
+  // ===== 이번 달 이미 완료한 점검·소독 현장 잠금(중복 체크 방지, 매월 1일 자동 초기화) =====
+  var MONTH_DONE={'점검':{}, '소독':{}};
+  function monthDoneKey(cat,key){ return !!(MONTH_DONE[cat] && MONTH_DONE[cat][key]); }
+  function applyMonthLocks(){
+    ['점검','소독'].forEach(function(c){
+      var pn=panels[c]; if(!pn) return;
+      pn.querySelectorAll('.school-row').forEach(function(row){
+        if(row.dataset.sub==='1') return;
+        if(monthDoneKey(c,row.dataset.key) && !row.classList.contains('mdone')){
+          row.classList.add('mdone'); row.classList.remove('selected');
+          if(!row.querySelector('.mdone-tag')){ var tg=document.createElement('span'); tg.className='mdone-tag'; tg.textContent='이번 달 완료'; row.appendChild(tg); }
+        }
+      });
+    });
+  }
+  function markSentDone(rows){
+    (rows||[]).forEach(function(r){ var c=r[1];
+      if((c==='점검'||c==='소독') && r[4]!=='단타'){ var k=(r[2]||'')+'|'+(r[3]||''); if(!MONTH_DONE[c]) MONTH_DONE[c]={}; MONTH_DONE[c][k]=true; }
+    });
+    applyMonthLocks();
+  }
+  function loadMonthDone(){
+    try{
+      var M=(new Date()).getMonth()+1;
+      var cb='__mDone'+Date.now();
+      var s=document.createElement('script');
+      window[cb]=function(res){
+        try{
+          var items=(res&&res.items)||[]; var insp={}, dis={};
+          items.forEach(function(x){ var k=(x.r||'')+'|'+(x.s||'');
+            if((x.i||[]).indexOf(M)>=0) insp[k]=true;
+            if((x.d||[]).indexOf(M)>=0) dis[k]=true; });
+          MONTH_DONE={'점검':insp, '소독':dis};
+          applyMonthLocks();
+        }catch(e){}
+        try{ delete window[cb]; }catch(e){ window[cb]=null; } s.remove();
+      };
+      s.onerror=function(){ try{ delete window[cb]; }catch(e){ window[cb]=null; } s.remove(); };
+      s.src=APPS_URL+'?action=mapstat&callback='+cb+'&t='+Date.now();
+      (document.body||document.documentElement).appendChild(s);
+    }catch(e){}
+  }
+  loadMonthDone();
+
   const wsel=document.getElementById('writerSel');
   wsel.innerHTML='<option value="">(이름 선택)</option>'+NAMES.map(n=>'<option>'+n+'</option>').join('');
   try{ wsel.value=localStorage.getItem('ilji_writer')||''; }catch(e){}
@@ -935,7 +985,7 @@
     if(!confirm(writer+' 님, ['+dateStr()+'] 작업을 전송할까요?\n같은 날짜로 다시 전송하면 새 내용으로 덮어써집니다.\n\n'+sendSummaryText(rows))) return;
     var btn=document.getElementById('sendBtn'); btn.textContent='전송 중...'; btn.disabled=true;
     submitData(writer)
-      .then(function(){ try{ localStorage.setItem(sentKey(), nowStamp()); }catch(e){} renderSentStatus(); btn.textContent='전송 완료 ✓'; setTimeout(function(){btn.textContent='전송';btn.disabled=false;},2500); })
+      .then(function(){ markSentDone(rows); try{ localStorage.setItem(sentKey(), nowStamp()); }catch(e){} renderSentStatus(); btn.textContent='전송 완료 ✓'; setTimeout(function(){btn.textContent='전송';btn.disabled=false;},2500); })
       .catch(function(){ alert('전송 실패 — 인터넷 연결을 확인하세요.'); btn.textContent='전송';btn.disabled=false; });
   }
   document.getElementById('sendBtn').addEventListener('click',send);
