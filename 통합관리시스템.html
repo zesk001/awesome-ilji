@@ -3193,7 +3193,7 @@ function printHTML(bodyHTML){
     '<style>'+styleEl.textContent+'</style>'+
     '<style>'+css+'</style>'+
     '</head><body>'+bodyHTML+
-    '<script>window.onload=function(){setTimeout(function(){window.print();window.close();},400);}<\/script>'+
+    '<script>function __fit(p){p.style.zoom=1;var t=1010;if(p.getBoundingClientRect().height<=t)return;var z=1;for(var k=0;k<16;k++){z=z-0.02;if(z<0.6)z=0.6;p.style.zoom=z;if(p.getBoundingClientRect().height<=t)break;}}window.onload=function(){setTimeout(function(){var ps=document.getElementsByClassName(&quot;paper&quot;);for(var i=0;i<ps.length;i++){__fit(ps[i]);}setTimeout(function(){window.print();window.close();},150);},400);}<\/script>'+
     '</body></html>'
   );
   pw.document.close();
@@ -3253,6 +3253,8 @@ function openPreview(pages, printFn){
   });
   ov.appendChild(scroll);
   document.body.appendChild(ov);
+  var _pgs=ov.getElementsByClassName('pvPage');
+  for(var _i=0;_i<_pgs.length;_i++){ var _pp=_pgs[_i].getElementsByClassName('paper')[0]; if(!_pp) continue; _pp.style.zoom=1; if(_pp.getBoundingClientRect().height>1010){ var _z=1; for(var _k=0;_k<16;_k++){ _z=_z-0.02; if(_z<0.6)_z=0.6; _pp.style.zoom=_z; if(_pp.getBoundingClientRect().height<=1010)break; } } }
 }
 function hidePrintDialog(){ var ov=document.getElementById('printDlg'); if(ov) ov.remove(); }
 function showPrintDialog(){
