@@ -524,7 +524,7 @@
     }
     function etcRowHTML(key,v,ph){
       return '<div class="etc-item" data-key="'+sEsc(key)+'" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">'+
-        '<input class="etc-input recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0" value="'+sEsc(v.workText||'')+'" placeholder="'+sEsc(ph||'내용을 적으세요')+'">'+
+        '<textarea class="etc-input recv-input" data-key="'+sEsc(key)+'" style="flex:1;margin:0" placeholder="'+sEsc(ph||'내용을 적으세요 (엔터로 줄바꿈)')+'">'+sEsc(v.workText||'')+'</textarea>'+
         '<i class="etc-del" data-key="'+sEsc(key)+'" style="cursor:pointer;font-style:normal;font-size:22px;line-height:1;color:#e5484d;padding:0 8px" title="삭제">×</i>'+
         '</div>';
     }
