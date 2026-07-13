@@ -3612,6 +3612,19 @@ function applyShared(res){
   // 입고예정일
   if('ordArrival' in map){try{ordArrivalDates=JSON.parse(map['ordArrival']||'{}');localStorage.setItem('aws_ord_arrivaldates',JSON.stringify(ordArrivalDates));}catch(e){}}
   else{const lo=localStorage.getItem('aws_ord_arrivaldates')||'';if(lo&&lo!=='{}')postShared('ordArrival',lo);}
+  // 견적서 시트별 금액(estsheets:) + 대표 견적서 선택(estrep:) 병합
+  if(gData.est&&gData.est.length){
+    const sheetsMap={},repMap={};
+    Object.keys(map).forEach(k=>{
+      if(k.indexOf('estsheets:')===0){try{sheetsMap[k.slice(10)]=JSON.parse(map[k]);}catch(e){}}
+      else if(k.indexOf('estrep:')===0){try{repMap[k.slice(7)]=JSON.parse(map[k]);}catch(e){}}
+    });
+    gData.est.forEach(e=>{
+      const s=sheetsMap[e.file];if(s&&s.length)e.sheets=s;
+      const rp=repMap[e.file];
+      if(rp){e.repSheet=rp.name;e.repEditor=rp.editor||'';e.repTime=rp.time||'';if(rp.amount!=null)e.repAmount=rp.amount;}
+    });
+  }
 }
 let gPendingMat={};try{gPendingMat=JSON.parse(localStorage.getItem('aws_matpending')||'{}');}catch(e){gPendingMat={};}
 let __jcb=0;
@@ -4442,6 +4455,7 @@ function renderOrders(){
 }
 // 견적 세부 분류(공사·점검·소독). 기본=공사. (현재 견적엔 분류값이 없어 전부 공사로 잡힘)
 let estCat='공사';
+const estExpanded=new Set();   // 시트별 금액 펼쳐진 견적서 파일 집합
 function estCatOf(e){ return (e&&e.cat)||'공사'; }
 function setEstCat(c){
   estCat=c;
@@ -4472,13 +4486,49 @@ function renderEstimates(){
   rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   document.getElementById('estCnt').textContent=`${rows.length}건`;
   const t=document.getElementById('estTable');
-  t.innerHTML=rows.length?`<thead><tr><th>현장</th><th>공사명</th><th>지역</th><th>견적일</th><th class="amt">금액</th><th>담당</th><th>계약</th></tr></thead><tbody>`+rows.map(e=>{
+  t.innerHTML=rows.length?`<thead><tr><th style="width:20px;"></th><th>현장</th><th>공사명</th><th>지역</th><th>견적일</th><th class="amt">금액</th><th>담당</th><th>계약</th></tr></thead><tbody>`+rows.map(e=>{
     const po=gHasOrder(e);
     const dealInfo=(!po&&e.deal&&e.dealEditor)?`<span class="small" style="color:var(--muted);margin-left:4px;">${esc(e.dealEditor)}</span>`:'';
     const badge=po?'<span class="badge b-done">계약</span> <span class="badge b-done">발주</span>':(e.deal?'<span class="badge b-done">계약</span>':'<span class="badge b-wait">미성사</span>');
     const chk=`<input type="checkbox" ${e.deal?'checked':''} ${po?'disabled title="발주기록 있음(자동 성사)"':''} onchange="setDeal('${encodeURIComponent(e.file)}',this.checked)">`;
-    return `<tr><td><b>${esc(e.site||e.region)}</b></td><td>${esc(e.work||'')}</td><td>${esc(e.region||'')}</td><td>${fmtDate(e.date)}</td><td class="amt">${fmtMoney(e.amount)}</td><td class="small">${esc(e.manager||'')}</td><td style="white-space:nowrap;">${chk} ${badge}${dealInfo}</td></tr>`;
-  }).join('')+'</tbody>':'<tr><td class="empty">견적이 없습니다. (견적추출기로 올려주세요)</td></tr>';
+    const multi=e.sheets&&e.sheets.length>=2;
+    const encFile=encodeURIComponent(e.file);
+    const open=estExpanded.has(e.file);
+    const dispAmt=(e.repAmount!=null?e.repAmount:e.amount);
+    const caret=multi?`<span onclick="toggleEstRow('${encFile}')" title="시트별 금액 펼치기" style="cursor:pointer;user-select:none;color:var(--muted);">${open?'▾':'▸'}</span>`:'';
+    const sheetBadge=multi?` <span class="badge" style="background:#243b2a;color:#8fe3a8;">${e.sheets.length}시트</span>`:'';
+    const repEd=(multi&&e.repEditor)?`<div class="small" style="color:var(--muted);">대표변경 ${esc(e.repEditor)}</div>`:'';
+    const amtCell=multi
+      ?`<td class="amt" onclick="toggleEstRow('${encFile}')" style="cursor:pointer;">${fmtMoney(dispAmt)}${sheetBadge}${repEd}</td>`
+      :`<td class="amt">${fmtMoney(dispAmt)}</td>`;
+    let html=`<tr><td style="text-align:center;">${caret}</td><td><b>${esc(e.site||e.region)}</b></td><td>${esc(e.work||'')}</td><td>${esc(e.region||'')}</td><td>${fmtDate(e.date)}</td>${amtCell}<td class="small">${esc(e.manager||'')}</td><td style="white-space:nowrap;">${chk} ${badge}${dealInfo}</td></tr>`;
+    if(multi&&open){
+      const repName=e.repSheet||(e.sheets[0]&&e.sheets[0].name);
+      const subRows=e.sheets.map(s=>{
+        const isRep=(s.name===repName);
+        return `<label style="display:flex;align-items:center;gap:10px;padding:5px 8px;border-radius:6px;cursor:pointer;${isRep?'background:rgba(116,194,68,.12);':''}"><input type="radio" name="rep_${encFile}" data-name="${encodeURIComponent(s.name)}" data-amt="${s.amount}" ${isRep?'checked':''}><span style="flex:1;">${esc(s.name)}${isRep?' <span class="badge b-done">대표</span>':''}</span><span class="amt">${fmtMoney(s.amount)}</span></label>`;
+      }).join('');
+      const edInfo=e.repEditor?`최근 변경: ${esc(e.repEditor)}${e.repTime?' · '+fmtDate(String(e.repTime).slice(0,10)):''}`:'대표를 아직 바꾼 적 없음 (추출기 기본값)';
+      html+=`<tr><td></td><td colspan="7"><div style="padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px;margin:2px 0 6px;"><div class="small" style="color:var(--muted);margin-bottom:6px;">견적서 시트별 금액 — 대표로 쓸 시트를 고른 뒤 '대표 견적서 변경'을 누르세요</div>${subRows}<div style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap;"><button onclick="commitEstRep('${encFile}')" style="padding:5px 12px;border-radius:7px;border:1px solid #3a8a5a;background:linear-gradient(135deg,#74c244,#3f8a2a);color:#06210a;font-weight:800;cursor:pointer;">대표 견적서 변경</button><span class="small" style="color:var(--muted);">${edInfo}</span></div></div></td></tr>`;
+    }
+    return html;
+  }).join('')+'</tbody>':'<tr><td class="empty" colspan="8">견적이 없습니다. (견적추출기로 올려주세요)</td></tr>';
+}
+function toggleEstRow(encFile){const file=decodeURIComponent(encFile);if(estExpanded.has(file))estExpanded.delete(file);else estExpanded.add(file);renderEstimates();}
+function commitEstRep(encFile){
+  const file=decodeURIComponent(encFile);
+  const sel=document.querySelector('input[name="rep_'+encFile+'"]:checked');
+  if(!sel){alert('대표로 쓸 시트를 먼저 선택해 주세요.');return;}
+  const name=decodeURIComponent(sel.getAttribute('data-name'));
+  const amt=Number(sel.getAttribute('data-amt'))||0;
+  const it=(gData.est||[]).find(e=>e.file===file);
+  if(!it)return;
+  if(it.repSheet===name){alert('이미 대표로 지정된 시트입니다.');return;}
+  let who=conWho();
+  if(!who){who=(prompt('대표 견적서를 바꾼 사람 이름을 적어주세요 (기록용)')||'').trim();if(!who)return;localStorage.setItem('aws_matwho',who);const wi=document.getElementById('matWho');if(wi)wi.value=who;}
+  it.repSheet=name;it.repAmount=amt;it.repEditor=who;it.repTime=new Date().toISOString();
+  postShared('estrep:'+file,JSON.stringify({name:name,amount:amt,editor:who,time:it.repTime}));
+  renderEstimates();renderEst();renderConstruction();
 }
 function setDeal(encFile,checked){
   const file=decodeURIComponent(encFile);
