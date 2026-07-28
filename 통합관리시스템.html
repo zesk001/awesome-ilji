@@ -3866,6 +3866,16 @@ function applyShared(res){
   // 통합현황 메모 카드(특별 사항)
   if('wbmemo' in map){localStorage.setItem('aws_wbmemo',map['wbmemo']);gData.wbMemo=map['wbmemo'];}
   else{const wm=localStorage.getItem('aws_wbmemo')||'';gData.wbMemo=wm;if(wm)postShared('wbmemo',wm);}
+  // 현황판 카드 목록·달력 배치 공유(wbdata/wbcal 통짜 JSON — 입고예정일과 같은 방식)
+  try{
+    const hasD=('wbdata' in map), hasC=('wbcal' in map);
+    if(hasD||hasC) WB.applySharedWb(hasD?map['wbdata']:null, hasC?map['wbcal']:null);
+    if(Object.keys(map).length){
+      const ex=WB.exportShared();
+      if(!hasD&&ex.any) postShared('wbdata',ex.d);
+      if(!hasC&&ex.anyC) postShared('wbcal',ex.c);
+    }
+  }catch(e){}
   // 입고예정일
   if('ordArrival' in map){try{ordArrivalDates=JSON.parse(map['ordArrival']||'{}');localStorage.setItem('aws_ord_arrivaldates',JSON.stringify(ordArrivalDates));}catch(e){}}
   else{const lo=localStorage.getItem('aws_ord_arrivaldates')||'';if(lo&&lo!=='{}')postShared('ordArrival',lo);}
@@ -4316,10 +4326,11 @@ const WB=(function(){
     sodahoe:{title:'소독 다회현장',empty:'등록된 다회 소독현장이 없습니다.'}
   };
   const KEY='aws_wb_lists';
+  let wbLastEdit=0; // 이 PC에서 마지막으로 수정한 시각 — 직후 15초는 서버 수신으로 덮어쓰지 않음(방금 입력 유실 방지)
   let data={};
   try{data=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){data={};}
   Object.keys(CFG).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
-  function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}}
+  function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){} wbLastEdit=Date.now(); try{postShared('wbdata',JSON.stringify(data));}catch(e){}}
   let editing=null; // {list,id}
   function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'&#10;');}
   function catOf(src){return src==='as'?'as':(src==='sojung'||src==='sodan')?'so':'gong';}
@@ -4351,7 +4362,7 @@ const WB=(function(){
   /* ── 달력 배치: 날짜별 {gong[], as[], so:{1..4}} 구조 ── */
   const CALKEY='aws_wb_cal';
   let placed={};try{placed=JSON.parse(localStorage.getItem(CALKEY)||'{}');}catch(e){placed={};}
-  function persistCal(){try{localStorage.setItem(CALKEY,JSON.stringify(placed));}catch(e){}}
+  function persistCal(){try{localStorage.setItem(CALKEY,JSON.stringify(placed));}catch(e){} wbLastEdit=Date.now(); try{postShared('wbcal',JSON.stringify(placed));}catch(e){}}
   function emptyDay(){return {gong:[],as:[],so:{1:[],2:[],3:[],4:[]}};}
   function dayView(date){var o=placed[date];if(!o)return emptyDay();
     if(Array.isArray(o)){var n=emptyDay();o.forEach(function(pp){var c=catOf(pp.src);if(c==='gong')n.gong.push(pp);else if(c==='as')n.as.push(pp);else n.so[1].push(pp);});return n;}
@@ -4431,7 +4442,20 @@ const WB=(function(){
   function selectRegion(r){sjRegion=(sjRegion===r?'':r);renderSojung();}
   function filterSojung(v){sjFilter=v||'';renderSojung();}
   function onDragStartDB(e,name){try{e.dataTransfer.setData('text/wb',JSON.stringify({list:'sojung',name:name,note:''}));e.dataTransfer.setData('wbcat-so','1');e.dataTransfer.setData('text/plain',name);e.dataTransfer.effectAllowed='copy';}catch(err){}}
-  return {auth:wbAuth,renderAll,render,openAdd,openEdit,save,del,delCurrent,onDragStart,renderCell,removeItem,ensureCalDnD,selectRegion,filterSojung,onDragStartDB};
+  /* 공유데이터(wbdata/wbcal) 수신: 서버가 정답. 단 방금(15초 내) 이 PC에서 수정했으면 이번 수신은 건너뜀 */
+  function applySharedWb(dStr,cStr){
+    if(Date.now()-wbLastEdit<15000) return;
+    let changed=false;
+    if(dStr!=null){try{const d=JSON.parse(dStr||'{}')||{};Object.keys(CFG).forEach(k=>{if(!Array.isArray(d[k]))d[k]=[];});data=d;localStorage.setItem(KEY,JSON.stringify(data));changed=true;}catch(e){}}
+    if(cStr!=null){try{placed=JSON.parse(cStr||'{}')||{};localStorage.setItem(CALKEY,JSON.stringify(placed));changed=true;}catch(e){}}
+    if(changed){try{renderAll();}catch(e){}}
+  }
+  function exportShared(){
+    const any=Object.keys(data).some(k=>Array.isArray(data[k])&&data[k].length);
+    const anyC=Object.keys(placed||{}).length>0;
+    return {d:JSON.stringify(data), c:JSON.stringify(placed||{}), any:any, anyC:anyC};
+  }
+  return {auth:wbAuth,applySharedWb,exportShared,renderAll,render,openAdd,openEdit,save,del,delCurrent,onDragStart,renderCell,removeItem,ensureCalDnD,selectRegion,filterSojung,onDragStartDB};
 })();
 
 /* 메모(특별 사항) 카드: 보기는 누구나, 수정은 관리자(마스터 비밀번호) — 전 기기 공유(wbmemo 키) */
