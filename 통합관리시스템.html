@@ -440,7 +440,7 @@
       <div class="col">
         <div class="glass"><h3><span class="hgrp"><span class="wtab" title="일일업무일지 열기" onclick="openWorkLog('day')">일일업무 ↗</span><span class="wtab" title="주간업무일지 열기" onclick="openWeeklyReport()">주간업무 ↗</span></span></h3><div id="pWeekly"></div></div>
         <div class="glass"><h3>금주 휴가자 <span class="hgrp"><span class="cnt" id="cLeave"></span><span class="go" onclick="goTab('leave')">보기 →</span></span></h3><div class="scroll" id="pLeave"></div></div>
-        <div class="glass"><h3>발주서 정보 <span class="hgrp"><span class="cnt" id="cPo"></span><span class="go" onclick="goTab('orders')">보기 →</span></span></h3><div class="scroll" id="pPo"></div></div>
+        <div class="glass"><h3>메모 <span class="hgrp"><span class="cnt" id="cMemo"></span><span class="go wbadd" onclick="wbMemoEdit()">✎ 수정</span></span></h3><div class="scroll" id="pMemo" style="max-height:320px"></div></div>
       </div>
       <div class="col">
         <div class="calwrap">
@@ -3863,6 +3863,9 @@ function applyShared(res){
   // 메모
   if('carememo' in map){localStorage.setItem('aws_carememo',map['carememo']);const el=document.getElementById('careMemoBox');if(el&&document.activeElement!==el)el.value=map['carememo'];}
   else{const lm=localStorage.getItem('aws_carememo')||'';if(lm)postShared('carememo',lm);}
+  // 통합현황 메모 카드(특별 사항)
+  if('wbmemo' in map){localStorage.setItem('aws_wbmemo',map['wbmemo']);gData.wbMemo=map['wbmemo'];}
+  else{const wm=localStorage.getItem('aws_wbmemo')||'';gData.wbMemo=wm;if(wm)postShared('wbmemo',wm);}
   // 입고예정일
   if('ordArrival' in map){try{ordArrivalDates=JSON.parse(map['ordArrival']||'{}');localStorage.setItem('aws_ord_arrivaldates',JSON.stringify(ordArrivalDates));}catch(e){}}
   else{const lo=localStorage.getItem('aws_ord_arrivaldates')||'';if(lo&&lo!=='{}')postShared('ordArrival',lo);}
@@ -4236,6 +4239,7 @@ function renderEst(){
   document.getElementById('pEst').innerHTML=list.length?list.map(s=>`<div class="row"><div><span class="nm">${esc(s.name)}</span><div class="meta">${esc(s.region||'')} · ${s.stages[1]===2?'견적완료':'작성중'}</div></div><span class="amt">${fmtMoney(s.amount)}</span></div>`).join(''):'<div class="empty">견적 정보 없음</div>';
 }
 function renderPo(){
+  if(!document.getElementById('pPo'))return;
   if(gData.connected){
     const list=(gData.orders||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     document.getElementById('cPo').textContent=`${list.length}건`;
@@ -4325,7 +4329,12 @@ const WB=(function(){
     const cnt=document.getElementById('wbCnt_'+k);if(cnt)cnt.textContent=list.length?list.length+'곳':'';
     const box=document.getElementById('wbList_'+k);if(!box)return;
     if(k==='sodahoe'){
-      box.innerHTML=list.length?list.map(it=>`<div class="row wbrow"><div style="cursor:pointer;flex:1" onclick="WB.openEdit('${k}','${it.id}')"><span class="nm">${esc(it.name||'-')}</span>${it.note?`<div class="meta">${esc(it.note)}</div>`:''}</div><span class="wbdel" title="삭제" onclick="WB.del('${k}','${it.id}')">✕</span></div>`).join(''):'<div class="empty">'+CFG[k].empty+'</div>';
+      if(!list.length){box.innerHTML='<div class="empty">'+CFG[k].empty+'</div>';return;}
+      const is4=it=>/(x|×)\s*4|4\s*회/i.test(it.note||'');
+      const row=it=>`<div class="row wbrow" style="padding:5px 6px"><div style="cursor:pointer;flex:1;min-width:0" onclick="WB.openEdit('${k}','${it.id}')"><span class="nm" style="font-size:12px">${esc(it.name||'-')}</span>${it.note?`<div class="meta">${esc(it.note)}</div>`:''}</div><span class="wbdel" title="삭제" onclick="WB.del('${k}','${it.id}')">✕</span></div>`;
+      const g3=list.filter(it=>!is4(it)), g4=list.filter(is4);
+      const col=(t,arr)=>`<div style="min-width:0"><div class="lwhd" style="text-align:center;margin-bottom:4px;position:sticky;top:0;background:rgba(20,22,25,.92);padding:2px 0;border-radius:4px">${t} <b>${arr.length}</b></div>${arr.map(row).join('')||'<div class="lwdash" style="text-align:center">·</div>'}</div>`;
+      box.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start">${col('3회 현장',g3)}${col('4회 현장',g4)}</div>`;
       return;
     }
     if(!list.length){box.innerHTML='<div class="empty">'+CFG[k].empty+'</div>';return;}
@@ -4422,10 +4431,37 @@ const WB=(function(){
   function selectRegion(r){sjRegion=(sjRegion===r?'':r);renderSojung();}
   function filterSojung(v){sjFilter=v||'';renderSojung();}
   function onDragStartDB(e,name){try{e.dataTransfer.setData('text/wb',JSON.stringify({list:'sojung',name:name,note:''}));e.dataTransfer.setData('wbcat-so','1');e.dataTransfer.setData('text/plain',name);e.dataTransfer.effectAllowed='copy';}catch(err){}}
-  return {renderAll,render,openAdd,openEdit,save,del,delCurrent,onDragStart,renderCell,removeItem,ensureCalDnD,selectRegion,filterSojung,onDragStartDB};
+  return {auth:wbAuth,renderAll,render,openAdd,openEdit,save,del,delCurrent,onDragStart,renderCell,removeItem,ensureCalDnD,selectRegion,filterSojung,onDragStartDB};
 })();
 
-function renderOverview(){renderCalendar();renderWeekly();renderLeaveWeek();renderPo();WB.renderAll();}
+/* 메모(특별 사항) 카드: 보기는 누구나, 수정은 관리자(마스터 비밀번호) — 전 기기 공유(wbmemo 키) */
+let wbMemoEditing=false;
+function renderMemo(){
+  const el=document.getElementById('pMemo');if(!el||wbMemoEditing)return;
+  const txt=(gData.wbMemo!=null?gData.wbMemo:(localStorage.getItem('aws_wbmemo')||''));
+  const cEl=document.getElementById('cMemo');if(cEl)cEl.textContent='';
+  el.innerHTML=String(txt).trim()?`<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.75;color:#e6ebee;padding:2px 2px">${esc(txt)}</div>`:'<div class="empty">기재된 특별 사항이 없습니다.<br>✎ 수정(관리자)으로 작성하세요.</div>';
+}
+function wbMemoEdit(){
+  if(!WB.auth())return;
+  const el=document.getElementById('pMemo');if(!el)return;
+  wbMemoEditing=true;
+  const cur=(gData.wbMemo!=null?gData.wbMemo:(localStorage.getItem('aws_wbmemo')||''));
+  el.innerHTML=`<textarea id="wbMemoTa" style="width:100%;box-sizing:border-box;min-height:160px;background:rgba(255,255,255,.05);border:1px solid var(--stroke2);border-radius:8px;padding:8px 10px;color:var(--txt);font-family:inherit;font-size:12.5px;line-height:1.6;resize:vertical" placeholder="특별 사항을 적어주세요 (전 기기 공유)"></textarea>
+  <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">
+    <button class="btn sec" style="padding:4px 10px;font-size:12px" onclick="wbMemoCancel()">취소</button>
+    <button class="btn" style="padding:4px 12px;font-size:12px" onclick="wbMemoSave()">저장</button>
+  </div>`;
+  const ta=document.getElementById('wbMemoTa');ta.value=String(cur);ta.focus();
+}
+function wbMemoCancel(){wbMemoEditing=false;renderMemo();}
+function wbMemoSave(){
+  const ta=document.getElementById('wbMemoTa');if(!ta)return;
+  const v=ta.value;
+  gData.wbMemo=v;localStorage.setItem('aws_wbmemo',v);postShared('wbmemo',v);
+  wbMemoEditing=false;renderMemo();
+}
+function renderOverview(){renderCalendar();renderWeekly();renderLeaveWeek();renderMemo();WB.renderAll();}
 
 /* ===== 빠른 검색: 현장·업무일지·견적·발주자재·일정을 한 번에 찾기 ===== */
 let qsLast=[];
