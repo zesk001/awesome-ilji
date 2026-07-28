@@ -74,6 +74,23 @@
   .glass h3 .go{font-size:10.5px;color:var(--g1);cursor:pointer;font-weight:700;border:1px solid var(--stroke2);padding:3px 10px;border-radius:8px;background:var(--glass);white-space:nowrap;transition:.15s;}
   .glass h3 .go:hover{border-color:var(--g2);color:#fff;background:rgba(116,194,68,.14);}
   .scroll{max-height:230px;overflow:auto;}
+  /* 현황판 6개 카드: 항목이 늘어도 틀 고정·내부 스크롤 (작은 화면 기본값) */
+  [id^="wbList_"]{height:158px;max-height:158px;overflow-y:auto;}
+  [id^="wbList_"] .empty{padding:14px;}
+  /* 넓은 화면(3단): 발주서 정보(왼쪽) 끝선에 맞춰 가운데·오른쪽 바닥선 정렬 */
+  @media(min-width:1151px){
+    .deck{align-items:stretch;}
+    /* 오른쪽 4개 카드를 열 높이만큼 균등 분할해 채움 (틀 고정·안쪽만 스크롤) */
+    .deck>.col:nth-child(3)>.glass{flex:1 1 0;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+    /* 가운데: 달력을 크게(약 3/4), 아래 소독(정기·다회)을 나머지(약 1/4)로 → 달력 하단 ≈ AS현장 하단 */
+    .deck>.col:nth-child(2)>.calwrap{flex:3 1 0;display:flex;flex-direction:column;min-height:0;}
+    .deck>.col:nth-child(2)>.calwrap>.calgrid{flex:1 1 auto;min-height:0;grid-template-rows:auto;grid-auto-rows:1fr;}
+    .deck>.col:nth-child(2)>.schpair{flex:1 1 0;min-height:0;}
+    .deck>.col:nth-child(2)>.schpair>.glass{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+    /* 채워진 카드 안 목록: 남는 높이만큼 늘고 넘치면 스크롤 */
+    .deck>.col:nth-child(3)>.glass>[id^="wbList_"],
+    .deck>.col:nth-child(2)>.schpair>.glass>[id^="wbList_"]{flex:1 1 auto;height:auto;max-height:none;min-height:0;}
+  }
 
   .calwrap{background:linear-gradient(150deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
     backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
@@ -128,6 +145,53 @@
   .b-wait{background:rgba(255,255,255,.07);color:var(--muted);}
   .b-late{background:rgba(236,106,106,.16);color:#f0a0a0;}
   .empty{text-align:center;color:var(--dim);padding:20px;font-size:12.5px;}
+  .glass h3 .go.wbadd{color:var(--g1);}
+  .wbrow .wbdel{color:var(--dim);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;flex:0 0 auto;transition:.15s;}
+  .wbrow .wbdel:hover{color:#ff6b6b;background:rgba(255,107,107,.12);}
+  .wbrow{cursor:grab;}
+  .wbrow:active{cursor:grabbing;}
+  .cell.dragover{outline:2px dashed var(--g2);outline-offset:-2px;background:rgba(116,194,68,.12);}
+  .cev.wbplaced{cursor:pointer;margin-top:2px;}
+  .cev.wbplaced:hover{filter:brightness(1.15);text-decoration:line-through;}
+  /* 정기 소독 지역 브라우저 */
+  .wbsearchwrap{position:sticky;top:0;background:rgba(20,22,25,.96);padding:2px 0 6px;z-index:2;}
+  .wbsearch{width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid var(--stroke2);border-radius:8px;padding:6px 10px;color:var(--txt);font-family:inherit;font-size:12px;}
+  .wbsearch:focus{outline:none;border-color:var(--g2);}
+  /* 지역명 목록(이름만) → 클릭 시 아래 현장 표시 */
+  .wbregrow{display:flex;flex-wrap:wrap;gap:5px;padding:2px 0 8px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:8px;}
+  .wbregtab{cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.05);border:1px solid var(--stroke2);color:#dfe6ea;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:8px;transition:.12s;}
+  .wbregtab b{font-weight:600;font-size:9.5px;color:var(--dim);}
+  .wbregtab:hover{border-color:var(--g2);color:#fff;}
+  .wbregtab.on{background:rgba(116,194,68,.18);border-color:var(--g2);color:#fff;}
+  .wbregtab.on b{color:#bfe89a;}
+  .wbhint{color:var(--dim);font-size:11.5px;padding:8px 4px;}
+  .wbchips{display:flex;flex-wrap:wrap;gap:5px;padding:2px 4px 9px;}
+  .wbchip{cursor:grab;background:rgba(108,195,223,.14);border:1px solid rgba(108,195,223,.3);color:#bfe6f4;font-size:11px;padding:3px 9px;border-radius:12px;white-space:nowrap;transition:.12s;}
+  .wbchip:hover{background:rgba(108,195,223,.28);border-color:var(--g2);}
+  .wbchip:active{cursor:grabbing;}
+  .wbchip.c-gong{background:rgba(237,150,70,.15);border-color:rgba(237,150,70,.35);color:#f3c089;}
+  .wbchip.c-out{background:rgba(233,110,110,.15);border-color:rgba(233,110,110,.35);color:#f0b0b0;}
+  .wbchip.c-as{background:rgba(150,170,185,.15);border-color:rgba(150,170,185,.35);color:#d2dae2;}
+  .wbchip.c-dan{background:rgba(184,142,224,.16);border-color:rgba(184,142,224,.38);color:#dcc6f2;}
+  .cell .cellgrid{display:flex;flex-direction:column;gap:2px;margin-top:3px;}
+  .cell .crow1{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+  .cell .zone{min-height:16px;border-radius:5px;padding:1px 2px;display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start;}
+  .cell .zone.zoneover{background:rgba(116,194,68,.20);outline:1px dashed var(--g2);outline-offset:-1px;}
+  .cellchip{max-width:100%;font-size:9px;line-height:1.35;padding:1px 6px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+  .cellchip.c-gong{background:rgba(237,150,70,.24);color:#f6cb96;}
+  .cellchip.c-out{background:rgba(233,110,110,.24);color:#f4bcbc;}
+  .cellchip.c-as{background:rgba(150,170,185,.24);color:#dbe2e8;}
+  .teambadge{font-size:9px;line-height:1.35;padding:1px 7px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;background:rgba(108,195,223,.24);color:#b9e6f6;}
+  .teambadge.t2{background:rgba(116,194,68,.22);color:#c7ecab;}
+  .teambadge.t3{background:rgba(237,190,70,.22);color:#f2dc9a;}
+  .teambadge.t4{background:rgba(200,140,220,.22);color:#e6c6f0;}
+  .teambadge b{font-weight:700;font-size:8px;opacity:.75;}
+  .teambadge:hover,.cellchip:hover{filter:brightness(1.15);}
+  .wbtip{position:absolute;z-index:9999;display:none;background:#0d0f11;border:1px solid var(--stroke2);border-radius:8px;padding:7px 10px;font-size:11.5px;color:#e6ebee;box-shadow:0 8px 24px rgba(0,0,0,.55);max-width:250px;white-space:pre-line;line-height:1.5;}
+  .wbtip .wbtiphd{font-weight:800;margin-bottom:4px;color:#fff;}
+  .wbtip .wbtiprow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:2px 0;white-space:normal;}
+  .wbtip .wbtiprow i{color:var(--dim);font-style:normal;font-size:10.5px;}
+  .wbtip .wbtiprow b{cursor:pointer;color:#ff8a8a;font-weight:700;padding-left:6px;}
 
   .stagebar{display:flex;gap:2px;margin-top:4px;}
   .stagebar .s{flex:1;height:6px;border-radius:2px;background:rgba(255,255,255,.07);}
@@ -360,7 +424,7 @@
     <div class="deck">
       <div class="col">
         <div class="glass"><h3><span class="hgrp"><span class="wtab" title="일일업무일지 열기" onclick="openWorkLog('day')">일일업무 ↗</span><span class="wtab" title="주간업무일지 열기" onclick="openWeeklyReport()">주간업무 ↗</span></span></h3><div id="pWeekly"></div></div>
-        <div class="glass"><h3>견적서 정보 <span class="hgrp"><span class="cnt" id="cEst"></span><span class="go" onclick="goTab('estimates')">보기 →</span></span></h3><div class="scroll" id="pEst"></div></div>
+        <div class="glass"><h3>금주 휴가자 <span class="hgrp"><span class="cnt" id="cLeave"></span><span class="go" onclick="goTab('leave')">보기 →</span></span></h3><div class="scroll" id="pLeave"></div></div>
         <div class="glass"><h3>발주서 정보 <span class="hgrp"><span class="cnt" id="cPo"></span><span class="go" onclick="goTab('orders')">보기 →</span></span></h3><div class="scroll" id="pPo"></div></div>
       </div>
       <div class="col">
@@ -381,14 +445,15 @@
           </div>
         </div>
         <div class="schpair">
-          <div class="glass"><h3>소독 일정 <span class="hgrp"><span class="cnt" id="cSo"></span><span class="go" onclick="goTab('care')">보기 →</span></span></h3><div class="scroll" id="pSoSch"></div></div>
-          <div class="glass"><h3>공사 일정 <span class="hgrp"><span class="cnt" id="cGong"></span><span class="go" onclick="goTab('construction')">보기 →</span></span></h3><div class="scroll" id="pGongSch"></div></div>
+          <div class="glass"><h3>소독현장 (정기) <span class="hgrp"><span class="cnt" id="wbCnt_sojung"></span></span></h3><div class="scroll" id="wbList_sojung"></div></div>
+          <div class="glass"><h3>소독 다회현장 <span class="hgrp"><span class="cnt" id="wbCnt_sodahoe"></span><span class="go wbadd" onclick="WB.openAdd('sodahoe')">+ 추가</span></span></h3><div class="scroll" id="wbList_sodahoe"></div></div>
         </div>
       </div>
       <div class="col">
-        <div class="glass"><h3>자재 관리 <span class="hgrp"><span class="cnt" id="cMat">입고·가공·출고</span><span class="go" onclick="goTab('orders')">보기 →</span></span></h3><div class="scroll" id="pMat"></div></div>
-        <div class="glass"><h3>지역별 현황 <span class="cnt" id="cRegion"></span></h3><div class="scroll" id="pRegion"></div></div>
-        <div class="glass"><h3>청구 내역 <span class="hgrp"><span class="cnt" id="cBill"></span><span class="go" onclick="goTab('construction')">보기 →</span></span></h3><div class="scroll" id="pBill"></div></div>
+        <div class="glass"><h3>공사요청 현장 <span class="hgrp"><span class="cnt" id="wbCnt_csreq"></span><span class="go wbadd" onclick="WB.openAdd('csreq')">+ 추가</span></span></h3><div class="scroll" id="wbList_csreq"></div></div>
+        <div class="glass"><h3>외주 공사 <span class="hgrp"><span class="cnt" id="wbCnt_outsrc"></span><span class="go wbadd" onclick="WB.openAdd('outsrc')">+ 추가</span></span></h3><div class="scroll" id="wbList_outsrc"></div></div>
+        <div class="glass"><h3>AS 현장 <span class="hgrp"><span class="cnt" id="wbCnt_as"></span><span class="go wbadd" onclick="WB.openAdd('as')">+ 추가</span></span></h3><div class="scroll" id="wbList_as"></div></div>
+        <div class="glass"><h3>소독현장 (단타) <span class="hgrp"><span class="cnt" id="wbCnt_sodan"></span><span class="go wbadd" onclick="WB.openAdd('sodan')">+ 추가</span></span></h3><div class="scroll" id="wbList_sodan"></div></div>
       </div>
     </div>
   </section>
@@ -3020,6 +3085,20 @@ window.addEventListener('DOMContentLoaded', App.init);
   </div>
 </div></div>
 
+<!-- 현황판 수기 현장 입력 모달 -->
+<div class="modal" id="wbModal"><div class="modal-box" style="max-width:460px;">
+  <h3 id="wbModalTitle">현장 추가</h3>
+  <div class="form-grid" style="grid-template-columns:1fr;">
+    <div class="field"><label>현장명 *</label><input type="text" id="wb_name" placeholder="예) 온산초등학교" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('wb_note').focus();}"></div>
+    <div class="field"><label>비고 (진행 월·횟수·메모 등)</label><input type="text" id="wb_note" placeholder="예) 8월 요청 / 正 x3 / 외주 등" onkeydown="if(event.key==='Enter'){event.preventDefault();WB.save();}"></div>
+  </div>
+  <div class="modal-actions">
+    <button class="btn gray sm" id="wbDelBtn" onclick="WB.delCurrent()" style="display:none;margin-right:auto;">삭제</button>
+    <button class="btn sec" onclick="closeModal('wbModal')">취소</button>
+    <button class="btn" onclick="WB.save()">저장</button>
+  </div>
+</div></div>
+
 <!-- 수기 자재 모달 -->
 <div class="modal" id="matModal"><div class="modal-box">
   <h3 id="matModalTitle">수기 자재 추가</h3><input type="hidden" id="m_key">
@@ -3286,7 +3365,7 @@ const CATS=['점검','소독','공사','견적','계약','사무','대표'];
 const CATCOLOR={'점검':'#2e7d32','소독':'#0277bd','공사':'#ef6c00','견적':'#00acc1','계약':'#8d6e63','사무':'#6a1b9a','대표':'#c2185b'};
 
 /* 담당자 표시 순서(직급순) — 일일업무일지 명단과 동일 */
-const ORDER=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','김지훈 주임','원채아 대리'];
+const ORDER=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','원채아 대리','김지훈 주임'];
 function nameKey(w){ return String(w==null?'':w).trim().split(/\s+/)[0]; }
 /* 같은 사람인데 '김재성'·'김재성 이사'·오타 등으로 나뉘는 것을 하나로 → 공식 '이름 직책'으로 정규화 */
 const WRITER_CANON=(function(){ const m={}; ORDER.forEach(function(full){ m[nameKey(full)]=full; }); return m; })();
@@ -3746,6 +3825,15 @@ mergeManualEst();
 function postShared(key,value){try{fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'setshared',key:key,value:value,editor:(typeof conWho==='function'?conWho():'')||''})}).catch(()=>{});}catch(e){}}
 function applyShared(res){
   const map=(res&&res.map)||{};
+  // 연차 휴가 데이터(금주 휴가자 카드용) — 연차 탭과 같은 공유 키에서 읽기만 함
+  (function(){
+    const lvE=[],lvR=[];
+    Object.keys(map).forEach(k=>{
+      if(k.indexOf('leave_emp:')===0){try{const e=JSON.parse(map[k]);if(e&&e.id)lvE.push(e);}catch(_){}}
+      else if(k.indexOf('leave_rec:')===0){try{const r=JSON.parse(map[k]);if(r&&r.id)lvR.push(r);}catch(_){}}
+    });
+    if(Object.keys(map).length){gData.leaveEmps=lvE;gData.leaveRecs=lvR;}
+  })();
   // 완료보고 체크(세금계산서·입금 등)
   const rs={};let hasR=false;
   Object.keys(map).forEach(k=>{if(k.indexOf('report:')===0){hasR=true;try{rs[k.slice(7)]=JSON.parse(map[k]);}catch(e){}}});
@@ -3944,10 +4032,12 @@ function renderCalendar(){
     const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(dn).padStart(2,'0')}`;
     const dow=new Date(y,m,dn).getDay();
     const evs=sites.filter(s=>s.planDate===ds);
-    const evhtml=evs.slice(0,3).map(s=>{const c=s.type==='공사'?'gong':s.type==='소독'?'so':'jeom';return `<div class="cev ${c}" title="${esc(s.name)}">${esc(s.name)}</div>`;}).join('')+(evs.length>3?`<div class="cev" style="color:var(--dim)">+${evs.length-3}건</div>`:'');
-    html+=`<div class="cell ${ds===ts?'today':''} ${dow===0?'sun':dow===6?'sat':''}"><div class="dnum">${dn}</div>${evhtml}</div>`;
+    const evhtml=evs.slice(0,2).map(s=>{const c=s.type==='공사'?'gong':s.type==='소독'?'so':'jeom';return `<div class="cev ${c}" title="${esc(s.name)}">${esc(s.name)}</div>`;}).join('')+(evs.length>2?`<div class="cev" style="color:var(--dim)">+${evs.length-2}건</div>`:'');
+    const cellHtml=(typeof WB!=='undefined')?WB.renderCell(ds):'';
+    html+=`<div class="cell celldrop ${ds===ts?'today':''} ${dow===0?'sun':dow===6?'sat':''}" data-date="${ds}"><div class="dnum">${dn}</div>${evhtml}${cellHtml}</div>`;
   }
   document.getElementById('calGrid').innerHTML=html;
+  if(typeof WB!=='undefined')WB.ensureCalDnD();
 }
 
 /* ===== 점검·소독 달력 (완료=일지 기록 / 예정=등록 현장) ===== */
@@ -4084,7 +4174,29 @@ function renderWeekly(){
       return `<div class="row"><div><span class="nm">${txt}</span><div class="meta">${sub}</div></div>${typeBadge2(l.type)}</div>`;
     }).join(''):'<div class="empty">'+(day?'오늘 작성된 일지 없음':'이번 주 일지 없음')+'</div>'}`;
 }
+/* 금주 휴가자: 공유데이터의 연차 기록 중 이번 주(월~일) 표시 */
+function renderLeaveWeek(){
+  const el=document.getElementById('pLeave');if(!el)return;
+  const cEl=document.getElementById('cLeave');
+  const emps=gData.leaveEmps||[],recs=gData.leaveRecs||[];
+  const nm={};emps.forEach(e=>{if(e&&e.id)nm[e.id]=e.name||'';});
+  const pad2=n=>String(n).padStart(2,'0');
+  const ymd=d=>d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+  const t=new Date();const ts=ymd(t);
+  const mon=new Date(t);mon.setDate(t.getDate()-((t.getDay()+6)%7));
+  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  const w0=ymd(mon),w1=ymd(sun);
+  const DOW=['일','월','화','수','목','금','토'];
+  const kindOf=r=>{const d=Number(r.days);return d===0.25?'반반차':(d>0&&d<1)?'반차':(d>1?'연차 '+d+'일':'연차');};
+  const list=recs.filter(r=>r&&r.date>=w0&&r.date<=w1).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  if(cEl)cEl.textContent=list.length?list.length+'건':'';
+  el.innerHTML=list.length?list.map(r=>{
+    const d=new Date(r.date+'T00:00:00');const today=r.date===ts;
+    return `<div class="row"><div><span class="nm">${esc(nm[r.empId]||'?')}${today?' <span style="color:var(--g1);font-weight:700">오늘</span>':''}</span><div class="meta">${r.date.slice(5).replace('-','/')}(${DOW[d.getDay()]}) · ${kindOf(r)} · ${esc(r.status||'')}</div></div></div>`;
+  }).join(''):(gData.connected?'<div class="empty">이번 주 휴가자가 없습니다.</div>':'<div class="empty">구글 연동 후 표시됩니다.</div>');
+}
 function renderEst(){
+  if(!document.getElementById('pEst'))return;
   if(gData.connected){
     if(gData.est&&gData.est.length){   // '견적' 탭(추출기로 올린 실제 견적, 금액 포함)
       const list=gData.est.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -4154,7 +4266,133 @@ function renderTypeSch(type,cntId,listId){
   const show=up.length?up:list.slice(-4);
   document.getElementById(listId).innerHTML=show.length?show.map(s=>{const dd=daysBetween(ts,s.planDate);const past=dd<0;const tag=past?(s.stages[7]<2?'b-late':'b-done'):dd===0?'b-doing':'b-wait';const txt=past?(s.stages[7]<2?(-dd)+'일 지남':'완료'):dd===0?'오늘':'D-'+dd;return `<div class="row" style="cursor:pointer" onclick="openSiteModal('${s.id}')"><div><span class="nm">${esc(s.name)}</span><div class="meta">${s.planDate} · ${esc(s.region||'')} · ${esc(s.manager||'')}</div></div><span class="badge ${tag}">${txt}</span></div>`;}).join(''):'<div class="empty">예정 일정 없음</div>';
 }
-function renderOverview(){renderCalendar();renderWeekly();renderEst();renderPo();renderMat();renderRegion();renderBill();renderTypeSch('소독','cSo','pSoSch');renderTypeSch('공사','cGong','pGongSch');}
+/* ===== 현황판(화이트보드) 수기 현장 목록 6종 ===== */
+/* 저장은 우선 이 브라우저(localStorage)에만. 추후 구글시트 공유데이터 연동 예정. */
+const WB_DIS_SITES=[{n:"이천 율면초",r:"경기"},{n:"공주 경천초",r:"공주"},{n:"공주 계룡초",r:"공주"},{n:"공주 교동초",r:"공주"},{n:"공주 교육대부설초",r:"공주"},{n:"공주 구산초",r:"공주"},{n:"공주 귀산초",r:"공주"},{n:"공주 금학초",r:"공주"},{n:"공주 덕암초",r:"공주"},{n:"공주 마곡초",r:"공주"},{n:"공주 반포초",r:"공주"},{n:"공주 봉황초",r:"공주"},{n:"공주 사범대학 부설유치원",r:"공주"},{n:"공주 상서초",r:"공주"},{n:"공주 석송초",r:"공주"},{n:"공주 수촌초",r:"공주"},{n:"공주 신관유치원",r:"공주"},{n:"공주 신관초",r:"공주"},{n:"공주 신월초",r:"공주"},{n:"공주 신풍초",r:"공주"},{n:"공주 우성초",r:"공주"},{n:"공주 유구초",r:"공주"},{n:"공주 의당초",r:"공주"},{n:"공주 이인초",r:"공주"},{n:"공주 정명학교",r:"공주"},{n:"공주 정안초",r:"공주"},{n:"공주 중동초",r:"공주"},{n:"공주 탄천초",r:"공주"},{n:"공주 학봉초",r:"공주"},{n:"공주 호계초",r:"공주"},{n:"공주 효포초",r:"공주"},{n:"금산 군북초",r:"금산"},{n:"금산 금성초",r:"금산"},{n:"금산 남일초",r:"금산"},{n:"금산 상곡초",r:"금산"},{n:"금산 신대초",r:"금산"},{n:"금산 용문초",r:"금산"},{n:"금산 제원초",r:"금산"},{n:"금산 진산초",r:"금산"},{n:"금산 추부초",r:"금산"},{n:"금산동초",r:"금산"},{n:"금산유치원",r:"금산"},{n:"금산중앙초",r:"금산"},{n:"금산초",r:"금산"},{n:"논산 가야곡초",r:"논산"},{n:"논산 감곡초",r:"논산"},{n:"논산 강경중앙초",r:"논산"},{n:"논산 강경황산초",r:"논산"},{n:"논산 광석초",r:"논산"},{n:"논산 구자곡초",r:"논산"},{n:"논산 금암초",r:"논산"},{n:"논산 내동초",r:"논산"},{n:"논산 놀뫼유치원",r:"논산"},{n:"논산 대실초",r:"논산"},{n:"논산 도산초",r:"논산"},{n:"논산 동성초",r:"논산"},{n:"논산 두마초",r:"논산"},{n:"논산 반곡초",r:"논산"},{n:"논산 반월초",r:"논산"},{n:"논산 백석초",r:"논산"},{n:"논산 벌곡초",r:"논산"},{n:"논산 부적초",r:"논산"},{n:"논산 상월초",r:"논산"},{n:"논산 성덕초",r:"논산"},{n:"논산 성동초",r:"논산"},{n:"논산 신도초",r:"논산"},{n:"논산 양촌초",r:"논산"},{n:"논산 엄사초",r:"논산"},{n:"논산 연무중앙초",r:"논산"},{n:"논산 연무초",r:"논산"},{n:"논산 연산초",r:"논산"},{n:"논산 왕전초",r:"논산"},{n:"논산 용남초",r:"논산"},{n:"논산 원봉초",r:"논산"},{n:"논산 은진초",r:"논산"},{n:"논산 이화초",r:"논산"},{n:"논산 채운",r:"논산"},{n:"논산 청동초",r:"논산"},{n:"논산중앙초",r:"논산"},{n:"당진 고산초",r:"당진"},{n:"당진 기지초",r:"당진"},{n:"당진 서정초",r:"당진"},{n:"당진 성당초",r:"당진"},{n:"당진 신평초",r:"당진"},{n:"당진 원당초",r:"당진"},{n:"당진 전대초",r:"당진"},{n:"당진 초락초",r:"당진"},{n:"당진 탑동초",r:"당진"},{n:"보령 개화초",r:"보령"},{n:"보령 관창초",r:"보령"},{n:"보령 남포초",r:"보령"},{n:"보령 대관초",r:"보령"},{n:"보령 대창초",r:"보령"},{n:"보령 대천동대초",r:"보령"},{n:"보령 대천초",r:"보령"},{n:"보령 명천유치원",r:"보령"},{n:"보령 명천초",r:"보령"},{n:"보령 성주초",r:"보령"},{n:"보령 송학초",r:"보령"},{n:"보령 옥계초",r:"보령"},{n:"보령 웅천초",r:"보령"},{n:"보령 월전초",r:"보령"},{n:"보령 주포초",r:"보령"},{n:"보령 창미유치원",r:"보령"},{n:"보령 천북초 3-1",r:"보령"},{n:"보령 청보초",r:"보령"},{n:"부여 구룡초",r:"부여"},{n:"부여 궁남초",r:"부여"},{n:"부여 규암초",r:"부여"},{n:"부여 내산초",r:"부여"},{n:"부여 대왕초 3-1",r:"부여"},{n:"부여 백강초",r:"부여"},{n:"부여 백제초",r:"부여"},{n:"부여 석양초",r:"부여"},{n:"부여 선교유치원",r:"부여"},{n:"부여 세도초",r:"부여"},{n:"부여 송간초",r:"부여"},{n:"부여 양화초",r:"부여"},{n:"부여 옥산초",r:"부여"},{n:"부여 외산초",r:"부여"},{n:"부여 은산초",r:"부여"},{n:"부여 임천초",r:"부여"},{n:"부여 장암초",r:"부여"},{n:"부여 초촌초",r:"부여"},{n:"부여 합송초",r:"부여"},{n:"부여 홍산초",r:"부여"},{n:"부여유치원",r:"부여"},{n:"부여초",r:"부여"},{n:"서산 가사초",r:"서산"},{n:"서산 강당초",r:"서산"},{n:"서산 고북초",r:"서산"},{n:"서산 대산초",r:"서산"},{n:"서산 대진초",r:"서산"},{n:"서산 동문초",r:"서산"},{n:"서산 동암초",r:"서산"},{n:"서산 부석초",r:"서산"},{n:"서산 부성초",r:"서산"},{n:"서산 부춘초",r:"서산"},{n:"서산 서령초",r:"서산"},{n:"서산 서림유치원",r:"서산"},{n:"서산 서림초",r:"서산"},{n:"서산 성봉학교",r:"서산"},{n:"서산 성연유치원",r:"서산"},{n:"서산 성연초",r:"서산"},{n:"서산 언암초",r:"서산"},{n:"서산 예천새뜰유치원",r:"서산"},{n:"서산 오산초 3-1",r:"서산"},{n:"서산 오토밸리어린이집",r:"서산"},{n:"서산 운산초",r:"서산"},{n:"서산 운신초",r:"서산"},{n:"서산 음암초",r:"서산"},{n:"서산 인지초",r:"서산"},{n:"서산 차동초 3-1",r:"서산"},{n:"서산초",r:"서산"},{n:"서천 서면초",r:"서천"},{n:"서천 송석초",r:"서천"},{n:"서천 장항중앙초",r:"서천"},{n:"서천 화양초",r:"서천"},{n:"서천초",r:"서천"},{n:"세종 금남초",r:"세종"},{n:"세종 나루초",r:"세종"},{n:"세종 연동초",r:"세종"},{n:"세종 연서초",r:"세종"},{n:"세종 연세유치원",r:"세종"},{n:"세종 전동초",r:"세종"},{n:"세종 조치원대동초",r:"세종"},{n:"세종 조치원명동초",r:"세종"},{n:"아산 갈산초 4-1",r:"아산"},{n:"아산 거산초",r:"아산"},{n:"아산 공수초",r:"아산"},{n:"아산 과학교육원",r:"아산"},{n:"아산 관대초 3-1",r:"아산"},{n:"아산 금곡초",r:"아산"},{n:"아산 금성초",r:"아산"},{n:"아산 남성초",r:"아산"},{n:"아산 남창초",r:"아산"},{n:"아산 도고온천초",r:"아산"},{n:"아산 도고초",r:"아산"},{n:"아산 동덕초",r:"아산"},{n:"아산 둔포초",r:"아산"},{n:"아산 모산초",r:"아산"},{n:"아산 배방유치원",r:"아산"},{n:"아산 배방초",r:"아산"},{n:"아산 북수초",r:"아산"},{n:"아산 산동초",r:"아산"},{n:"아산 성심학교",r:"아산"},{n:"아산 세교유치원",r:"아산"},{n:"아산 세교초",r:"아산"},{n:"아산 송곡초",r:"아산"},{n:"아산 송남초",r:"아산"},{n:"아산 신리초",r:"아산"},{n:"아산 신창초",r:"아산"},{n:"아산 신화초",r:"아산"},{n:"아산 쌍룡초",r:"아산"},{n:"아산 연화초",r:"아산"},{n:"아산 염작초",r:"아산"},{n:"아산 염티초",r:"아산"},{n:"아산 영인초",r:"아산"},{n:"아산 오목초",r:"아산"},{n:"아산 온양동신유치원",r:"아산"},{n:"아산 온양동신초",r:"아산"},{n:"아산 온양신정초",r:"아산"},{n:"아산 온양온천초",r:"아산"},{n:"아산 온양중앙초",r:"아산"},{n:"아산 온양초",r:"아산"},{n:"아산 온양초사초",r:"아산"},{n:"아산 용연초 3-1",r:"아산"},{n:"아산 용화초",r:"아산"},{n:"아산 월랑초",r:"아산"},{n:"아산 월천유치원",r:"아산"},{n:"아산 월천초",r:"아산"},{n:"아산 음봉초",r:"아산"},{n:"아산 이순신초",r:"아산"},{n:"아산 천우물초",r:"아산"},{n:"아산 충무초",r:"아산"},{n:"아산 탕정미래초",r:"아산"},{n:"아산 한들물빛유치원",r:"아산"},{n:"아산 한들물빛초",r:"아산"},{n:"아산 흰돌유치원",r:"아산"},{n:"아산초",r:"아산"},{n:"안성 개산초",r:"안성"},{n:"안성 개정초",r:"안성"},{n:"안성 고삼초",r:"안성"},{n:"안성 공도초",r:"안성"},{n:"안성 광덕초",r:"안성"},{n:"안성 내혜홀초",r:"안성"},{n:"안성 대덕초",r:"안성"},{n:"안성 문기초",r:"안성"},{n:"안성 미곡초",r:"안성"},{n:"안성 보개초",r:"안성"},{n:"안성 봄누리유치원",r:"안성"},{n:"안성 산평초",r:"안성"},{n:"안성 삼죽초",r:"안성"},{n:"안성 양성초",r:"안성"},{n:"안성 용머리초",r:"안성"},{n:"안성 원곡초",r:"안성"},{n:"안성 일죽초",r:"안성"},{n:"안성 죽산초",r:"안성"},{n:"안성 현매초",r:"안성"},{n:"예산 구만초",r:"예산"},{n:"예산 금오초",r:"예산"},{n:"예산 꿈빛학교",r:"예산"},{n:"예산 대술초",r:"예산"},{n:"예산 대흥초",r:"예산"},{n:"예산 보성초",r:"예산"},{n:"예산 봉산초",r:"예산"},{n:"예산 삽교초",r:"예산"},{n:"예산 수덕초",r:"예산"},{n:"예산 시량초",r:"예산"},{n:"예산 신례원초",r:"예산"},{n:"예산 신암초",r:"예산"},{n:"예산 신양초",r:"예산"},{n:"예산 양신초",r:"예산"},{n:"예산 예덕초",r:"예산"},{n:"예산 예목유치원",r:"예산"},{n:"예산 오가초",r:"예산"},{n:"예산 용동초",r:"예산"},{n:"예산 웅산초",r:"예산"},{n:"예산 응봉초",r:"예산"},{n:"예산 조림초",r:"예산"},{n:"예산 평촌초",r:"예산"},{n:"예산유치원",r:"예산"},{n:"예산중앙초",r:"예산"},{n:"예산초",r:"예산"},{n:"천안 가람초",r:"천안"},{n:"천안 가온초",r:"천안"},{n:"천안 광덕초",r:"천안"},{n:"천안 구성초",r:"천안"},{n:"천안 꽃마루유치원",r:"천안"},{n:"천안 남산초",r:"천안"},{n:"천안 남서울대부설 어린이집",r:"천안"},{n:"천안 늘봄거점센터",r:"천안"},{n:"천안 능수초",r:"천안"},{n:"천안 대홍초",r:"천안"},{n:"천안 도솔유치원",r:"천안"},{n:"천안 도장초",r:"천안"},{n:"천안 두정초",r:"천안"},{n:"천안 목천초",r:"천안"},{n:"천안 미라초",r:"천안"},{n:"천안 미죽초",r:"천안"},{n:"천안 백석초",r:"천안"},{n:"천안 버들유치원",r:"천안"},{n:"천안 병천초",r:"천안"},{n:"천안 보산원초",r:"천안"},{n:"천안 봉명초",r:"천안"},{n:"천안 봉서초",r:"천안"},{n:"천안 부성초",r:"천안"},{n:"천안 부영초",r:"천안"},{n:"천안 불당유치원",r:"천안"},{n:"천안 불당초",r:"천안"},{n:"천안 불무초",r:"천안"},{n:"천안 삼거리초",r:"천안"},{n:"천안 삼은초",r:"천안"},{n:"천안 새샘초",r:"천안"},{n:"천안 서당초",r:"천안"},{n:"천안 서초",r:"천안"},{n:"천안 성거초",r:"천안"},{n:"천안 성남초",r:"천안"},{n:"천안 성성유치원",r:"천안"},{n:"천안 성정유치원",r:"천안"},{n:"천안 성정초",r:"천안"},{n:"천안 성정현대아파트",r:"천안"},{n:"천안 성환초",r:"천안"},{n:"천안 소망초",r:"천안"},{n:"천안 수곡초",r:"천안"},{n:"천안 수신초",r:"천안"},{n:"천안 신가초",r:"천안"},{n:"천안 신계초",r:"천안"},{n:"천안 신대초",r:"천안"},{n:"천안 신방초",r:"천안"},{n:"천안 신부초",r:"천안"},{n:"천안 신사초",r:"천안"},{n:"천안 신안초",r:"천안"},{n:"천안 신용초",r:"천안"},{n:"천안 신촌초",r:"천안"},{n:"천안 신흥초",r:"천안"},{n:"천안 쌍용초",r:"천안"},{n:"천안 쌍정초",r:"천안"},{n:"천안 아름초",r:"천안"},{n:"천안 안서초",r:"천안"},{n:"천안 양대초",r:"천안"},{n:"천안 업성초",r:"천안"},{n:"천안 오성초",r:"천안"},{n:"천안 와촌초",r:"천안"},{n:"천안 용소초 4-1",r:"천안"},{n:"천안 용암초",r:"천안"},{n:"천안 용정초",r:"천안"},{n:"천안 월봉초",r:"천안"},{n:"천안 위례초",r:"천안"},{n:"천안 은석초",r:"천안"},{n:"천안 인애학교",r:"천안"},{n:"천안 일봉유치원",r:"천안"},{n:"천안 입장초",r:"천안"},{n:"천안 직산초",r:"천안"},{n:"천안 차암초",r:"천안"},{n:"천안 천동초",r:"천안"},{n:"천안 청룡초",r:"천안"},{n:"천안 풍세초",r:"천안"},{n:"천안 한들초",r:"천안"},{n:"천안 행정초",r:"천안"},{n:"천안 호수초 4-1",r:"천안"},{n:"천안 환서초",r:"천안"},{n:"천안 희망초",r:"천안"},{n:"청양 가남초",r:"청양"},{n:"청양 남양초",r:"청양"},{n:"청양 목면초",r:"청양"},{n:"청양 수정초",r:"청양"},{n:"청양 운곡초",r:"청양"},{n:"청양 장평초",r:"청양"},{n:"청양 정산초",r:"청양"},{n:"청양 청남초",r:"청양"},{n:"청양 청송초",r:"청양"},{n:"청양 합천초",r:"청양"},{n:"청양유치원",r:"청양"},{n:"청양초",r:"청양"},{n:"청주 가경초",r:"청주"},{n:"청주 갈원초",r:"청주"},{n:"청주 강내초",r:"청주"},{n:"청주 경산초",r:"청주"},{n:"청주 교동초",r:"청주"},{n:"청주 교육대부설초",r:"청주"},{n:"청주 남이초",r:"청주"},{n:"청주 낭성초",r:"청주"},{n:"청주 내곡초",r:"청주"},{n:"청주 단재초",r:"청주"},{n:"청주 동주초",r:"청주"},{n:"청주 모충초",r:"청주"},{n:"청주 북이초",r:"청주"},{n:"청주 비상초",r:"청주"},{n:"청주 사천초",r:"청주"},{n:"청주 산성초",r:"청주"},{n:"청주 생명초중학교",r:"청주"},{n:"청주 서원초",r:"청주"},{n:"청주 석교초",r:"청주"},{n:"청주 양청초",r:"청주"},{n:"청주 오창초",r:"청주"},{n:"청주 옥산유치원",r:"청주"},{n:"청주 옥포초",r:"청주"},{n:"청주 용성초",r:"청주"},{n:"청주 운동초",r:"청주"},{n:"청주 운천초",r:"청주"},{n:"청주 원봉초",r:"청주"},{n:"청주 율량초",r:"청주"},{n:"청주 주성초",r:"청주"},{n:"청주 주중초",r:"청주"},{n:"청주 증안초",r:"청주"},{n:"청주 창리초",r:"청주"},{n:"청주 창신초",r:"청주"},{n:"괴산 동인초",r:"충북"},{n:"증평 삼보초",r:"충북"},{n:"증평 죽리초",r:"충북"},{n:"진천 문상초 4-1",r:"충북"},{n:"진천 옥동초",r:"충북"},{n:"진천 한천초",r:"충북"},{n:"충주 용원초",r:"충북"},{n:"태안 고남초",r:"태안"},{n:"태안 남면초",r:"태안"},{n:"태안 대기초",r:"태안"},{n:"태안 방포초",r:"태안"},{n:"태안 삼성초",r:"태안"},{n:"태안 소원초",r:"태안"},{n:"태안 송암초",r:"태안"},{n:"태안 시목초",r:"태안"},{n:"태안 안면초",r:"태안"},{n:"태안 안중초",r:"태안"},{n:"태안 원북초",r:"태안"},{n:"태안 이원초 3-1",r:"태안"},{n:"태안 창기초",r:"태안"},{n:"태안 화동초",r:"태안"},{n:"태안유치원",r:"태안"},{n:"태안초",r:"태안"},{n:"평택 가사초",r:"평택"},{n:"평택 고덕함박초",r:"평택"},{n:"평택 군문초",r:"평택"},{n:"평택 민세초",r:"평택"},{n:"평택 새빛초",r:"평택"},{n:"평택 서정리초",r:"평택"},{n:"평택 안중초 4-1",r:"평택"},{n:"평택 연화초",r:"평택"},{n:"평택 용죽초",r:"평택"},{n:"평택 이화초",r:"평택"},{n:"평택 자람직장어린이집",r:"평택"},{n:"평택 죽백초",r:"평택"},{n:"평택 지산초",r:"평택"},{n:"평택 지장초",r:"평택"},{n:"평택 청북초",r:"평택"},{n:"평택 해창초 4-1",r:"평택"},{n:"평택 현촌초",r:"평택"},{n:"평택 현화초",r:"평택"},{n:"평택 홍원초",r:"평택"},{n:"평택중앙초",r:"평택"},{n:"홍성 가람유치원",r:"홍성"},{n:"홍성 갈산초",r:"홍성"},{n:"홍성 결성초",r:"홍성"},{n:"홍성 광천초",r:"홍성"},{n:"홍성 구항초",r:"홍성"},{n:"홍성 금당초",r:"홍성"},{n:"홍성 금마초",r:"홍성"},{n:"홍성 내포유치원",r:"홍성"},{n:"홍성 내포초",r:"홍성"},{n:"홍성 대정초",r:"홍성"},{n:"홍성 배양초",r:"홍성"},{n:"홍성 서부초",r:"홍성"},{n:"홍성 신당초",r:"홍성"},{n:"홍성 용봉초",r:"홍성"},{n:"홍성 유아교육원",r:"홍성"},{n:"홍성 은하초",r:"홍성"},{n:"홍성 장곡초",r:"홍성"},{n:"홍성 조양유치원",r:"홍성"},{n:"홍성 홍남초",r:"홍성"},{n:"홍성 홍동초",r:"홍성"},{n:"홍성 홍북초",r:"홍성"},{n:"홍성 홍주초",r:"홍성"},{n:"홍성초",r:"홍성"}];
+const WB=(function(){
+  const CFG={
+    csreq:{title:'공사요청 현장',empty:'등록된 공사요청 현장이 없습니다.'},
+    outsrc:{title:'외주 공사',empty:'등록된 외주 공사가 없습니다.'},
+    as:{title:'AS 현장',empty:'등록된 AS 현장이 없습니다.'},
+    sodan:{title:'소독현장 (단타)',empty:'등록된 단타 소독현장이 없습니다.'},
+    sojung:{title:'소독현장 (정기)',empty:'등록된 정기 소독현장이 없습니다.'},
+    sodahoe:{title:'소독 다회현장',empty:'등록된 다회 소독현장이 없습니다.'}
+  };
+  const KEY='aws_wb_lists';
+  let data={};
+  try{data=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){data={};}
+  Object.keys(CFG).forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
+  function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}}
+  let editing=null; // {list,id}
+  function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'&#10;');}
+  function catOf(src){return src==='as'?'as':(src==='sojung'||src==='sodan')?'so':'gong';}
+  function render(k){
+    if(k==='sojung'){renderSojung();return;}
+    const list=data[k]||[];
+    const cnt=document.getElementById('wbCnt_'+k);if(cnt)cnt.textContent=list.length?list.length+'곳':'';
+    const box=document.getElementById('wbList_'+k);if(!box)return;
+    if(k==='sodahoe'){
+      box.innerHTML=list.length?list.map(it=>`<div class="row wbrow"><div style="cursor:pointer;flex:1" onclick="WB.openEdit('${k}','${it.id}')"><span class="nm">${esc(it.name||'-')}</span>${it.note?`<div class="meta">${esc(it.note)}</div>`:''}</div><span class="wbdel" title="삭제" onclick="WB.del('${k}','${it.id}')">✕</span></div>`).join(''):'<div class="empty">'+CFG[k].empty+'</div>';
+      return;
+    }
+    if(!list.length){box.innerHTML='<div class="empty">'+CFG[k].empty+'</div>';return;}
+    box.innerHTML='<div class="wbchips">'+list.map(it=>'<span class="wbchip '+chipCls(k)+'" draggable="true" ondragstart="WB.onDragStart(event,\''+k+'\',\''+it.id+'\')" onclick="WB.openEdit(\''+k+'\',\''+it.id+'\')" title="'+(it.note?escAttr(it.note)+' · ':'')+'클릭:수정 · 드래그:달력">'+esc(it.name||'-')+'</span>').join('')+'</div>';
+  }
+  function renderAll(){Object.keys(CFG).forEach(render);}
+  function openAdd(k){editing={list:k,id:null};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 추가';document.getElementById('wb_name').value='';document.getElementById('wb_note').value='';document.getElementById('wbDelBtn').style.display='none';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
+  function openEdit(k,id){const it=(data[k]||[]).find(x=>x.id===id);if(!it)return;editing={list:k,id:id};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 수정';document.getElementById('wb_name').value=it.name||'';document.getElementById('wb_note').value=it.note||'';document.getElementById('wbDelBtn').style.display='';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
+  function save(){if(!editing)return;const k=editing.list;const name=document.getElementById('wb_name').value.trim();const note=document.getElementById('wb_note').value.trim();if(!name){alert('현장명을 입력하세요.');return;}
+    if(editing.id){const it=data[k].find(x=>x.id===editing.id);if(it){it.name=name;it.note=note;}}
+    else{data[k].push({id:'wb'+Date.now()+Math.floor(Math.random()*1000),name:name,note:note});}
+    persist();render(k);closeModal('wbModal');editing=null;}
+  function del(k,id){if(!confirm('이 현장을 삭제할까요?'))return;data[k]=(data[k]||[]).filter(x=>x.id!==id);persist();render(k);}
+  /* ── 달력 배치: 날짜별 {gong[], as[], so:{1..4}} 구조 ── */
+  const CALKEY='aws_wb_cal';
+  let placed={};try{placed=JSON.parse(localStorage.getItem(CALKEY)||'{}');}catch(e){placed={};}
+  function persistCal(){try{localStorage.setItem(CALKEY,JSON.stringify(placed));}catch(e){}}
+  function emptyDay(){return {gong:[],as:[],so:{1:[],2:[],3:[],4:[]}};}
+  function dayView(date){var o=placed[date];if(!o)return emptyDay();
+    if(Array.isArray(o)){var n=emptyDay();o.forEach(function(pp){var c=catOf(pp.src);if(c==='gong')n.gong.push(pp);else if(c==='as')n.as.push(pp);else n.so[1].push(pp);});return n;}
+    return {gong:o.gong||[],as:o.as||[],so:{1:(o.so&&o.so[1])||[],2:(o.so&&o.so[2])||[],3:(o.so&&o.so[3])||[],4:(o.so&&o.so[4])||[]}};}
+  function dayEdit(date){if(!placed[date]||Array.isArray(placed[date]))placed[date]=dayView(date);return placed[date];}
+  function isEmptyDay(o){return !o.gong.length&&!o.as.length&&!o.so[1].length&&!o.so[2].length&&!o.so[3].length&&!o.so[4].length;}
+  function chipCls(k){return k==='outsrc'?'c-out':k==='as'?'c-as':k==='sodan'?'c-dan':'c-gong';}
+  function onDragStart(e,list,id){var it=(data[list]||[]).find(function(x){return x.id===id;});if(!it)return;try{e.dataTransfer.setData('text/wb',JSON.stringify({list:list,name:it.name,note:it.note||''}));e.dataTransfer.setData('wbcat-'+catOf(list),'1');e.dataTransfer.setData('text/plain',it.name);e.dataTransfer.effectAllowed='copy';}catch(err){}}
+  function placeInZone(date,zone,team,pl){if(!date||!pl||!pl.name)return;var o=dayEdit(date);var item={id:'wc'+Date.now()+Math.floor(Math.random()*1000),name:pl.name,note:pl.note||'',src:pl.list};
+    if(zone==='gong'){if(o.gong.some(function(x){return x.name===item.name;}))return;o.gong.push(item);}
+    else if(zone==='as'){if(o.as.some(function(x){return x.name===item.name;}))return;o.as.push(item);}
+    else if(zone==='so'){team=team||1;var t=o.so[team]||(o.so[team]=[]);if(t.length>=4){alert('소독 한 팀은 하루 최대 4개 현장까지입니다.');return;}if(t.some(function(x){return x.name===item.name;}))return;t.push(item);}
+    persistCal();if(typeof renderCalendar==='function')renderCalendar();}
+  function removeItem(date,zone,team,id){var o=placed[date];if(!o||Array.isArray(o))o=dayEdit(date);
+    if(zone==='gong')o.gong=(o.gong||[]).filter(function(x){return x.id!==id;});
+    else if(zone==='as')o.as=(o.as||[]).filter(function(x){return x.id!==id;});
+    else if(zone==='so'&&o.so&&o.so[team])o.so[team]=o.so[team].filter(function(x){return x.id!==id;});
+    if(isEmptyDay(dayView(date)))delete placed[date];
+    persistCal();hideTip(true);if(typeof renderCalendar==='function')renderCalendar();}
+  function chipCell(it,zone,date){return '<span class="cellchip '+chipCls(it.src)+'" data-date="'+date+'" data-zone="'+zone+'" data-id="'+it.id+'"'+(it.note?' data-tip="'+escAttr(it.note)+'"':'')+'>'+escAttr(it.name)+'</span>';}
+  function teamBadge(date,team,list){var tip=list.map(function(x){return x.name+(x.note?' ('+x.note+')':'');}).join('\n');return '<span class="teambadge t'+team+'" data-date="'+date+'" data-zone="so" data-team="'+team+'" data-tip="'+escAttr(tip)+'">소독'+team+'팀<b>'+list.length+'</b></span>';}
+  function renderCell(date){var o=dayView(date);var h='<div class="cellgrid"><div class="crow crow1">';
+    h+='<div class="zone zgong" data-date="'+date+'" data-zone="gong">'+o.gong.map(function(it){return chipCell(it,'gong',date);}).join('')+'</div>';
+    h+='<div class="zone zas" data-date="'+date+'" data-zone="as">'+o.as.map(function(it){return chipCell(it,'as',date);}).join('')+'</div></div>';
+    for(var t=1;t<=4;t++){var list=o.so[t]||[];h+='<div class="zone zteam" data-date="'+date+'" data-zone="so" data-team="'+t+'">'+(list.length?teamBadge(date,t,list):'')+'</div>';}
+    return h+'</div>';}
+  /* 툴팁(1초 호버) + 클릭 팝오버 */
+  var tipTimer=null,tipPinned=false;
+  function tipEl(){var t=document.getElementById('wbTip');if(!t){t=document.createElement('div');t.id='wbTip';t.className='wbtip';t.addEventListener('click',function(e){e.stopPropagation();});document.body.appendChild(t);}return t;}
+  function placeTip(t,target){t.style.display='block';var r=target.getBoundingClientRect();t.style.top=(r.bottom+6+window.scrollY)+'px';t.style.left=(r.left+window.scrollX)+'px';var tr=t.getBoundingClientRect();if(tr.right>window.innerWidth-8)t.style.left=(Math.max(8,window.innerWidth-tr.width-8)+window.scrollX)+'px';if(tr.bottom>window.innerHeight-8)t.style.top=(r.top+window.scrollY-tr.height-6)+'px';}
+  function showTipText(target,text){var t=tipEl();t.textContent=text;tipPinned=false;placeTip(t,target);}
+  function showTipHtml(target,html){var t=tipEl();t.innerHTML=html;tipPinned=true;placeTip(t,target);}
+  function hideTip(force){if(tipPinned&&!force)return;var t=document.getElementById('wbTip');if(t)t.style.display='none';}
+  function openTeamPop(badge){var date=badge.getAttribute('data-date'),team=badge.getAttribute('data-team');var o=dayView(date);var list=o.so[team]||[];var html='<div class="wbtiphd">소독'+team+'팀 ('+list.length+')</div>'+list.map(function(x){return '<div class="wbtiprow"><span>'+escAttr(x.name)+(x.note?' <i>'+escAttr(x.note)+'</i>':'')+'</span><b onclick="WB.removeItem(\''+date+'\',\'so\','+team+',\''+x.id+'\')">✕</b></div>';}).join('');showTipHtml(badge,html);}
+  function contains(list,v){for(var i=0;i<list.length;i++)if(list[i]===v)return true;return false;}
+  var dndReady=false;
+  function ensureCalDnD(){
+    if(dndReady)return;var grid=document.getElementById('calGrid');if(!grid)return;dndReady=true;
+    grid.addEventListener('dragover',function(e){var z=e.target.closest?e.target.closest('.zone'):null;if(!z)return;var zt=z.getAttribute('data-zone');var ty=e.dataTransfer.types||[];var ok=(zt==='gong'&&contains(ty,'wbcat-gong'))||(zt==='as'&&contains(ty,'wbcat-as'))||(zt==='so'&&contains(ty,'wbcat-so'));if(ok){e.preventDefault();try{e.dataTransfer.dropEffect='copy';}catch(e2){}z.classList.add('zoneover');}});
+    grid.addEventListener('dragleave',function(e){var z=e.target.closest?e.target.closest('.zone'):null;if(z)z.classList.remove('zoneover');});
+    grid.addEventListener('drop',function(e){var z=e.target.closest?e.target.closest('.zone'):null;if(!z)return;var zt=z.getAttribute('data-zone');e.preventDefault();z.classList.remove('zoneover');var raw='';try{raw=e.dataTransfer.getData('text/wb');}catch(err){}if(!raw)return;var pl;try{pl=JSON.parse(raw);}catch(err){return;}if(catOf(pl.list)!==zt)return;placeInZone(z.getAttribute('data-date'),zt,parseInt(z.getAttribute('data-team')||'0',10),pl);});
+    grid.addEventListener('mouseover',function(e){var el=e.target.closest?e.target.closest('[data-tip]'):null;if(!el||tipPinned)return;clearTimeout(tipTimer);tipTimer=setTimeout(function(){showTipText(el,el.getAttribute('data-tip')||'');},1000);});
+    grid.addEventListener('mouseout',function(e){var el=e.target.closest?e.target.closest('[data-tip]'):null;if(!el)return;clearTimeout(tipTimer);if(!tipPinned)hideTip();});
+    grid.addEventListener('click',function(e){var badge=e.target.closest?e.target.closest('.teambadge'):null;if(badge){e.stopPropagation();openTeamPop(badge);return;}var chip=e.target.closest?e.target.closest('.cellchip'):null;if(chip){e.stopPropagation();if(confirm('이 현장을 달력에서 뺄까요?'))removeItem(chip.getAttribute('data-date'),chip.getAttribute('data-zone'),0,chip.getAttribute('data-id'));}});
+    document.addEventListener('click',function(){if(tipPinned){tipPinned=false;hideTip(true);}});
+  }
+  function delCurrent(){if(!editing||!editing.id)return;const k=editing.list,id=editing.id;if(!confirm('이 현장을 삭제할까요?'))return;data[k]=(data[k]||[]).filter(x=>x.id!==id);persist();render(k);closeModal('wbModal');editing=null;}
+  /* ── 정기 소독: 지역명 목록 → 지역 클릭 시 해당 현장만 표시 + 드래그 ── */
+  let sjRegion='';   // 선택된 지역
+  let sjFilter='';
+  const SJDATA=(typeof WB_DIS_SITES!=='undefined')?WB_DIS_SITES:[];
+  function sjGroups(){
+    const g={};SJDATA.forEach(s=>{(g[s.r]=g[s.r]||[]).push(s);});
+    return Object.keys(g).sort((a,b)=>a.localeCompare(b,'ko')).map(r=>({region:r,sites:g[r]}));
+  }
+  function sjShort(s){return (s.n&&s.r&&s.n.indexOf(s.r+' ')===0)?s.n.slice(s.r.length+1):s.n;}
+  function sjChip(s){return '<span class="wbchip" draggable="true" ondragstart="WB.onDragStartDB(event,\''+esc(s.n).replace(/'/g,"\\'")+'\')" title="드래그하여 달력에 넣기">'+esc(sjShort(s))+'</span>';}
+  function renderSojung(){
+    const box=document.getElementById('wbList_sojung');if(!box)return;
+    const cnt=document.getElementById('wbCnt_sojung');if(cnt)cnt.textContent=SJDATA.length+'곳';
+    const groups=sjGroups();
+    const f=sjFilter.trim().toLowerCase();
+    let html='<div class="wbsearchwrap"><input class="wbsearch" type="text" placeholder="현장·지역 검색" value="'+esc(sjFilter)+'" oninput="WB.filterSojung(this.value)"></div>';
+    if(f){   // 검색 중이면 지역 무시하고 매칭 현장 전부
+      const hits=SJDATA.filter(s=>s.n.toLowerCase().indexOf(f)>=0||s.r.toLowerCase().indexOf(f)>=0);
+      html+='<div class="wbchips">'+(hits.length?hits.map(sjChip).join(''):'<div class="empty">검색 결과가 없습니다.</div>')+'</div>';
+      box.innerHTML=html;const gi=box.querySelector('.wbsearch');if(gi){gi.focus();gi.setSelectionRange(gi.value.length,gi.value.length);}
+      return;
+    }
+    // 지역명 목록(이름만)
+    html+='<div class="wbregrow">'+groups.map(gp=>'<span class="wbregtab'+(gp.region===sjRegion?' on':'')+'" onclick="WB.selectRegion(\''+esc(gp.region)+'\')">'+esc(gp.region)+'<b>'+gp.sites.length+'</b></span>').join('')+'</div>';
+    const cur=groups.find(gp=>gp.region===sjRegion);
+    if(cur){html+='<div class="wbchips">'+cur.sites.map(sjChip).join('')+'</div>';}
+    else{html+='<div class="wbhint">지역을 클릭하면 해당 현장이 표시됩니다.</div>';}
+    box.innerHTML=html;
+  }
+  function selectRegion(r){sjRegion=(sjRegion===r?'':r);renderSojung();}
+  function filterSojung(v){sjFilter=v||'';renderSojung();}
+  function onDragStartDB(e,name){try{e.dataTransfer.setData('text/wb',JSON.stringify({list:'sojung',name:name,note:''}));e.dataTransfer.setData('wbcat-so','1');e.dataTransfer.setData('text/plain',name);e.dataTransfer.effectAllowed='copy';}catch(err){}}
+  return {renderAll,render,openAdd,openEdit,save,del,delCurrent,onDragStart,renderCell,removeItem,ensureCalDnD,selectRegion,filterSojung,onDragStartDB};
+})();
+
+function renderOverview(){renderCalendar();renderWeekly();renderLeaveWeek();renderPo();WB.renderAll();}
 
 /* ===== 빠른 검색: 현장·업무일지·견적·발주자재·일정을 한 번에 찾기 ===== */
 let qsLast=[];
