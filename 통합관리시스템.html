@@ -1770,6 +1770,7 @@ loadFromIlji();
   .ev{flex:0 0 auto;font-size:10.5px;border-radius:5px;padding:1px 4px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ev.use{background:var(--blue-soft);color:var(--blue);}
   .ev.plan{background:var(--orange-soft);color:var(--orange);}
+  .ev.ot{background:var(--green-soft);color:var(--green);}
   .legend{display:flex;gap:14px;font-size:12.5px;color:var(--muted);margin-top:10px;align-items:center;flex-wrap:wrap;}
   .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:50;padding:16px;}
@@ -1848,6 +1849,7 @@ loadFromIlji();
       <div class=&quot;legend&quot;>
         <span><i style=&quot;background:var(--blue)&quot;></i>사용 완료</span>
         <span><i style=&quot;background:var(--orange)&quot;></i>사용 계획</span>
+        <span><i style=&quot;background:var(--green)&quot;></i>OT(추가근무)</span>
         <span><i style=&quot;background:#d33&quot;></i>공휴일(빨간날)</span>
         <span class=&quot;muted&quot;>· 칸에 &quot;이름 + 종류(연차·반차·반반차)&quot;가 표시됩니다</span>
       </div>
@@ -1856,6 +1858,14 @@ loadFromIlji();
       <h2><span id=&quot;ovSumMonth&quot;></span> 종합 <span class=&quot;muted&quot; style=&quot;font-weight:400;font-size:12.5px&quot;>(대분류)</span></h2>
       <div class=&quot;stat-grid&quot; id=&quot;ovSummary&quot; style=&quot;grid-template-columns:repeat(2,1fr)&quot;></div>
       <div class=&quot;hint&quot; style=&quot;margin-top:14px&quot;>세부 사용 내역·직원별 발생/잔여 연차는 상단 <b>직원별 관리</b> 탭에서 확인하세요.</div>
+      <div id=&quot;ovOtBox&quot; style=&quot;margin-top:18px&quot;>
+        <h2 style=&quot;justify-content:space-between;font-size:15px&quot;><span><span id=&quot;ovOtMonth&quot;></span> OT(추가근무) 현황</span>
+          <button class=&quot;btn sm edit-only&quot; onclick=&quot;App.openOtModal(null)&quot;>+ OT 추가</button></h2>
+        <table>
+          <thead><tr><th>직원</th><th>건수</th><th>평일연장</th><th>휴일</th><th>합계</th></tr></thead>
+          <tbody id=&quot;ovOtRows&quot;></tbody>
+        </table>
+      </div>
     </div>
     </div>
   </section>
@@ -1872,7 +1882,7 @@ loadFromIlji();
           <button class=&quot;btn gray sm&quot; onclick=&quot;App.calMove('emp',1)&quot;>다음달 ▶</button>
         </div>
         <div class=&quot;cal&quot; id=&quot;empCal&quot;></div>
-        <div class=&quot;legend&quot;><span><i style=&quot;background:var(--blue)&quot;></i>사용 완료</span><span><i style=&quot;background:var(--orange)&quot;></i>사용 계획</span></div>
+        <div class=&quot;legend&quot;><span><i style=&quot;background:var(--blue)&quot;></i>사용 완료</span><span><i style=&quot;background:var(--orange)&quot;></i>사용 계획</span><span><i style=&quot;background:var(--green)&quot;></i>OT(추가근무)</span></div>
       </div>
       <!-- 오른쪽: 직원 선택 + 정보 + 휴가 내역 -->
       <div style=&quot;flex:1;min-width:340px;display:flex;flex-direction:column;gap:18px&quot;>
@@ -1941,6 +1951,28 @@ loadFromIlji();
   </div>
 </div>
 
+<!-- OT(추가근무) 기록 추가 모달 -->
+<div class=&quot;modal-bg&quot; id=&quot;otModal&quot;>
+  <div class=&quot;modal&quot;>
+    <h3>OT(추가근무) 기록 추가</h3>
+    <div class=&quot;field&quot; id=&quot;o_emp_field&quot;><label>직원 *</label><select id=&quot;o_emp&quot;></select></div>
+    <div class=&quot;field&quot;><label>날짜 *</label><input id=&quot;o_date&quot; type=&quot;date&quot;></div>
+    <div class=&quot;field&quot;><label>구분</label>
+      <select id=&quot;o_kind&quot;>
+        <option value=&quot;평일연장&quot;>평일 연장근무</option>
+        <option value=&quot;휴일&quot;>휴일 근무</option>
+      </select>
+    </div>
+    <div class=&quot;field&quot;><label>추가 시간 * <span class=&quot;muted&quot;>(시간 단위, 0.5=30분)</span></label><input id=&quot;o_hours&quot; type=&quot;number&quot; step=&quot;0.5&quot; min=&quot;0.5&quot; placeholder=&quot;예: 2.5&quot;></div>
+    <div class=&quot;field&quot;><label>현장 / 메모</label><input id=&quot;o_note&quot; placeholder=&quot;예: 천안 성남초 모래장 (선택)&quot;></div>
+    <div class=&quot;hint&quot;>월별 합계는 자동으로 계산됩니다. 기록은 마스터 로그인 시에만 추가·삭제할 수 있습니다.</div>
+    <div class=&quot;modal-actions&quot;>
+      <button class=&quot;btn gray&quot; onclick=&quot;App.closeModal('otModal')&quot;>취소</button>
+      <button class=&quot;btn&quot; onclick=&quot;App.saveOt()&quot;>저장</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const App = (function(){
   const KEY = 'awesome_leave_data_v1';
@@ -1950,8 +1982,9 @@ const App = (function(){
   // 배포(보기전용) 파일에서 주입되는 값
   const READ_ONLY = (typeof window!=='undefined' &amp;&amp; window.__READONLY__===true);
   const SEED_STATE = (typeof window!=='undefined' &amp;&amp; window.__SEEDSTATE__) ? window.__SEEDSTATE__ : null;
-  let state = { employees:[], records:[], overrides:{} };
+  let state = { employees:[], records:[], overrides:{}, ot:[] };
   let recTargetFixed = null;
+  let otTargetFixed = null;
   let curYear = new Date().getFullYear();
   let curEmpId = null;
   let calCursor = { ov:new Date(), emp:new Date() };
@@ -2007,6 +2040,7 @@ const App = (function(){
       if(!state.overrides) state.overrides={};
       if(!state.employees) state.employees=[];
       if(!state.records) state.records=[];
+      if(!state.ot) state.ot=[];
       const lpw = loadLocalPw();
       state.employees.forEach(e=>{ if(!e.pw &amp;&amp; lpw[e.id]) e.pw = lpw[e.id]; });   // 관리자 미설정 직원은 본인이 설정한 비번 적용
       return;
@@ -2015,6 +2049,7 @@ const App = (function(){
     if(!state.overrides) state.overrides = {};
     if(!state.employees) state.employees = [];
     if(!state.records) state.records = [];
+    if(!state.ot) state.ot = [];
     if(mergeSeed()) save();
   }
   // 기본 명단 병합: 이름+입사일이 같은 직원이 없으면 추가 (기존 데이터 보존). 변경 시 true
@@ -2036,6 +2071,7 @@ const App = (function(){
      공유저장소(공유데이터 시트) 키 규칙:
        leave_emp:<id>       → 직원 1명(JSON)
        leave_rec:<id>       → 휴가기록 1건(JSON)
+       leave_ot:<id>        → OT(추가근무)기록 1건(JSON)
        leave_ov:<id>_<연도> → 발생연차 수동값(숫자)
        leave_admin          → 마스터 비밀번호
      값을 빈칸으로 보내면 그 줄이 삭제됨(=항목 삭제).
@@ -2049,12 +2085,14 @@ const App = (function(){
   }
   function pushEmp(e){ if(e&amp;&amp;e.id) postLeaveKV('leave_emp:'+e.id, JSON.stringify(e)); }
   function pushRec(r){ if(r&amp;&amp;r.id) postLeaveKV('leave_rec:'+r.id, JSON.stringify(r)); }
+  function pushOt(o){ if(o&amp;&amp;o.id) postLeaveKV('leave_ot:'+o.id, JSON.stringify(o)); }
   function pushOv(id, year, val){ postLeaveKV('leave_ov:'+id+'_'+year, (val===''||val==null)?'':String(val)); }
   function pushAdmin(){ postLeaveKV('leave_admin', state.adminPw||''); }
   function delLeaveKey(key){ postLeaveKV(key, ''); }
   function pushAll(){
     (state.employees||[]).forEach(pushEmp);
     (state.records||[]).forEach(pushRec);
+    (state.ot||[]).forEach(pushOt);
     Object.keys(state.overrides||{}).forEach(k=>{ const v=state.overrides[k]; if(v!=null&amp;&amp;v!=='') postLeaveKV('leave_ov:'+k, String(v)); });
     if(state.adminPw) pushAdmin();
   }
@@ -2078,15 +2116,16 @@ const App = (function(){
     try{
       const r=await jsonpShared();
       const map=(r&amp;&amp;r.map)||{};
-      const emps=[], recs=[], ov={}; let admin=null, found=false;
+      const emps=[], recs=[], ots=[], ov={}; let admin=null, found=false;
       Object.keys(map).forEach(k=>{
         if(k.indexOf('leave_emp:')===0){ found=true; try{ const e=JSON.parse(map[k]); if(e&amp;&amp;e.id) emps.push(e); }catch(_){ } }
         else if(k.indexOf('leave_rec:')===0){ found=true; try{ const rc=JSON.parse(map[k]); if(rc&amp;&amp;rc.id) recs.push(rc); }catch(_){ } }
+        else if(k.indexOf('leave_ot:')===0){ found=true; try{ const ot=JSON.parse(map[k]); if(ot&amp;&amp;ot.id) ots.push(ot); }catch(_){ } }
         else if(k.indexOf('leave_ov:')===0){ found=true; const num=Number(map[k]); if(!isNaN(num)) ov[k.slice(9)]=num; }
         else if(k==='leave_admin'){ found=true; if(map[k]!=='') admin=map[k]; }
       });
       if(found){
-        state={ employees:emps, records:recs, overrides:ov };
+        state={ employees:emps, records:recs, overrides:ov, ot:ots };
         if(admin!=null) state.adminPw=admin;
         if(mergeSeed()) pushAll();            // SEED 누락분 보강 시 서버에도 반영
         localStorage.setItem(KEY, JSON.stringify(state));
@@ -2098,7 +2137,7 @@ const App = (function(){
       // 항목별 키가 없음 → 예전 통짜(leaveData)라도 있으면 그걸 기준으로 이관
       if(map.leaveData){
         try{ const old=JSON.parse(map.leaveData);
-          if(old&amp;&amp;old.employees){ state=old; if(!state.overrides)state.overrides={}; if(!state.records)state.records=[]; if(!state.employees)state.employees=[]; }
+          if(old&amp;&amp;old.employees){ state=old; if(!state.overrides)state.overrides={}; if(!state.records)state.records=[]; if(!state.employees)state.employees=[]; if(!state.ot)state.ot=[]; }
         }catch(_){ }
       }
       mergeSeed();
@@ -2161,7 +2200,7 @@ const App = (function(){
   function importData(ev){
     const f=ev.target.files[0]; if(!f) return;
     const rd=new FileReader();
-    rd.onload=e=>{ try{ state=JSON.parse(e.target.result); if(!state.overrides)state.overrides={}; save(); renderAll(); alert('불러오기 완료!'); }catch(err){ alert('파일을 읽을 수 없습니다.'); } };
+    rd.onload=e=>{ try{ state=JSON.parse(e.target.result); if(!state.overrides)state.overrides={}; if(!state.ot)state.ot=[]; save(); renderAll(); alert('불러오기 완료!'); }catch(err){ alert('파일을 읽을 수 없습니다.'); } };
     rd.readAsText(f);
     ev.target.value='';
   }
@@ -2210,6 +2249,11 @@ const App = (function(){
   }
   function fmt(n){ return Number.isInteger(n)? n : n.toFixed(1); }
 
+  /* ---------- OT(추가근무) 집계 ---------- */
+  function otOf(empId, year){ return (state.ot||[]).filter(o=>o.empId===empId &amp;&amp; new Date(o.date).getFullYear()===year); }
+  function otSum(arr){ return Math.round(arr.reduce((a,o)=>a+(Number(o.hours)||0),0)*100)/100; }
+  function otMonthSum(empId, y, m){ return otSum((state.ot||[]).filter(o=>{ const d=new Date(o.date); return o.empId===empId &amp;&amp; d.getFullYear()===y &amp;&amp; d.getMonth()===m; })); }
+
   /* ---------- 연도 셀렉트 ---------- */
   function yearOptions(){
     const years = new Set([curYear, curYear-1, curYear+1, new Date().getFullYear()]);
@@ -2241,6 +2285,26 @@ const App = (function(){
       <div class=&quot;stat plan&quot;><div class=&quot;lab&quot;>반차·반반차 사용</div><div class=&quot;val&quot;>${fmt(halfDays)}<span class=&quot;unit&quot;>일</span></div></div>
       <div class=&quot;stat left&quot;><div class=&quot;lab&quot;>사용 예정(계획)</div><div class=&quot;val&quot;>${planPeople}<span class=&quot;unit&quot;>명</span></div>
         <div class=&quot;muted&quot; style=&quot;font-size:11px;margin-top:6px&quot;>예정 합계 ${fmt(sum(plan))}일</div></div>`;
+    renderOvOt();
+  }
+
+  // 통합 현황: 달력에 보이는 달의 OT(추가근무) 직원별 합계 (기록 있는 직원만 표시)
+  function renderOvOt(){
+    const box=document.getElementById('ovOtBox'); if(!box) return;
+    const cur=calCursor.ov, y=cur.getFullYear(), m=cur.getMonth();
+    const lab=document.getElementById('ovOtMonth'); if(lab) lab.textContent = y+'년 '+(m+1)+'월';
+    const tb=document.getElementById('ovOtRows'); if(!tb) return;
+    let totalH=0, totalC=0, totalW=0, totalD=0;
+    const rows=(state.employees||[]).map(e=>{
+      const os=(state.ot||[]).filter(o=>{ const d=new Date(o.date); return o.empId===e.id &amp;&amp; d.getFullYear()===y &amp;&amp; d.getMonth()===m; });
+      if(os.length===0) return '';
+      const w=otSum(os.filter(o=>o.kind!=='휴일')), h=otSum(os.filter(o=>o.kind==='휴일')), s=otSum(os);
+      totalH+=s; totalC+=os.length; totalW+=w; totalD+=h;
+      return `<tr><td>${esc(e.name)}</td><td>${os.length}건</td><td>${fmt(w)}시간</td><td>${fmt(h)}시간</td><td style=&quot;font-weight:700;color:var(--green)&quot;>${fmt(s)}시간</td></tr>`;
+    }).join('');
+    if(!rows){ tb.innerHTML='<tr><td colspan=&quot;5&quot; class=&quot;empty&quot;>이 달에는 OT 기록이 없습니다.</td></tr>'; return; }
+    const r2=n=>Math.round(n*100)/100;
+    tb.innerHTML = rows + `<tr><td style=&quot;font-weight:700&quot;>합계</td><td style=&quot;font-weight:700&quot;>${totalC}건</td><td style=&quot;font-weight:700&quot;>${fmt(r2(totalW))}시간</td><td style=&quot;font-weight:700&quot;>${fmt(r2(totalD))}시간</td><td style=&quot;font-weight:700;color:var(--green)&quot;>${fmt(r2(totalH))}시간</td></tr>`;
   }
 
   /* ---------- 렌더: 통합 달력 ---------- */
@@ -2272,6 +2336,15 @@ const App = (function(){
         const del = READ_ONLY? '' : ` onclick=&quot;event.stopPropagation();App.evDelete('${r.id}')&quot;`;
         const tip = READ_ONLY? `${esc(nm)} · ${cat} · ${r.status}` : `클릭하면 삭제 · ${esc(nm)} · ${cat} · ${r.status}`;
         return `<div class=&quot;ev ${cls}&quot;${del} title=&quot;${tip}&quot;>${text}</div>`;
+      }).join('');
+      const dayOts = (state.ot||[]).filter(o=> o.date===dateStr &amp;&amp; (onlyEmpId? o.empId===onlyEmpId : true));
+      evs += dayOts.map(o=>{
+        const emp = state.employees.find(e=>e.id===o.empId);
+        const nm = emp? emp.name : '?';
+        const txt = (onlyEmpId? '' : esc(nm)+' ') + 'OT ' + fmt(Number(o.hours)||0) + 'h';
+        const del = (READ_ONLY||!isAdmin)? '' : ` onclick=&quot;event.stopPropagation();App.delOt('${o.id}')&quot;`;
+        const tip = `${esc(nm)} · OT(${esc(o.kind||'평일연장')}) ${fmt(Number(o.hours)||0)}시간${o.note?' · '+esc(o.note):''}` + ((READ_ONLY||!isAdmin)?'':' · 클릭하면 삭제');
+        return `<div class=&quot;ev ot&quot;${del} title=&quot;${tip}&quot;>${txt}</div>`;
       }).join('');
       const hol = HOLIDAYS[dateStr];
       const click = READ_ONLY? '' : ` onclick=&quot;App.calClick('${which}','${dateStr}')&quot;`;
@@ -2323,6 +2396,41 @@ const App = (function(){
       </tr>`).join('');
     if(!recRows) recRows='<tr><td colspan=&quot;6&quot; class=&quot;empty&quot;>올해 휴가 기록이 없습니다.</td></tr>';
 
+    // OT(추가근무) 섹션 — 전 직원
+    let otHtml='';
+    {
+      const ors = otOf(emp.id, curYear).sort((a,b)=>a.date<b.date?1:-1);
+      const now = new Date();
+      const yearSum = otSum(ors);
+      let chips='';
+      for(let mi=0; mi<12; mi++){
+        const s = otMonthSum(emp.id, curYear, mi);
+        if(s>0) chips += `<span style=&quot;display:inline-block;background:rgba(116,194,68,.13);border:1px solid rgba(116,194,68,.35);color:var(--green);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;margin:0 6px 6px 0&quot;>${mi+1}월 ${fmt(s)}시간</span>`;
+      }
+      if(!chips) chips = '<span class=&quot;muted&quot; style=&quot;font-size:12px&quot;>아직 기록이 없습니다.</span>';
+      const curMonthTxt = (curYear===now.getFullYear())? ' · 이번 달 <b style=&quot;color:var(--green)&quot;>'+fmt(otMonthSum(emp.id,curYear,now.getMonth()))+'시간</b>' : '';
+      let otRows = ors.map(o=>`
+        <tr>
+          <td>${o.date}</td>
+          <td><span class=&quot;pill ${o.kind==='휴일'?'plan':'use'}&quot;>${esc(o.kind||'평일연장')}</span></td>
+          <td>${fmt(Number(o.hours)||0)}시간</td>
+          <td style=&quot;text-align:left&quot;>${esc(o.note||'')}</td>
+          <td><span class=&quot;x edit-only&quot; onclick=&quot;App.delOt('${o.id}')&quot;>삭제</span></td>
+        </tr>`).join('');
+      if(!otRows) otRows='<tr><td colspan=&quot;5&quot; class=&quot;empty&quot;>올해 OT 기록이 없습니다.</td></tr>';
+      otHtml = `
+    <div class=&quot;card&quot; style=&quot;margin-top:18px;margin-bottom:0&quot;>
+      <h2 style=&quot;justify-content:space-between&quot;>${curYear}년 OT(추가근무) 내역
+        <button class=&quot;btn sm edit-only&quot; onclick=&quot;App.openOtModal('${emp.id}')&quot;>+ OT 추가</button></h2>
+      <div style=&quot;margin-bottom:6px&quot;>${chips}</div>
+      <div class=&quot;muted&quot; style=&quot;font-size:12px;margin-bottom:10px&quot;>올해 합계 <b style=&quot;color:var(--green)&quot;>${fmt(yearSum)}시간</b>${curMonthTxt}</div>
+      <table>
+        <thead><tr><th>날짜</th><th>구분</th><th>시간</th><th style=&quot;text-align:left&quot;>내용/현장</th><th></th></tr></thead>
+        <tbody>${otRows}</tbody>
+      </table>
+    </div>`;
+    }
+
     box.innerHTML = `
     <div class=&quot;card&quot;>
       <h2>
@@ -2345,7 +2453,7 @@ const App = (function(){
         <thead><tr><th>날짜</th><th>종류</th><th>일수</th><th>상태</th><th style=&quot;text-align:left&quot;>사유</th><th></th></tr></thead>
         <tbody>${recRows}</tbody>
       </table>
-    </div>`;
+    </div>${otHtml}`;
     var _cc3=document.getElementById('empCalCard');
     if(_cc3){ _cc3.style.display=''; }
     var _ct=document.getElementById('empCalTitle');
@@ -2396,9 +2504,11 @@ const App = (function(){
     if(!confirm('이 직원과 모든 휴가 기록을 삭제할까요?')) return;
     const delId=curEmpId;
     state.records.filter(r=>r.empId===delId).forEach(r=>delLeaveKey('leave_rec:'+r.id));
+    (state.ot||[]).filter(o=>o.empId===delId).forEach(o=>delLeaveKey('leave_ot:'+o.id));
     Object.keys(state.overrides).forEach(k=>{ if(k.startsWith(delId+'_')) delLeaveKey('leave_ov:'+k); });
     delLeaveKey('leave_emp:'+delId);
     state.records = state.records.filter(r=>r.empId!==delId);
+    state.ot = (state.ot||[]).filter(o=>o.empId!==delId);
     Object.keys(state.overrides).forEach(k=>{ if(k.startsWith(delId+'_')) delete state.overrides[k]; });
     state.employees = state.employees.filter(e=>e.id!==delId);
     curEmpId = state.employees[0]? state.employees[0].id : null;
@@ -2470,6 +2580,45 @@ const App = (function(){
     if(!confirm('이 휴가 표시를 지울까요?\n\n'+nm+' · '+r.date+' · '+evCat(r)+' ('+r.status+')')) return;
     state.records = state.records.filter(x=>x.id!==id);
     save(); delLeaveKey('leave_rec:'+id); renderAll();
+  }
+
+  /* ---------- OT(추가근무) 기록 ---------- */
+  // empId 지정 → 그 직원으로 고정 / null → OT 대상 직원 선택칸 표시
+  function openOtModal(empId, date){
+    if(READ_ONLY) return;
+    if(!isAdmin){ alert('마스터 로그인 후 OT 기록을 추가할 수 있습니다.'); return; }
+    if(state.employees.length===0){ alert('먼저 직원을 추가해 주세요.'); return; }
+    const field=document.getElementById('o_emp_field');
+    if(empId){ otTargetFixed=empId; field.style.display='none'; }
+    else{
+      otTargetFixed=null; field.style.display='';
+      document.getElementById('o_emp').innerHTML = state.employees.map(e=>`<option value=&quot;${e.id}&quot;>${esc(e.name)}${e.dept?' · '+esc(e.dept):''}</option>`).join('');
+    }
+    const dv = date || new Date().toISOString().slice(0,10);
+    o_date.value = dv;
+    const dow = new Date(dv).getDay();
+    o_kind.value = (dow===0 || dow===6 || HOLIDAYS[dv]) ? '휴일' : '평일연장';
+    o_hours.value=''; o_note.value='';
+    show('otModal');
+  }
+  function saveOt(){
+    if(!isAdmin){ alert('마스터 로그인 후 편집할 수 있습니다.'); return; }
+    if(!o_date.value){ alert('날짜를 입력해 주세요.'); return; }
+    const h=Number(o_hours.value);
+    if(!h || h<=0){ alert('추가 시간을 입력해 주세요. (예: 2.5)'); return; }
+    const empId = otTargetFixed || document.getElementById('o_emp').value;
+    if(!empId){ alert('직원을 선택해 주세요.'); return; }
+    const o={ id:'o'+Date.now(), empId:empId, date:o_date.value, hours:h, kind:(o_kind.value||'평일연장'), note:o_note.value.trim() };
+    if(!state.ot) state.ot=[];
+    state.ot.push(o);
+    save(); pushOt(o); closeModal('otModal'); renderAll();
+  }
+  function delOt(id){
+    if(!isAdmin){ alert('마스터 로그인 후 편집할 수 있습니다.'); return; }
+    const o=(state.ot||[]).find(x=>x.id===id);
+    if(!confirm('이 OT 기록을 삭제할까요?'+(o?'\n\n'+o.date+' · '+o.hours+'시간'+(o.note?' · '+o.note:''):''))) return;
+    state.ot=(state.ot||[]).filter(x=>x.id!==id);
+    save(); delLeaveKey('leave_ot:'+id); renderAll();
   }
 
   /* ---------- 연차휴가신청서 (인쇄용 양식 생성) ---------- */
@@ -2774,7 +2923,7 @@ const App = (function(){
     if(READ_ONLY) return;
     var t=new Date(); t.setHours(0,0,0,0);
     var ch=[];
-    (state.records||[]).forEach(function(r){ if(r&amp;&amp;r.status==='계획'&amp;&amp;r.date){ var d=new Date(r.date); if(!isNaN(d.getTime())&amp;&amp;d&lt;t){ r.status='사용'; ch.push(r); } } });
+    (state.records||[]).forEach(function(r){ if(r&amp;&amp;r.status==='계획'&amp;&amp;r.date){ var d=new Date(r.date); if(!isNaN(d.getTime())&amp;&amp;d<t){ r.status='사용'; ch.push(r); } } });
     if(ch.length){ save(); ch.forEach(pushRec); }
   }
   function renderAll(){ autoCompletePastLeaves(); sortEmps(); updateAdminBtn(); updateMasterBtn(); applyAccessUI(); renderYearSel(); renderEmpSel(); renderOverview(); renderEmpDetail(); }
@@ -2787,6 +2936,7 @@ const App = (function(){
 
   return { init, switchTab, changeYear, calMove, selectEmp, openEmpModal, saveEmp, deleteEmp, editEnt,
            openRecModal, calClick, evDelete, syncDays, saveRec, delRec, closeModal, exportData, importData, exportViewer,
+           openOtModal, saveOt, delOt,
            unlockCurrent, setupPw, adminToggle, setAdminPw, masterLogin, openLeaveForm, syncNow };
 })();
 window.addEventListener('DOMContentLoaded', App.init);
