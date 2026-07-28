@@ -82,14 +82,13 @@
     .deck{align-items:stretch;}
     /* 오른쪽 4개 카드를 열 높이만큼 균등 분할해 채움 (틀 고정·안쪽만 스크롤) */
     .deck>.col:nth-child(3)>.glass{flex:1 1 0;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
-    /* 가운데: 달력을 크게(약 3/4), 아래 소독(정기·다회)을 나머지(약 1/4)로 → 달력 하단 ≈ AS현장 하단 */
-    .deck>.col:nth-child(2)>.calwrap{flex:3 1 0;display:flex;flex-direction:column;min-height:0;}
-    .deck>.col:nth-child(2)>.calwrap>.calgrid{flex:1 1 auto;min-height:0;grid-template-rows:auto;grid-auto-rows:1fr;}
-    .deck>.col:nth-child(2)>.schpair{flex:1 1 0;min-height:0;}
+    /* 가운데: 달력은 자연 높이 그대로, 아래 소독(정기·다회)은 고정 높이 → 화면 크기와 무관하게 겹침 없음 */
+    .deck>.col:nth-child(2)>.calwrap{flex:0 0 auto;}
+    .deck>.col:nth-child(2)>.schpair{flex:0 0 auto;}
     .deck>.col:nth-child(2)>.schpair>.glass{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
-    /* 채워진 카드 안 목록: 남는 높이만큼 늘고 넘치면 스크롤 */
-    .deck>.col:nth-child(3)>.glass>[id^="wbList_"],
-    .deck>.col:nth-child(2)>.schpair>.glass>[id^="wbList_"]{flex:1 1 auto;height:auto;max-height:none;min-height:0;}
+    .deck>.col:nth-child(2)>.schpair>.glass>[id^="wbList_"]{height:200px;max-height:200px;}
+    /* 오른쪽 카드 안 목록: 남는 높이만큼 늘고 넘치면 스크롤 */
+    .deck>.col:nth-child(3)>.glass>[id^="wbList_"]{flex:1 1 auto;height:auto;max-height:none;min-height:0;}
   }
 
   .calwrap{background:linear-gradient(150deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
