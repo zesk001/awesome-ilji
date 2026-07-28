@@ -113,6 +113,9 @@
   .cell.today{border-color:var(--g2);background:rgba(116,194,68,.10);box-shadow:0 0 0 1px rgba(116,194,68,.3) inset;}
   .cell.today .dnum{color:#fff;font-weight:800;}
   .cell.sun .dnum{color:#e88;} .cell.sat .dnum{color:#88c6e6;}
+  .cell.hol{background:rgba(230,110,110,.05);border-color:rgba(230,110,110,.15);}
+  .cell.hol .dnum{color:#e88;}
+  .dnum .holnm{font-size:8.5px;color:#e88;font-weight:700;margin-left:3px;letter-spacing:-.3px;}
   .cev{font-size:10px;padding:2px 5px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .cev.jeom{background:rgba(116,194,68,.18);color:#bfe89a;}
   .cev.so{background:rgba(108,195,223,.18);color:#aee0f2;}
@@ -2101,7 +2104,7 @@ const App = (function(){
     '2025-10-05':'추석','2025-10-06':'추석','2025-10-07':'추석','2025-10-08':'대체공휴일','2025-10-09':'한글날','2025-12-25':'성탄절',
     // 2026
     '2026-01-01':'신정','2026-02-16':'설날','2026-02-17':'설날','2026-02-18':'설날',
-    '2026-03-01':'삼일절','2026-03-02':'대체공휴일','2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일',
+    '2026-03-01':'삼일절','2026-03-02':'대체공휴일','2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일','2026-06-03':'지방선거',
     '2026-06-06':'현충일','2026-07-17':'제헌절','2026-08-15':'광복절','2026-08-17':'대체공휴일',
     '2026-09-24':'추석','2026-09-25':'추석','2026-09-26':'추석','2026-10-03':'개천절','2026-10-05':'대체공휴일',
     '2026-10-09':'한글날','2026-12-25':'성탄절',
@@ -4049,6 +4052,27 @@ document.addEventListener('keydown',function(e){
 
 /* ===== 달력 ===== */
 function shiftMonth(o){if(o===0)monthOffset=0;else monthOffset+=o;renderCalendar();}
+/* ---------- 대한민국 법정 공휴일 2024~2027 (통합현황·일정관리 달력 표시용) ----------
+   ※ 제헌절: 2025-01 법 개정으로 2026-07-17부터 공휴일 부활. 2026-06-03 지방선거일 포함. */
+const HOLIDAYS = {
+  '2024-01-01':'신정','2024-02-09':'설날','2024-02-10':'설날','2024-02-11':'설날','2024-02-12':'대체공휴일',
+  '2024-03-01':'삼일절','2024-04-10':'국회의원선거','2024-05-05':'어린이날','2024-05-06':'대체공휴일','2024-05-15':'부처님오신날',
+  '2024-06-06':'현충일','2024-08-15':'광복절','2024-09-16':'추석','2024-09-17':'추석','2024-09-18':'추석',
+  '2024-10-01':'국군의날','2024-10-03':'개천절','2024-10-09':'한글날','2024-12-25':'성탄절',
+  '2025-01-01':'신정','2025-01-27':'임시공휴일','2025-01-28':'설날','2025-01-29':'설날','2025-01-30':'설날',
+  '2025-03-01':'삼일절','2025-03-03':'대체공휴일','2025-05-05':'어린이날·부처님오신날','2025-05-06':'대체공휴일',
+  '2025-06-03':'대통령선거','2025-06-06':'현충일','2025-08-15':'광복절','2025-10-03':'개천절',
+  '2025-10-05':'추석','2025-10-06':'추석','2025-10-07':'추석','2025-10-08':'대체공휴일','2025-10-09':'한글날','2025-12-25':'성탄절',
+  '2026-01-01':'신정','2026-02-16':'설날','2026-02-17':'설날','2026-02-18':'설날',
+  '2026-03-01':'삼일절','2026-03-02':'대체공휴일','2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'대체공휴일',
+  '2026-06-03':'지방선거','2026-06-06':'현충일','2026-07-17':'제헌절','2026-08-15':'광복절','2026-08-17':'대체공휴일',
+  '2026-09-24':'추석','2026-09-25':'추석','2026-09-26':'추석','2026-10-03':'개천절','2026-10-05':'대체공휴일',
+  '2026-10-09':'한글날','2026-12-25':'성탄절',
+  '2027-01-01':'신정','2027-02-06':'설날','2027-02-07':'설날','2027-02-08':'설날','2027-02-09':'대체공휴일',
+  '2027-03-01':'삼일절','2027-05-05':'어린이날','2027-05-13':'부처님오신날','2027-06-06':'현충일','2027-07-17':'제헌절',
+  '2027-08-15':'광복절','2027-08-16':'대체공휴일','2027-09-14':'추석','2027-09-15':'추석','2027-09-16':'추석',
+  '2027-10-03':'개천절','2027-10-04':'대체공휴일','2027-10-09':'한글날','2027-10-11':'대체공휴일','2027-12-25':'성탄절','2027-12-27':'대체공휴일'
+};
 function renderCalendar(){
   const base=new Date();base.setDate(1);base.setMonth(base.getMonth()+monthOffset);
   const y=base.getFullYear(),m=base.getMonth();
@@ -4063,7 +4087,8 @@ function renderCalendar(){
     const evs=sites.filter(s=>s.planDate===ds);
     const evhtml=evs.slice(0,2).map(s=>{const c=s.type==='공사'?'gong':s.type==='소독'?'so':'jeom';return `<div class="cev ${c}" title="${esc(s.name)}">${esc(s.name)}</div>`;}).join('')+(evs.length>2?`<div class="cev" style="color:var(--dim)">+${evs.length-2}건</div>`:'');
     const cellHtml=(typeof WB!=='undefined')?WB.renderCell(ds):'';
-    html+=`<div class="cell celldrop ${ds===ts?'today':''} ${dow===0?'sun':dow===6?'sat':''}" data-date="${ds}"><div class="dnum">${dn}</div>${evhtml}${cellHtml}</div>`;
+    const hnm=HOLIDAYS[ds]||'';
+    html+=`<div class="cell celldrop ${ds===ts?'today':''} ${dow===0?'sun':dow===6?'sat':''}${hnm?' hol':''}" data-date="${ds}"><div class="dnum">${dn}${hnm?` <span class="holnm">${hnm}</span>`:''}</div>${evhtml}${cellHtml}</div>`;
   }
   document.getElementById('calGrid').innerHTML=html;
   if(typeof WB!=='undefined')WB.ensureCalDnD();
@@ -4128,7 +4153,8 @@ function renderCareCalendar(){
     const chips=garr.map(g=>{const c=g.type==='소독'?'so':g.type==='공사'?'gong':g.type==='기타'?'etc':'jeom';const tc=g.type.charAt(0);const isLate=(g.done<g.n&&(g.late||0)>0);const dchk=g.done>=g.n?'✓':(g.done>0?g.done+'/':'');const lm=isLate?'⚠':'';return `<div class="cev ${c}" style="${isLate?'outline:2px solid #e0a82e;outline-offset:-2px;':''}" title="${esc(g.mgr)} · ${g.type} ${g.n}건${g.done?(' (완료 '+g.done+')'):''}${isLate?(' (지연 '+g.late+')'):''}">${esc(g.mgr)} ${tc}${dchk}${lm}${g.n}</div>`;}).join('');
     const inner=evs.length?`<div class="cevscroll">${chips}</div>`:'';
     const click=evs.length?`openDayDetail('${ds}')`:`openCareSiteModal(null,'${ds}')`;
-    html+=`<div class="cell ${ds===ts?'today':''} ${dow===0?'sun':dow===6?'sat':''}" onclick="${click}" style="cursor:pointer" title="클릭하여 현장 추가 / 상세 보기"><div class="dnum">${dn}</div>${inner}</div>`;
+    const hnm=HOLIDAYS[ds]||'';
+    html+=`<div class="cell ${ds===ts?'today':''} ${dow===0?'sun':dow===6?'sat':''}${hnm?' hol':''}" onclick="${click}" style="cursor:pointer" title="클릭하여 현장 추가 / 상세 보기"><div class="dnum">${dn}${hnm?` <span class="holnm">${hnm}</span>`:''}</div>${inner}</div>`;
   }
   grid.innerHTML=html;
 }
