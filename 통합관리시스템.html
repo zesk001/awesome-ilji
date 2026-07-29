@@ -2069,6 +2069,7 @@ const App = (function(){
   let state = { employees:[], records:[], overrides:{}, ot:[] };
   let recTargetFixed = null;
   let otTargetFixed = null;
+  let syncedOnce = false;   // 서버와 한 번이라도 동기화 성공했는지 — 그 전엔 서버로 재업로드 금지(삭제 기록 부활 방지)
   let curYear = new Date().getFullYear();
   let curEmpId = null;
   let calCursor = { ov:new Date(), emp:new Date() };
@@ -2139,7 +2140,9 @@ const App = (function(){
   // 기본 명단 병합: 이름+입사일이 같은 직원이 없으면 추가 (기존 데이터 보존). 변경 시 true
   function mergeSeed(){
     let changed=false;
+    const noSeed = state.noSeed||[];
     SEED.forEach(s=>{
+      if(noSeed.indexOf(s.id)>=0) return;   // 삭제(퇴사) 처리된 기본 명단 직원은 다시 추가하지 않음
       const exists = state.employees.some(e=>e.name===s.name &amp;&amp; e.joinDate===s.joinDate);
       if(!exists){
         state.employees.push({id:s.id, name:s.name, dept:s.dept, joinDate:s.joinDate, note:s.note||''});
@@ -2157,6 +2160,7 @@ const App = (function(){
        leave_rec:<id>       → 휴가기록 1건(JSON)
        leave_ot:<id>        → OT(추가근무)기록 1건(JSON)
        leave_ov:<id>_<연도> → 발생연차 수동값(숫자)
+       leave_noseed:<id>    → 기본 명단 직원 삭제(퇴사) 표시
        leave_admin          → 마스터 비밀번호
      값을 빈칸으로 보내면 그 줄이 삭제됨(=항목 삭제).
      항목별로 따로 저장하므로 서로 다른 직원/기록을 동시에 고쳐도 덮어쓰지 않음. */
@@ -2200,19 +2204,21 @@ const App = (function(){
     try{
       const r=await jsonpShared();
       const map=(r&amp;&amp;r.map)||{};
-      const emps=[], recs=[], ots=[], ov={}; let admin=null, found=false;
+      const emps=[], recs=[], ots=[], ov={}, ns=[]; let admin=null, found=false;
       Object.keys(map).forEach(k=>{
         if(k.indexOf('leave_emp:')===0){ found=true; try{ const e=JSON.parse(map[k]); if(e&amp;&amp;e.id) emps.push(e); }catch(_){ } }
         else if(k.indexOf('leave_rec:')===0){ found=true; try{ const rc=JSON.parse(map[k]); if(rc&amp;&amp;rc.id) recs.push(rc); }catch(_){ } }
         else if(k.indexOf('leave_ot:')===0){ found=true; try{ const ot=JSON.parse(map[k]); if(ot&amp;&amp;ot.id) ots.push(ot); }catch(_){ } }
         else if(k.indexOf('leave_ov:')===0){ found=true; const num=Number(map[k]); if(!isNaN(num)) ov[k.slice(9)]=num; }
+        else if(k.indexOf('leave_noseed:')===0){ found=true; if(map[k]!=='') ns.push(k.slice(13)); }
         else if(k==='leave_admin'){ found=true; if(map[k]!=='') admin=map[k]; }
       });
       if(found){
-        state={ employees:emps, records:recs, overrides:ov, ot:ots };
+        state={ employees:emps, records:recs, overrides:ov, ot:ots, noSeed:ns };
         if(admin!=null) state.adminPw=admin;
         if(mergeSeed()) pushAll();            // SEED 누락분 보강 시 서버에도 반영
         localStorage.setItem(KEY, JSON.stringify(state));
+        syncedOnce=true;
         renderAll();
         setSyncStatus('최신 상태 ✓');
         if(showMsg) alert('최신 연차 데이터를 불러왔습니다.');
@@ -2228,6 +2234,7 @@ const App = (function(){
       localStorage.setItem(KEY, JSON.stringify(state));
       renderAll();
       pushAll();                              // 현재 데이터를 항목별로 업로드
+      syncedOnce=true;
       postLeaveKV('leaveData','');            // 예전 통짜 키 정리
       setSyncStatus('서버에 처음 업로드 ✓');
       if(showMsg) alert('서버에 연차 데이터를 올렸습니다.');
@@ -2591,6 +2598,7 @@ const App = (function(){
     (state.ot||[]).filter(o=>o.empId===delId).forEach(o=>delLeaveKey('leave_ot:'+o.id));
     Object.keys(state.overrides).forEach(k=>{ if(k.startsWith(delId+'_')) delLeaveKey('leave_ov:'+k); });
     delLeaveKey('leave_emp:'+delId);
+    if(SEED.some(s=>s.id===delId)){ state.noSeed=state.noSeed||[]; if(state.noSeed.indexOf(delId)<0) state.noSeed.push(delId); postLeaveKV('leave_noseed:'+delId,'1'); }
     state.records = state.records.filter(r=>r.empId!==delId);
     state.ot = (state.ot||[]).filter(o=>o.empId!==delId);
     Object.keys(state.overrides).forEach(k=>{ if(k.startsWith(delId+'_')) delete state.overrides[k]; });
@@ -3008,7 +3016,7 @@ const App = (function(){
     var t=new Date(); t.setHours(0,0,0,0);
     var ch=[];
     (state.records||[]).forEach(function(r){ if(r&amp;&amp;r.status==='계획'&amp;&amp;r.date){ var d=new Date(r.date); if(!isNaN(d.getTime())&amp;&amp;d<t){ r.status='사용'; ch.push(r); } } });
-    if(ch.length){ save(); ch.forEach(pushRec); }
+    if(ch.length){ save(); if(syncedOnce) ch.forEach(pushRec); }   // 동기화 전에 올리면 다른 PC에서 지운 기록이 되살아남
   }
   function renderAll(){ autoCompletePastLeaves(); sortEmps(); updateAdminBtn(); updateMasterBtn(); applyAccessUI(); renderYearSel(); renderEmpSel(); renderOverview(); renderEmpDetail(); }
 
@@ -3016,6 +3024,12 @@ const App = (function(){
     if(READ_ONLY) document.body.classList.add('readonly');
     load(); renderAll();
     if(!READ_ONLY &amp;&amp; APPS_URL) syncFromShared(false);   // 시작 시 서버 최신 데이터로 갱신
+    // 켜 둔 화면도 최신 유지: 창으로 돌아올 때 + 5분마다 자동 동기화 (입력창이 열려 있으면 건너뜀)
+    if(!READ_ONLY &amp;&amp; APPS_URL){
+      const autoSync=()=>{ try{ if(document.hidden) return; if(document.querySelector('.modal-bg.show')) return; syncFromShared(false); }catch(_){ } };
+      window.addEventListener('focus', autoSync);
+      setInterval(autoSync, 300000);
+    }
   }
 
   return { init, switchTab, changeYear, calMove, selectEmp, openEmpModal, saveEmp, deleteEmp, editEnt,
