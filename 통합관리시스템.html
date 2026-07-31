@@ -1862,6 +1862,8 @@ loadFromIlji();
   .modal{background:#fff;border-radius:14px;padding:22px;width:440px;max-width:100%;max-height:90vh;overflow:auto;}
   .modal h3{margin:0 0 16px;font-size:17px;}
   .field{margin-bottom:13px;}
+  .o-date-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .o-date-row input{flex:1 1 150px;min-width:0;}
   .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
   .x{cursor:pointer;color:var(--muted);font-size:13px;}
   .x:hover{color:var(--red);}
@@ -2040,7 +2042,7 @@ loadFromIlji();
   <div class=&quot;modal&quot;>
     <h3>OT(추가근무) 기록 추가</h3>
     <div class=&quot;field&quot; id=&quot;o_emp_field&quot;><label>직원 *</label><select id=&quot;o_emp&quot;></select></div>
-    <div class=&quot;field&quot;><label>날짜 *</label><input id=&quot;o_date&quot; type=&quot;date&quot;></div>
+    <div class=&quot;field&quot;><label>날짜 *</label><div class=&quot;o-date-row&quot;><input id=&quot;o_date&quot; type=&quot;date&quot; onclick=&quot;App.pickDate(this)&quot; onchange=&quot;App.otDateChanged()&quot;><button type=&quot;button&quot; class=&quot;btn gray sm&quot; onclick=&quot;App.otDay(-1)&quot;>◀ 하루</button><button type=&quot;button&quot; class=&quot;btn gray sm&quot; onclick=&quot;App.otToday()&quot;>오늘</button><button type=&quot;button&quot; class=&quot;btn gray sm&quot; onclick=&quot;App.otDay(1)&quot;>하루 ▶</button></div></div>
     <div class=&quot;field&quot;><label>구분</label>
       <select id=&quot;o_kind&quot;>
         <option value=&quot;평일연장&quot;>평일 연장근무</option>
@@ -2693,6 +2695,19 @@ const App = (function(){
     o_hours.value=''; o_note.value='';
     show('otModal');
   }
+  function pickDate(el){ try{ el.showPicker(); }catch(e){} }
+  function otYmd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function otDateChanged(){
+    const dv=o_date.value; if(!dv) return;
+    const dow=new Date(dv+'T00:00:00').getDay();
+    o_kind.value=(dow===0 || dow===6 || HOLIDAYS[dv]) ? '휴일' : '평일연장';
+  }
+  function otDay(n){
+    const base=o_date.value || otYmd(new Date());
+    const d=new Date(base+'T00:00:00'); d.setDate(d.getDate()+n);
+    o_date.value=otYmd(d); otDateChanged();
+  }
+  function otToday(){ o_date.value=otYmd(new Date()); otDateChanged(); }
   function saveOt(){
     if(!isAdmin){ alert('마스터 로그인 후 편집할 수 있습니다.'); return; }
     if(!o_date.value){ alert('날짜를 입력해 주세요.'); return; }
@@ -3034,7 +3049,7 @@ const App = (function(){
 
   return { init, switchTab, changeYear, calMove, selectEmp, openEmpModal, saveEmp, deleteEmp, editEnt,
            openRecModal, calClick, evDelete, syncDays, saveRec, delRec, closeModal, exportData, importData, exportViewer,
-           openOtModal, saveOt, delOt,
+           openOtModal, saveOt, delOt, pickDate, otDateChanged, otDay, otToday,
            unlockCurrent, setupPw, adminToggle, setAdminPw, masterLogin, openLeaveForm, syncNow };
 })();
 window.addEventListener('DOMContentLoaded', App.init);
