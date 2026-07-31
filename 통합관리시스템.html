@@ -1925,7 +1925,8 @@ loadFromIlji();
   <section id=&quot;view-overview&quot;>
     <div style=&quot;display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap&quot;>
     <div class=&quot;card&quot; style=&quot;flex:1.15;min-width:360px;margin-bottom:0&quot;>
-      <h2>전체 휴가 달력</h2>
+      <h2 id=&quot;ovCalTitle&quot;>전체 휴가 달력</h2>
+      <div id=&quot;ovCalMode&quot; style=&quot;display:flex;gap:6px;margin:2px 0 10px&quot;><button class=&quot;btn sm&quot; data-mode=&quot;leave&quot; onclick=&quot;App.setCalMode('leave')&quot;>휴가</button><button class=&quot;btn gray sm&quot; data-mode=&quot;ot&quot; onclick=&quot;App.setCalMode('ot')&quot;>OT</button><button class=&quot;btn gray sm&quot; data-mode=&quot;all&quot; onclick=&quot;App.setCalMode('all')&quot;>전체</button><button class=&quot;btn gray sm&quot; style=&quot;margin-left:auto&quot; onclick=&quot;App.printCal()&quot;>🖨 인쇄</button></div>
       <div class=&quot;cal-head&quot;>
         <button class=&quot;btn gray sm&quot; onclick=&quot;App.calMove('ov',-1)&quot;>◀ 이전달</button>
         <span class=&quot;m&quot; id=&quot;ovCalMonth&quot;></span>
@@ -2401,10 +2402,121 @@ const App = (function(){
   }
 
   /* ---------- 렌더: 통합 달력 ---------- */
+  let ovCalMode = 'leave';   // 'leave' | 'ot' | 'all' — 통합 현황 달력 표시 모드
+  function setCalMode(mode){
+    ovCalMode = mode;
+    const box = document.getElementById('ovCalMode');
+    if(box) box.querySelectorAll('button').forEach(b=>{ b.className = (b.dataset.mode===mode)? 'btn sm' : 'btn gray sm'; });
+    const t = document.getElementById('ovCalTitle');
+    if(t) t.textContent = (mode==='ot')? 'OT(추가근무) 달력' : ((mode==='all')? '휴가 + OT 달력' : '전체 휴가 달력');
+    renderOvCal();
+  }
+  /* ---------- 달력 인쇄 ---------- */
+  function printCal(){
+    const cur = calCursor['ov'];
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const mode = ovCalMode;
+    const modeName = (mode==='ot')? 'OT(추가근무) 현황' : ((mode==='all')? '휴가 · OT 현황' : '휴가 현황');
+    const dim = new Date(y, m+1, 0).getDate();
+    const startDow = new Date(y, m, 1).getDay();
+    const dows = ['일','월','화','수','목','금','토'];
+    const sumL = {}, sumO = {}, cntO = {};
+    let cells = '<tr>';
+    let col = 0;
+    for(let i=0;i<startDow;i++){ cells += '<td class=&quot;out&quot;></td>'; col++; }
+    for(let d=1; d<=dim; d++){
+      const ds = y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      const dow = new Date(y,m,d).getDay();
+      const hol = HOLIDAYS[ds];
+      let evs = '';
+      if(mode!=='ot'){
+        state.records.filter(r=>r.date===ds).forEach(r=>{
+          const emp = state.employees.find(e=>e.id===r.empId);
+          const nm = emp? emp.name : '?';
+          evs += '<div class=&quot;e l&quot;>'+esc(nm)+' '+evCat(r)+'</div>';
+          sumL[nm] = (sumL[nm]||0) + (Number(r.days)||0);
+        });
+      }
+      if(mode!=='leave'){
+        (state.ot||[]).filter(o=>o.date===ds).forEach(o=>{
+          const emp = state.employees.find(e=>e.id===o.empId);
+          const nm = emp? emp.name : '?';
+          const h = Number(o.hours)||0;
+          evs += '<div class=&quot;e o&quot;>'+esc(nm)+' OT '+fmt(h)+'h</div>';
+          sumO[nm] = (sumO[nm]||0) + h;
+          cntO[nm] = (cntO[nm]||0) + 1;
+        });
+      }
+      const cls = (dow===0?' sun':'') + (dow===6?' sat':'') + (hol?' hol':'');
+      cells += '<td class=&quot;day'+cls+'&quot;><div class=&quot;n&quot;>'+d+(hol?' <span class=&quot;hn&quot;>'+esc(hol)+'</span>':'')+'</div>'+evs+'</td>';
+      col++;
+      if(col===7){ cells += '</tr><tr>'; col = 0; }
+    }
+    if(col===0){ cells = cells.slice(0, -4); }
+    else { while(col<7){ cells += '<td class=&quot;out&quot;></td>'; col++; } cells += '</tr>'; }
+
+    let sumHtml = '';
+    const nameL = Object.keys(sumL), nameO = Object.keys(sumO);
+    if(mode!=='ot' &amp;&amp; nameL.length){
+      sumHtml += '<div class=&quot;sum&quot;><h3>휴가 합계</h3><table class=&quot;st&quot;><tr><th>직원</th><th>사용 일수</th></tr>'
+        + nameL.map(n=>'<tr><td>'+esc(n)+'</td><td>'+fmt(sumL[n])+'일</td></tr>').join('')
+        + '</table></div>';
+    }
+    if(mode!=='leave' &amp;&amp; nameO.length){
+      sumHtml += '<div class=&quot;sum&quot;><h3>OT(추가근무) 합계</h3><table class=&quot;st&quot;><tr><th>직원</th><th>건수</th><th>시간</th></tr>'
+        + nameO.map(n=>'<tr><td>'+esc(n)+'</td><td>'+cntO[n]+'건</td><td>'+fmt(sumO[n])+'시간</td></tr>').join('')
+        + '<tr class=&quot;tot&quot;><td>합계</td><td>'+nameO.reduce((a,n)=>a+cntO[n],0)+'건</td><td>'+fmt(nameO.reduce((a,n)=>a+sumO[n],0))+'시간</td></tr>'
+        + '</table></div>';
+    }
+    if(!sumHtml) sumHtml = '<div class=&quot;sum muted&quot;>이 달에는 표시할 기록이 없습니다.</div>';
+
+    const title = y+'년 '+(m+1)+'월 '+modeName;
+    const html = '<!DOCTYPE html><html lang=&quot;ko&quot;><head><meta charset=&quot;UTF-8&quot;><title>'+title+'</title><style>'
+      + '@page{size:A4 landscape;margin:10mm;}'
+      + '*{box-sizing:border-box;}'
+      + &quot;body{font-family:'Pretendard','Malgun Gothic','맑은 고딕',sans-serif;color:#222;background:#fff;margin:0;padding:16px 20px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}&quot;
+      + '.top{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #2f6b3a;padding-bottom:8px;margin-bottom:12px;}'
+      + 'h1{font-size:21px;margin:0;color:#1f4d2a;letter-spacing:-.5px;}'
+      + '.co{font-size:12.5px;color:#666;}'
+      + '.no-print{margin-bottom:10px;}'
+      + '.pbtn{background:#2f6b3a;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;}'
+      + 'table.cal{width:100%;border-collapse:collapse;table-layout:fixed;}'
+      + 'table.cal th{background:#eef4ee;border:1px solid #cfd8cf;font-size:12px;padding:5px 0;color:#33503a;}'
+      + 'table.cal th.sun{color:#c22;} table.cal th.sat{color:#2456c2;}'
+      + 'table.cal td{border:1px solid #dde3dd;vertical-align:top;height:92px;padding:3px 4px;}'
+      + 'table.cal td.out{background:#fafbfa;}'
+      + 'td.sun .n{color:#c22;} td.sat .n{color:#2456c2;} td.hol{background:#fff5f5;} td.hol .n{color:#c22;}'
+      + '.n{font-size:12px;font-weight:700;color:#444;margin-bottom:3px;}'
+      + '.hn{font-size:9.5px;font-weight:600;color:#c22;margin-left:3px;}'
+      + '.e{font-size:10.5px;line-height:1.35;border-radius:3px;padding:1px 4px;margin-bottom:2px;word-break:keep-all;}'
+      + '.e.l{background:#e7effa;color:#1c3f7a;}'
+      + '.e.o{background:#e8f5e2;color:#26611f;}'
+      + '.sums{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;}'
+      + '.sum h3{font-size:13px;margin:0 0 5px;color:#1f4d2a;}'
+      + 'table.st{border-collapse:collapse;font-size:11.5px;}'
+      + 'table.st th,table.st td{border:1px solid #dde3dd;padding:3px 10px;text-align:center;}'
+      + 'table.st th{background:#eef4ee;color:#33503a;}'
+      + 'table.st tr.tot td{font-weight:700;background:#f6faf6;}'
+      + '.muted{color:#888;font-size:12px;}'
+      + '@media print{.no-print{display:none;}}'
+      + '</style></head><body>'
+      + '<div class=&quot;no-print&quot;><button class=&quot;pbtn&quot; onclick=&quot;window.print()&quot;>인쇄 / PDF 저장</button></div>'
+      + '<div class=&quot;top&quot;><h1>'+title+'</h1><div class=&quot;co&quot;>(주)어썸조경</div></div>'
+      + '<table class=&quot;cal&quot;><tr>'
+      + dows.map((dn,i)=>'<th class=&quot;'+(i===0?'sun':(i===6?'sat':''))+'&quot;>'+dn+'</th>').join('')
+      + '</tr>'+cells+'</table>'
+      + '<div class=&quot;sums&quot;>'+sumHtml+'</div>'
+      + '</body></html>';
+
+    const w = window.open('', '_blank');
+    if(!w){ alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+  }
   function renderOvCal(){ renderCal('ov', null); }
   function renderEmpCal(){ renderCal('emp', curEmpId); }
 
   function renderCal(which, onlyEmpId){
+    const mode = (which==='ov')? ovCalMode : 'all';
     const cur = calCursor[which];
     const y=cur.getFullYear(), m=cur.getMonth();
     document.getElementById(which==='ov'?'ovCalMonth':'empCalMonth').textContent = y+'년 '+(m+1)+'월';
@@ -2420,7 +2532,7 @@ const App = (function(){
       const dow = new Date(y,m,d).getDay();
       const isToday = (new Date(y,m,d).getTime()===today.getTime());
       const dayRecs = recs.filter(r=>r.date===dateStr);
-      let evs = dayRecs.map(r=>{
+      let evs = (mode==='ot')? '' : dayRecs.map(r=>{
         const emp = state.employees.find(e=>e.id===r.empId);
         const nm = emp? emp.name : '?';
         const cls = r.status==='사용'?'use':'plan';
@@ -2431,7 +2543,7 @@ const App = (function(){
         return `<div class=&quot;ev ${cls}&quot;${del} title=&quot;${tip}&quot;>${text}</div>`;
       }).join('');
       const dayOts = (state.ot||[]).filter(o=> o.date===dateStr &amp;&amp; (onlyEmpId? o.empId===onlyEmpId : true));
-      evs += dayOts.map(o=>{
+      if(mode!=='leave') evs += dayOts.map(o=>{
         const emp = state.employees.find(e=>e.id===o.empId);
         const nm = emp? emp.name : '?';
         const txt = (onlyEmpId? '' : esc(nm)+' ') + 'OT ' + fmt(Number(o.hours)||0) + 'h';
@@ -2640,8 +2752,9 @@ const App = (function(){
   // 달력 날짜 클릭 → 입력창
   function calClick(which, date){
     if(READ_ONLY || !isAdmin) return;
-    if(which==='emp') openRecModal(curEmpId, date);
-    else openRecModal(null, date);
+    if(which==='emp'){ openRecModal(curEmpId, date); return; }
+    if(ovCalMode==='ot'){ openOtModal(null, date); return; }
+    openRecModal(null, date);
   }
   function syncDays(){
     const t=r_type.value;
@@ -3050,6 +3163,7 @@ const App = (function(){
   return { init, switchTab, changeYear, calMove, selectEmp, openEmpModal, saveEmp, deleteEmp, editEnt,
            openRecModal, calClick, evDelete, syncDays, saveRec, delRec, closeModal, exportData, importData, exportViewer,
            openOtModal, saveOt, delOt, pickDate, otDateChanged, otDay, otToday,
+           setCalMode, printCal,
            unlockCurrent, setupPw, adminToggle, setAdminPw, masterLogin, openLeaveForm, syncNow };
 })();
 window.addEventListener('DOMContentLoaded', App.init);
