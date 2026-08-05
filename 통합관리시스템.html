@@ -1739,12 +1739,27 @@ loadFromIlji();
 
   <!-- ===== 자료 보관실 ===== -->
   <section class="page" id="page-archive">
-    <p class="small" style="margin-bottom:12px;">모든 작업이 완료(보관 단계)된 현장의 데이터베이스입니다. 추후 반복 현장 진행 시 자료로 활용됩니다.</p>
-    <div class="toolbar">
-      <input type="text" id="archSearch" placeholder="현장명·지역 검색" oninput="renderArchive()" style="flex:1;min-width:200px;">
+    <div id="archCatTabs" style="display:flex;gap:8px;margin:0 0 14px;">
+      <button class="acat" data-acat="site" onclick="setArchCat('site')" style="padding:7px 18px;border:1px solid #3a8a5a;border-radius:8px;cursor:pointer;font-size:14px;background:linear-gradient(135deg,#74c244,#3f8a2a);color:#06210a;font-weight:800;">완료 보관 현장</button>
+      <button class="acat" data-acat="annual" onclick="setArchCat('annual')" style="padding:7px 18px;border:1px solid #2c3a30;border-radius:8px;cursor:pointer;font-size:14px;background:transparent;color:var(--muted);font-weight:600;">연간점검</button>
     </div>
-    <div class="miniwrap" id="archStats"></div>
-    <div class="glass"><h3>완료 보관 현장</h3><table id="archTable"></table></div>
+
+    <div id="archSite">
+      <p class="small" style="margin-bottom:12px;">모든 작업이 완료(보관 단계)된 현장의 데이터베이스입니다. 추후 반복 현장 진행 시 자료로 활용됩니다.</p>
+      <div class="toolbar">
+        <input type="text" id="archSearch" placeholder="현장명·지역 검색" oninput="renderArchive()" style="flex:1;min-width:200px;">
+      </div>
+      <div class="miniwrap" id="archStats"></div>
+      <div class="glass"><h3>완료 보관 현장</h3><table id="archTable"></table></div>
+    </div>
+
+    <div id="archAnnual" style="display:none;">
+      <p class="small" style="margin-bottom:10px;">연간 안전점검·소독 관리표입니다. <b>점검·소독·입금</b> 세 영역으로 나뉘며 권역별로 묶여 있습니다. 학교를 누르면 방문 달력과 계약 정보가 열립니다.</p>
+      <div id="annualBox" style="border:1px solid #2c3a30;border-radius:12px;overflow:hidden;background:#12161d;">
+        <div id="annualLoading" class="small" style="padding:40px;text-align:center;color:var(--muted);">연간점검 자료를 불러오는 중입니다… (자료가 커서 잠시 걸릴 수 있습니다)</div>
+        <iframe id="annualFrame" title="연간점검 관리" style="display:none;width:100%;height:78vh;border:0;"></iframe>
+      </div>
+    </div>
   </section>
 
   <!-- ===== 관리자 공간 ===== -->
@@ -4978,6 +4993,30 @@ function repStepsHtml(key,autoPhoto,tx,site,estDate){
 // 완료보고 세부 분류(공사·점검·소독). 기본=공사. (현재 견적엔 분류값이 없어 전부 공사로 잡힘)
 let conCat='공사';
 function conCatOf(e){ return (e&&e.cat)||'공사'; }
+var archCat='site', annualReady=false;
+function setArchCat(c){
+  archCat=c;
+  var bs=document.querySelectorAll('#archCatTabs .acat');
+  for(var i=0;i<bs.length;i++){ var b=bs[i],on=(b.getAttribute('data-acat')===c);
+    b.style.background=on?'linear-gradient(135deg,#74c244,#3f8a2a)':'transparent';
+    b.style.color=on?'#06210a':'var(--muted)';
+    b.style.fontWeight=on?'800':'600';
+    b.style.borderColor=on?'#3a8a5a':'#2c3a30';
+  }
+  document.getElementById('archSite').style.display=(c==='site')?'':'none';
+  document.getElementById('archAnnual').style.display=(c==='annual')?'':'none';
+  if(c==='annual'&&!annualReady){            // 처음 누를 때만 불러옴(용량이 커서 지연 로딩)
+    annualReady=true;
+    var f=document.getElementById('annualFrame');
+    f.onload=annualLoaded;                   // about:blank 로드 때 오류나지 않게 JS에서 연결
+    f.src='연간점검_관리.html';
+  }
+}
+function annualLoaded(){
+  var l=document.getElementById('annualLoading');
+  if(l)l.style.display='none';
+  document.getElementById('annualFrame').style.display='';
+}
 function setConCat(c){
   conCat=c;
   var bs=document.querySelectorAll('#conCatTabs .ccat');
