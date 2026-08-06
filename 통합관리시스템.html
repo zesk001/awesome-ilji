@@ -4194,7 +4194,7 @@ async function loadGoogle(manual){
        혹시 묶음이 안 되면(옛 서버 등) 예전처럼 하나씩 부르는 길로 자동으로 돌아간다. */
     let B=null;
     try{
-      B=await jsonp('action=bundle&parts=master,estimates,orders,materials,photoboards,taxinvoices,shared&days='+days.join(','),45000,3,[25000,35000,45000]);
+      B=await jsonp('action=bundle&parts=master,estimates,orders,materials,photoboards,taxinvoices,shared&days='+days.join(','),50000,2,[40000,50000]);   // 묶음은 원래 15~25초 걸리므로 넉넉히 기다린다(성급한 재시도가 오히려 느림)
       if(!B||typeof B!=='object'||(!B.master&&!B.shared&&!B.days))B=null;
     }catch(e){B=null;}
 
