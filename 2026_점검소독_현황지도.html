@@ -4,19 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>2026 어썸조경 월간 점검·소독 지도</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- 지도 라이브러리: 같은 폴더의 로컬 파일 사용(인터넷/방화벽 영향 없이 항상 로드). 원본 CDN: cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4 -->
+<link rel="stylesheet" href="leaflet.css">
+<script src="leaflet.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Malgun Gothic','맑은 고딕',sans-serif; }
 body { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 
-#topbar { background:#1e3a5f; color:#fff; padding:9px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; z-index:1100; }
+#topbar { background:#15181b; color:#fff; padding:9px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; z-index:1100; }
 #topbar h1 { font-size:16px; font-weight:700; }
-#topbar select { padding:6px 10px; border-radius:6px; border:none; font-size:14px; font-weight:700; color:#1e3a5f; }
+#topbar select { padding:6px 10px; border-radius:6px; border:none; font-size:14px; font-weight:700; color:#15181b; }
 #totals { font-size:13px; display:flex; gap:8px; }
 .chip { padding:4px 10px; border-radius:14px; font-weight:700; font-size:12px; }
 .chip.i { background:#2563eb; }
 .chip.d { background:#0d9488; }
+.modeseg { display:flex; gap:0; background:rgba(255,255,255,.18); border-radius:8px; padding:2px; }
+.modeseg button { background:none; border:none; color:#cfd3d0; font-size:13px; font-weight:700; padding:5px 13px; border-radius:6px; cursor:pointer; }
+.modeseg button.on { background:#fff; color:#15181b; }
 .tb-right { margin-left:auto; display:flex; gap:6px; }
 .tb-right button { background:#2d5285; color:#fff; border:none; border-radius:6px; padding:6px 11px; font-size:12px; cursor:pointer; }
 .tb-right button:hover { background:#3b82f6; }
@@ -25,17 +29,17 @@ body { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 #map { width:100%; height:100%; background:#dde8f0; }
 
 /* 지역 라벨 */
-.rlabel { background:rgba(255,255,255,.93); border:2px solid #1e3a5f; border-radius:9px; padding:5px 9px; box-shadow:0 2px 6px rgba(0,0,0,.25); cursor:pointer; white-space:nowrap; text-align:center; }
-.rlabel .nm { font-weight:800; font-size:13px; color:#1e3a5f; }
-.rlabel .st { display:flex; gap:4px; margin-top:3px; justify-content:center; }
-.rlabel .st span { font-size:11px; font-weight:700; padding:1px 6px; border-radius:8px; color:#fff; }
+.rlabel { background:rgba(255,255,255,.93); border:1px solid #9aa1a9; border-radius:7px; padding:3px 6px; box-shadow:0 2px 6px rgba(0,0,0,.25); cursor:pointer; white-space:nowrap; text-align:center; }
+.rlabel .nm { font-weight:800; font-size:10.5px; color:#15181b; }
+.rlabel .st { display:flex; gap:3px; margin-top:2px; justify-content:center; }
+.rlabel .st span { font-size:8.5px; font-weight:700; padding:0 4px; border-radius:7px; color:#fff; }
 
 /* 학교 마커: 왼쪽=점검, 오른쪽=소독 */
 .smk { width:20px; height:20px; border-radius:50%; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.45); overflow:hidden; display:flex; }
 .smk i { display:block; width:50%; height:100%; }
 .smk.all { border-color:#15803d; box-shadow:0 0 0 2.5px #22c55e, 0 1px 4px rgba(0,0,0,.45); }
 /* 학교 이름 라벨 */
-.slabel { background:rgba(255,255,255,.88); border:1px solid #b6c2d2; border-radius:5px; padding:1px 5px; font-size:11px; font-weight:700; color:#1e293b; box-shadow:0 1px 3px rgba(0,0,0,.2); white-space:nowrap; }
+.slabel { background:rgba(255,255,255,.88); border:1px solid #9aa1a9; border-radius:4px; padding:0 4px; font-size:9px; font-weight:700; color:#1e293b; box-shadow:0 1px 3px rgba(0,0,0,.2); white-space:nowrap; }
 .slabel::before { display:none; }
 .hide-names .slabel { display:none; }
 /* 모바일: 지역·학교 라벨을 작게 (작은 화면에서 지도를 가리지 않도록) */
@@ -51,7 +55,7 @@ body { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
   .slabel { font-size:8px; padding:0 3px; border-radius:4px; }
 }
 
-#backBtn { position:absolute; top:12px; left:12px; z-index:1000; background:#1e3a5f; color:#fff; border:none; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.3); display:none; }
+#backBtn { position:absolute; top:12px; left:12px; z-index:1000; background:#15181b; color:#fff; border:none; border-radius:8px; padding:9px 16px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.3); display:none; }
 #legend { position:absolute; bottom:14px; left:14px; z-index:1000; background:rgba(255,255,255,.95); border-radius:8px; padding:9px 13px; font-size:12px; box-shadow:0 2px 8px rgba(0,0,0,.2); }
 #legend .row { display:flex; align-items:center; gap:6px; margin:3px 0; }
 #legend .half { width:16px; height:16px; border-radius:50%; border:1.5px solid #94a3b8; overflow:hidden; display:flex; }
@@ -60,7 +64,7 @@ body { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 
 /* 지역 선택 시 우측 목록 (동선 계획용) */
 #panel { position:absolute; top:0; right:0; bottom:0; width:270px; background:rgba(255,255,255,.97); z-index:1000; box-shadow:-2px 0 10px rgba(0,0,0,.2); display:none; flex-direction:column; }
-#panel header { background:#1e3a5f; color:#fff; padding:11px 14px; font-size:15px; font-weight:800; display:flex; justify-content:space-between; align-items:center; }
+#panel header { background:#15181b; color:#fff; padding:11px 14px; font-size:15px; font-weight:800; display:flex; justify-content:space-between; align-items:center; }
 #panel header button { background:none; border:none; color:#fff; font-size:18px; cursor:pointer; }
 #psummary { padding:9px 14px; border-bottom:1px solid #e2e8f0; font-size:12.5px; color:#334155; background:#f8fafc; line-height:1.7; }
 #plist { flex:1; overflow-y:auto; }
@@ -70,7 +74,7 @@ body { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 .prow .nm2 small { color:#94a3b8; display:block; font-size:11px; }
 .tag { font-size:11px; font-weight:800; padding:2px 7px; border-radius:8px; color:#fff; }
 
-.pp h3 { font-size:15px; color:#1e3a5f; margin-bottom:4px; }
+.pp h3 { font-size:15px; color:#15181b; margin-bottom:4px; }
 .pp .meta { font-size:12px; color:#475569; line-height:1.55; }
 .pp .note { font-size:11px; color:#b45309; background:#fef3c7; border-radius:5px; padding:3px 6px; margin-top:5px; }
 .pp .btns { display:flex; gap:7px; margin-top:10px; }
@@ -83,6 +87,11 @@ body { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 
 <div id="topbar">
   <h1>2026 점검·소독 현황 지도</h1>
+  <div id="modeSel" class="modeseg">
+    <button data-m="both" class="on" onclick="setMode('both')">통합</button>
+    <button data-m="insp" onclick="setMode('insp')">점검</button>
+    <button data-m="dis" onclick="setMode('dis')">소독</button>
+  </div>
   <select id="monthSel" onchange="refresh()"></select>
   <select id="mgrSel" onchange="refresh()"><option value="">담당자 전체</option></select>
   <div id="totals"></div>
@@ -132,6 +141,12 @@ const GEO_URLS = [
 const C_I = '#2563eb';   /* 점검 파랑 */
 const C_D = '#0d9488';   /* 소독 청록 */
 const C_NO = '#e2e8f0';  /* 미완료 회색 */
+let viewMode='both';     /* 보기 모드: both 통합 · insp 점검 · dis 소독 */
+function setMode(m){
+  viewMode=m;
+  document.querySelectorAll('#modeSel button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  refresh(false);
+}
 const STORE_KEY = 'awesome2026_monthly';
 let selRegion = null;
 
@@ -246,7 +261,7 @@ function buildFromGeo(gj){
   finishBoundaries();
 }
 function shapeStyle(r){
-  return {color:'#1e3a5f',weight:2.5,fillColor:'#eaf3ff',fillOpacity:.55,opacity:.95};
+  return {color:'#9aa1a9',weight:1.5,fillColor:'#eaf3ff',fillOpacity:.45,opacity:.9};
 }
 (async function(){
   /* 이천 율면 동네 경계 */
@@ -283,8 +298,11 @@ function labelHTML(r){
   const di=a.filter(s=>s.m[mi][0]).length, dd=a.filter(s=>s.m[mi][1]).length, t=a.length;
   const cI=di>=t&&t?C_I:(di?'#93b4f5':'#9aa6b5');
   const cD=dd>=t&&t?C_D:(dd?'#67c5bc':'#9aa6b5');
+  const spI=`<span style="background:${cI}">점검 ${di}/${t}</span>`;
+  const spD=`<span style="background:${cD}">소독 ${dd}/${t}</span>`;
+  const st=viewMode==='insp'?spI:viewMode==='dis'?spD:spI+spD;
   return `<div class="rlabel"><div class="nm">${r} (${t})</div>
-    <div class="st"><span style="background:${cI}">점검 ${di}/${t}</span><span style="background:${cD}">소독 ${dd}/${t}</span></div></div>`;
+    <div class="st">${st}</div></div>`;
 }
 
 /* 학교 마커 */
@@ -292,6 +310,10 @@ const markerLayer=L.layerGroup();
 const markers={};
 function mkIcon(s){
   const mi=mIdx();
+  if(viewMode==='insp'){const on=s.m[mi][0];return L.divIcon({className:'',iconSize:[20,20],iconAnchor:[10,10],
+    html:`<div class="smk${on?' all':''}"><i style="background:${on?C_I:C_NO}"></i><i style="background:${on?C_I:C_NO}"></i></div>`});}
+  if(viewMode==='dis'){const on=s.m[mi][1];return L.divIcon({className:'',iconSize:[20,20],iconAnchor:[10,10],
+    html:`<div class="smk${on?' all':''}"><i style="background:${on?C_D:C_NO}"></i><i style="background:${on?C_D:C_NO}"></i></div>`});}
   const all=s.m[mi][0]&&s.m[mi][1];
   return L.divIcon({className:'',iconSize:[20,20],iconAnchor:[10,10],
     html:`<div class="smk${all?' all':''}"><i style="background:${s.m[mi][0]?C_I:C_NO}"></i><i style="background:${s.m[mi][1]?C_D:C_NO}"></i></div>`});
@@ -306,7 +328,7 @@ SCHOOLS.forEach(s=>{
 });
 /* 너무 축소하면 이름 숨김 (겹침 방지) */
 map.on('zoomend',()=>{
-  document.getElementById('map').classList.toggle('hide-names',map.getZoom()<10);
+  document.getElementById('map').classList.toggle('hide-names',map.getZoom()<11);
 });
 function popupHTML(s){
   const mi=mIdx(), mo=monthSel.value;
@@ -368,14 +390,24 @@ function refresh(){
   /* 상단 합계 */
   const list=SCHOOLS.filter(visible);
   const di=list.filter(s=>s.m[mi][0]).length, dd=list.filter(s=>s.m[mi][1]).length;
+  const chipI=`<span class="chip i">점검 ${di} / ${list.length}</span>`;
+  const chipD=`<span class="chip d">소독 ${dd} / ${list.length}</span>`;
   document.getElementById('totals').innerHTML=
-    `<span class="chip i">점검 ${di} / ${list.length}</span><span class="chip d">소독 ${dd} / ${list.length}</span>`;
+    viewMode==='insp'?chipI:viewMode==='dis'?chipD:chipI+chipD;
   /* 범례 */
-  document.getElementById('legend').innerHTML=
-    `<div class="row"><span class="half"><i style="background:${C_I}"></i><i style="background:${C_D}"></i></span> 왼쪽=점검 · 오른쪽=소독</div>
+  let legendHTML;
+  if(viewMode==='insp')
+    legendHTML=`<div class="row"><span class="half"><i style="background:${C_I}"></i><i style="background:${C_I}"></i></span> 점검 완료</div>
+     <div class="row"><span class="half"><i style="background:${C_NO}"></i><i style="background:${C_NO}"></i></span> 점검 미완료</div>`;
+  else if(viewMode==='dis')
+    legendHTML=`<div class="row"><span class="half"><i style="background:${C_D}"></i><i style="background:${C_D}"></i></span> 소독 완료</div>
+     <div class="row"><span class="half"><i style="background:${C_NO}"></i><i style="background:${C_NO}"></i></span> 소독 미완료</div>`;
+  else
+    legendHTML=`<div class="row"><span class="half"><i style="background:${C_I}"></i><i style="background:${C_D}"></i></span> 왼쪽=점검 · 오른쪽=소독</div>
      <div class="row"><span class="half"><i style="background:${C_I}"></i><i style="background:${C_NO}"></i></span> 점검만 완료</div>
      <div class="row"><span class="half"><i style="background:${C_NO}"></i><i style="background:${C_NO}"></i></span> 둘 다 미완료</div>
      <div class="row"><span class="half" style="border:2px solid #15803d;box-shadow:0 0 0 2px #22c55e"><i style="background:${C_I}"></i><i style="background:${C_D}"></i></span> <b>모두 완료 (초록 테두리)</b></div>`;
+  document.getElementById('legend').innerHTML=legendHTML;
   /* 우측 목록 (미완료 우선 → 동선 계획용) */
   if(selRegion){
     const a=REGIONS[selRegion].filter(visible);
@@ -479,12 +511,25 @@ window.__mapStat=function(res){
     buildLabels(); refresh();
   }catch(e){}
 };
-function loadFromIlji(){
+function loadFromIlji(tries){
   __recalcAll();
-  const s=document.createElement('script');
-  s.src=APPS_URL+'?action=mapstat&callback=__mapStat&t='+Date.now();
-  s.onload=function(){s.remove();}; s.onerror=function(){s.remove();};
-  document.body.appendChild(s);
+  tries = tries || 0;
+  /* 2026-08-06: 스크립트 태그 방식은 구글 응답이 늦거나 그냥 실패하는 일이 잦다(실측).
+     fetch 가 훨씬 안정적이라 fetch 를 먼저 쓰고, 두 번까지 다시 시도한 뒤,
+     그래도 안 되면 예전 방식으로 한 번 더 부른다(로컬 파일로 열었을 때 대비). */
+  var ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  var tid = setTimeout(function(){ try{ ctl && ctl.abort(); }catch(e){} }, 15000);
+  fetch(APPS_URL+'?action=mapstat&t='+Date.now(), ctl?{signal:ctl.signal}:{})
+    .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
+    .then(function(d){ clearTimeout(tid); window.__mapStat(d); })
+    .catch(function(){
+      clearTimeout(tid);
+      if(tries < 2){ setTimeout(function(){ loadFromIlji(tries+1); }, 600); return; }
+      var s=document.createElement('script');
+      s.src=APPS_URL+'?action=mapstat&callback=__mapStat&t='+Date.now();
+      s.onload=function(){s.remove();}; s.onerror=function(){s.remove();};
+      document.body.appendChild(s);
+    });
 }
 __recalcAll();
 loadFromIlji();

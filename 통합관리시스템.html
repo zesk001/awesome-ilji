@@ -1693,12 +1693,25 @@ window.__mapStat=function(res){
     buildLabels(); refresh();
   }catch(e){}
 };
-function loadFromIlji(){
+function loadFromIlji(tries){
   __recalcAll();
-  const s=document.createElement('script');
-  s.src=APPS_URL+'?action=mapstat&amp;callback=__mapStat&amp;t='+Date.now();
-  s.onload=function(){s.remove();}; s.onerror=function(){s.remove();};
-  document.body.appendChild(s);
+  tries = tries || 0;
+  /* 2026-08-06: 스크립트 태그 방식은 구글 응답이 늦거나 그냥 실패하는 일이 잦다(실측).
+     fetch 가 훨씬 안정적이라 fetch 를 먼저 쓰고, 두 번까지 다시 시도한 뒤,
+     그래도 안 되면 예전 방식으로 한 번 더 부른다(로컬 파일로 열었을 때 대비). */
+  var ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  var tid = setTimeout(function(){ try{ ctl &amp;&amp; ctl.abort(); }catch(e){} }, 15000);
+  fetch(APPS_URL+'?action=mapstat&amp;t='+Date.now(), ctl?{signal:ctl.signal}:{})
+    .then(function(r){ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
+    .then(function(d){ clearTimeout(tid); window.__mapStat(d); })
+    .catch(function(){
+      clearTimeout(tid);
+      if(tries < 2){ setTimeout(function(){ loadFromIlji(tries+1); }, 600); return; }
+      var s=document.createElement('script');
+      s.src=APPS_URL+'?action=mapstat&amp;callback=__mapStat&amp;t='+Date.now();
+      s.onload=function(){s.remove();}; s.onerror=function(){s.remove();};
+      document.body.appendChild(s);
+    });
 }
 __recalcAll();
 loadFromIlji();
@@ -2202,18 +2215,40 @@ const App = (function(){
     Object.keys(state.overrides||{}).forEach(k=>{ const v=state.overrides[k]; if(v!=null&amp;&amp;v!=='') postLeaveKV('leave_ov:'+k, String(v)); });
     if(state.adminPw) pushAdmin();
   }
-  // 조회(JSONP): 공유저장소 전체 map 가져오기
-  function jsonpShared(timeout){
+  // 조회(JSONP) 1회: 공유저장소 전체 map 가져오기
+  function jsonpSharedOnce(timeout){
     return new Promise((resolve,reject)=>{
       const cb='__lv'+Date.now()+Math.floor(Math.random()*1000);
       const sc=document.createElement('script'); let done=false;
       const cleanup=()=>{ try{delete window[cb];}catch(e){window[cb]=undefined;} sc.remove(); clearTimeout(tid); };
       window[cb]=d=>{ done=true; cleanup(); resolve(d); };
-      const tid=setTimeout(()=>{ if(!done){ cleanup(); reject(new Error('timeout')); } }, timeout||12000);
+      const tid=setTimeout(()=>{ if(!done){ cleanup(); reject(new Error('timeout')); } }, timeout||28000);
       sc.onerror=()=>{ if(!done){ cleanup(); reject(new Error('net')); } };
       sc.src=APPS_URL+'?action=shared&amp;callback='+cb+'&amp;t='+Date.now();
       document.head.appendChild(sc);
     });
+  }
+  // fetch 방식(더 안정적) 1회
+  function fetchShared(timeout){
+    return new Promise((resolve,reject)=>{
+      let done=false;
+      const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+      const tid=setTimeout(()=>{ if(!done){ done=true; try{ctl&amp;&amp;ctl.abort();}catch(e){} reject(new Error('timeout')); } }, timeout||28000);
+      fetch(APPS_URL+'?action=shared&amp;t='+Date.now(), ctl?{signal:ctl.signal}:{})
+        .then(r=>{ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
+        .then(d=>{ if(!done){ done=true; clearTimeout(tid); resolve(d); } })
+        .catch(e=>{ if(!done){ done=true; clearTimeout(tid); reject(e); } });
+    });
+  }
+  // 구글 응답이 늦거나 가끔 실패한다 → fetch 로 두 번 시도하고, 그래도 안 되면 예전 방식으로 한 번 더
+  function jsonpShared(timeout){
+    const waits=[13000,20000];
+    let n=0;
+    const go=()=>fetchShared(timeout||waits[Math.min(n,1)]).catch(err=>{
+      if(++n>=2) return jsonpSharedOnce(timeout||28000);
+      return new Promise(r=>setTimeout(r,500)).then(go);
+    });
+    return go();
   }
   // 서버에서 항목별 데이터를 받아 재구성. 없으면(또는 예전 통짜키만 있으면) 이관 후 업로드
   async function syncFromShared(showMsg){
@@ -4028,7 +4063,7 @@ let sites=[], logs=[], monthOffset=0;
 const APPS_URL='https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
 const ILJI_URL='https://zesk001.github.io/awesome-ilji';  // 일일업무일지 작성 폼(웹)
 function openIlji(){window.open(ILJI_URL,'_blank','noopener');}
-let gData={logs:[],estimates:{},wstat:{},recv:{},docrec:{},est:[],orders:[],matStatus:{},photoBoards:[],taxInvoices:[],_okeys:null,connected:false,loading:false,err:''};
+let gData={logs:[],estimates:{},wstat:{},recv:{},docrec:{},est:[],orders:[],matStatus:{},photoBoards:[],taxInvoices:[],_okeys:null,connected:false,loading:false,err:'',partial:''};
 try{gData.matStatus=JSON.parse(localStorage.getItem('aws_matstatus')||'{}');}catch(e){gData.matStatus={};}
 // 수기 견적(견적 추가 버튼) — 구글 공유 + 로컬 백업(서버 미반영 시에도 본인 화면엔 유지)
 let manualEst=[];try{manualEst=JSON.parse(localStorage.getItem('aws_manual_est')||'[]');}catch(e){manualEst=[];}
@@ -4036,7 +4071,12 @@ function mergeManualEst(){gData.est=gData.est||[];manualEst.forEach(m=>{if(!gDat
 mergeManualEst();
 /* ===== 수기 입력 공유(구글시트 '공유데이터') ===== */
 function postShared(key,value){try{fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'setshared',key:key,value:value,editor:(typeof conWho==='function'?conWho():'')||''})}).catch(()=>{});}catch(e){}}
-function applyShared(res){
+function applyShared(res,ok){
+  /* ok===false 는 '공유데이터를 못 받았다'는 뜻.
+     이때 그냥 진행하면 아래 로직이 "서버에 값이 없다"고 착각해서
+     이 PC의 옛 값을 서버로 도로 올려버린다(남이 바꾼 값을 덮어씀).
+     그러니 못 받았으면 아무것도 하지 않고 지금 화면 값을 그대로 둔다. */
+  if(ok===false)return;
   const map=(res&&res.map)||{};
   // 연차 휴가 데이터(금주 휴가자 카드용) — 연차 탭과 같은 공유 키에서 읽기만 함
   (function(){
@@ -4093,8 +4133,8 @@ function applyShared(res){
 }
 let gPendingMat={};try{gPendingMat=JSON.parse(localStorage.getItem('aws_matpending')||'{}');}catch(e){gPendingMat={};}
 let __jcb=0;
-// JSONP 호출(스크립트 태그 방식 — 로컬 파일에서도 작동, 일지 앱과 동일 방식)
-function jsonp(params,timeout=15000){
+// JSONP 호출 1회(스크립트 태그 방식 — 로컬 파일에서도 작동, 일지 앱과 동일 방식)
+function jsonpOnce(params,timeout){
   return new Promise((resolve,reject)=>{
     const cb='__g'+(++__jcb)+'_'+Date.now();
     const s=document.createElement('script');let done=false;
@@ -4105,6 +4145,34 @@ function jsonp(params,timeout=15000){
     s.src=APPS_URL+'?'+params+'&callback='+cb+'&t='+Date.now();
     document.head.appendChild(s);
   });
+}
+/* 일반 호출(fetch 방식) — 2026-08-06 실측 결과 이쪽이 훨씬 안정적이고 빠름
+   같은 시각에 나란히 재보면: fetch 2.0초·2.8초·2.5초(전부 성공) / 스크립트태그 20.7초 실패·2.5초 성공.
+   스크립트 태그 방식은 구글 로그인 상태를 함께 태워 보내느라 응답이 자주 늦거나 실패한다. */
+function fetchJson(params,timeout){
+  return new Promise((resolve,reject)=>{
+    let done=false;
+    const ctl=(typeof AbortController!=='undefined')?new AbortController():null;
+    const tid=setTimeout(()=>{if(!done){done=true;try{ctl&&ctl.abort();}catch(e){}reject(new Error('시간초과'));}},timeout);
+    fetch(APPS_URL+'?'+params+'&t='+Date.now(),ctl?{signal:ctl.signal}:{})
+      .then(r=>{if(!r.ok)throw new Error('응답 오류('+r.status+')');return r.json();})
+      .then(d=>{if(!done){done=true;clearTimeout(tid);resolve(d);}})
+      .catch(e=>{if(!done){done=true;clearTimeout(tid);reject(e);}});
+  });
+}
+/* 구글 조회(자동 재시도 포함)
+   ① fetch 로 시도 → 실패하면 잠깐 쉬었다 다시 시도
+   ② 그래도 안 되면 예전 방식(스크립트 태그)으로 한 번 더 — 로컬 파일로 열었을 때 대비
+   호출할 때마다 t= 값이 새로 붙으므로 재시도는 항상 새 요청이 된다. */
+function jsonp(params,timeout=28000,tries=3){
+  // 오래 기다리는 것보다 빨리 포기하고 새로 부르는 편이 훨씬 빠르다(새 요청은 대개 2~3초에 온다).
+  const waits=[Math.min(timeout,13000),Math.min(timeout,20000),timeout];
+  let n=0;
+  const go=()=>fetchJson(params,waits[Math.min(n,waits.length-1)]).catch(err=>{
+    if(++n>=tries)return jsonpOnce(params,timeout);
+    return new Promise(r=>setTimeout(r,500)).then(go);
+  });
+  return go();
 }
 function weekDates(){
   const base=new Date();const day=base.getDay();const mon=new Date(base);mon.setDate(base.getDate()-((day+6)%7));
@@ -4117,13 +4185,16 @@ async function loadGoogle(manual){
     const master=await jsonp('action=master');
     gData.estimates=master.estimates||{};gData.wstat=master.wstat||{};gData.recv=master.recv||{};gData.docrec=master.docrec||{};
     const today=todayStr();const days=weekDates().filter(d=>d<=today);
-    const estP=jsonp('action=estimates',12000).then(r=>(r&&r.items)||[]).catch(()=>[]);  // 견적 탭(동시 조회)
-    const ordP=jsonp('action=orders',12000).then(r=>(r&&r.items)||[]).catch(()=>[]);     // 발주 탭(동시 조회)
-    const matP=jsonp('action=materials',12000).then(r=>(r&&r.items)||[]).catch(()=>[]);  // 자재 단계 탭(동시 조회)
-    const pbP=jsonp('action=photoboards',12000).then(r=>(r&&r.items)||[]).catch(()=>[]); // 사진대지 목록(동시 조회)
-    const txP=jsonp('action=taxinvoices',12000).then(r=>(r&&r.items)||[]).catch(()=>[]); // 세금계산서 목록(동시 조회)
-    const shP=jsonp('action=shared',12000).then(r=>r||{map:{}}).catch(()=>({map:{}}));   // 수기 공유 항목(동시 조회)
-    const res=await Promise.all(days.map(d=>jsonp('action=day&date='+d).then(r=>({d,rows:(r&&r.rows)||[]})).catch(()=>({d,rows:[]}))));
+    const failed=[];  // 못 불러온 항목 이름(화면에 알려주기 위함)
+    const estP=jsonp('action=estimates').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('견적');return [];});      // 견적 탭(동시 조회)
+    const ordP=jsonp('action=orders').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('발주');return [];});         // 발주 탭(동시 조회)
+    const matP=jsonp('action=materials').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('자재');return [];});      // 자재 단계 탭(동시 조회)
+    const pbP=jsonp('action=photoboards').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('사진대지');return [];}); // 사진대지 목록(동시 조회)
+    const txP=jsonp('action=taxinvoices').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('세금계산서');return [];});// 세금계산서 목록(동시 조회)
+    // 수기 공유 항목(동시 조회) — 실패하면 sharedOk=false 로 표시해서 '되올리기'를 막는다
+    let sharedOk=true;
+    const shP=jsonp('action=shared').then(r=>r||{map:{}}).catch(()=>{sharedOk=false;failed.push('공유데이터');return {map:{}};});
+    const res=await Promise.all(days.map(d=>jsonp('action=day&date='+d).then(r=>({d,rows:(r&&r.rows)||[]})).catch(()=>{failed.push('일지 '+d.slice(5));return {d,rows:[]};})));
     const out=[];
     res.forEach(({d,rows})=>rows.forEach(r=>out.push({date:d,type:r[0]||'',region:r[1]||'',site:r[2]||'',content:r[3]||'',stage:r[4]||'',note:r[5]||'',writer:r[6]||''})));
     gData.logs=out;gData.est=await estP;gData.orders=await ordP;gData._okeys=null;gData.connected=true;mergeManualEst();
@@ -4133,7 +4204,9 @@ async function loadGoogle(manual){
     gData.matStatus=merged;matLocalSave();
     gData.photoBoards=await pbP;rebuildPb();
     gData.taxInvoices=await txP;rebuildTax();
-    applyShared(await shP);
+    applyShared(await shP,sharedOk);
+    gData.partial=failed.slice(0,4).join('·')+(failed.length>4?' 외':'');
+    if(failed.length&&manual)alert('일부 항목을 못 불러왔습니다: '+gData.partial+'\n\n구글 응답이 늦을 때 생깁니다. 잠시 후 [구글 연동]을 다시 눌러 주세요.\n(못 불러온 항목은 화면에 옛 내용이 남아 있을 수 있습니다.)');
   }catch(e){gData.connected=false;gData.err=String(e&&e.message||e);
     if(manual)alert('구글 연동에 실패했습니다.\n인터넷 연결을 확인해 주세요.\n('+gData.err+')');}
   gData.loading=false;updateSyncUI();renderAll();
@@ -4141,8 +4214,9 @@ async function loadGoogle(manual){
 function updateSyncUI(){
   const b=document.getElementById('syncBtn');if(!b)return;
   if(gData.loading){b.textContent='↻ 연동 중…';b.style.color='var(--amber)';b.style.borderColor='var(--amber)';}
-  else if(gData.connected){b.textContent='● 구글 연동됨';b.style.color='var(--g1)';b.style.borderColor='var(--g2)';}
-  else{b.textContent='↻ 구글 연동';b.style.color='var(--muted)';b.style.borderColor='var(--stroke2)';}
+  else if(gData.connected&&gData.partial){b.textContent='▲ 일부 못 받음('+gData.partial+')';b.style.color='var(--amber)';b.style.borderColor='var(--amber)';b.title='구글 응답이 늦어 일부 항목을 못 받았습니다. 눌러서 다시 시도하세요.';}
+  else if(gData.connected){b.textContent='● 구글 연동됨';b.style.color='var(--g1)';b.style.borderColor='var(--g2)';b.title='';}
+  else{b.textContent='↻ 구글 연동';b.style.color='var(--muted)';b.style.borderColor='var(--stroke2)';b.title='';}
 }
 // 견적 목록 평탄화: [{region,school,name,date,stage,recv}]
 function gEstList(){
@@ -5475,7 +5549,7 @@ async function flushMat(){
     fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)}).catch(()=>{});});
   await new Promise(r=>setTimeout(r,2000));   // 시트 반영 잠깐 대기
   try{
-    const r=await jsonp('action=materials',12000);
+    const r=await jsonp('action=materials');
     const items=(r&&r.items)||[];const sheetMap={};items.forEach(it=>{if(it&&it.key)sheetMap[it.key]=it;});
     let ok=0,fail=0;
     keys.forEach(k=>{const p=gPendingMat[k];
