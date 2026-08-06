@@ -4192,11 +4192,20 @@ async function loadGoogle(manual){
        구글은 같은 스크립트를 동시에 여러 개 처리하지 못하고 줄을 세워서, 부를수록 느려졌다.
        그래서 서버에 묶음 창구(action=bundle)를 만들어 한 번에 받아온다.
        혹시 묶음이 안 되면(옛 서버 등) 예전처럼 하나씩 부르는 길로 자동으로 돌아간다. */
-    let B=null;
-    try{
-      B=await jsonp('action=bundle&parts=master,estimates,orders,materials,photoboards,taxinvoices,shared&days='+days.join(','),50000,2,[40000,50000]);   // 묶음은 원래 15~25초 걸리므로 넉넉히 기다린다(성급한 재시도가 오히려 느림)
-      if(!B||typeof B!=='object'||(!B.master&&!B.shared&&!B.days))B=null;
-    }catch(e){B=null;}
+    /* 2026-08-06 실측 결론: 묶음(1번)보다 항목별(여러 번)이 실제로 더 빠르다.
+       묶음은 서버가 시트를 순서대로 다 읽느라 18초 넘게 걸리고 응답도 278KB라 자주 실패했다.
+       항목별은 하나에 2~5초씩이고 동시에 나가서 전체 5~10초면 끝난다.
+       그래서 기본은 항목별. 서버의 묶음 창구(action=bundle)는 만들어 뒀으니
+       나중에 데이터가 훨씬 커지면 아래 한 줄(aws_use_bundle)로 켜서 비교해 볼 수 있다.
+       (켜기: 주소창에서 localStorage.setItem('aws_use_bundle','1') 실행 후 새로고침) */
+    let B=null,useBundle=false;
+    try{useBundle=(localStorage.getItem('aws_use_bundle')==='1');}catch(e){}
+    if(useBundle){
+      try{
+        B=await jsonp('action=bundle&parts=master,estimates,orders,materials,photoboards,taxinvoices,shared&days='+days.join(','),50000,2,[40000,50000]);
+        if(!B||typeof B!=='object'||(!B.master&&!B.shared&&!B.days))B=null;
+      }catch(e){B=null;}
+    }
 
     if(B){
       const pick=(key,name)=>{const v=B[key];if(!v||v.error){failed.push(name);return null;}return v;};
@@ -4210,8 +4219,8 @@ async function loadGoogle(manual){
       if(s1){shRes=s1;}else{sharedOk=false;}
       dayRes = days.map(d=>({d,rows:((B.days&&B.days[d]&&B.days[d].rows)||[])}));
     }else{
-      // ── 예비 경로: 예전처럼 항목별로 따로 부르기 ──
-      failed.push('묶음조회');
+      // ── 기본 경로: 항목별로 동시에 부르기(빠름) ──
+      if(useBundle)failed.push('묶음조회');
       const estP=jsonp('action=estimates').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('견적');return [];});
       const ordP=jsonp('action=orders').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('발주');return [];});
       const matP=jsonp('action=materials').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('자재');return [];});
