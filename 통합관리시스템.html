@@ -3891,9 +3891,24 @@ function ceoRows(txt){
   if(cell!=='' || row.length){ row.push(cell); rows.push(row); }
   return rows;
 }
-/* 한 줄 = {t:글자, c:색}. 옛 저장분은 그냥 글자만 있으므로 둘 다 받아준다. */
-function ceoLine(v){ if(v &amp;&amp; typeof v==='object') return {t:String(v.t||''), c:String(v.c||'')}; return {t:String(v||''), c:''}; }
-function ceoLines(a){ return (a||[]).map(ceoLine); }
+/* 한 줄 = 조각 배열. 조각 = {t:글자, c:색}.
+   대표님 엑셀은 한 줄 안에서도 일부만 빨갛게(예: ㆍ[계약] - 학교장터[S2B]-(증평도안초) 칠하시므로
+   줄 단위가 아니라 조각 단위로 색을 들고 다닌다. 옛 저장분(문자열 / {t,c})도 그대로 읽힌다. */
+function ceoSegs(v){
+  if(v==null) return [];
+  if(typeof v==='string') return v?[{t:v,c:''}]:[];
+  if(Object.prototype.toString.call(v)==='[object Array]'){
+    return v.map(function(x){ return (typeof x==='string')?{t:x,c:''}:{t:String((x&amp;&amp;x.t)||''),c:String((x&amp;&amp;x.c)||'')}; })
+            .filter(function(o){ return o.t!==''; });
+  }
+  if(typeof v==='object'){
+    if(Object.prototype.toString.call(v.s)==='[object Array]') return ceoSegs(v.s);
+    return [{t:String(v.t||''),c:String(v.c||'')}];
+  }
+  return [];
+}
+function ceoText(v){ return ceoSegs(v).map(function(o){ return o.t; }).join(''); }
+function ceoHasColor(v){ var g=ceoSegs(v); for(var i=0;i<g.length;i++){ if(g[i].c) return true; } return false; }
 function ceoSection(head){
   var h=String(head||'').replace(/\s+/g,'');
   if(h.indexOf('금주업무보고')>=0) return 'n';
@@ -3910,7 +3925,7 @@ function ceoParse(txt){
     var body='';
     for(var i=1;i<cols.length;i++){ var v=String(cols[i]||'').replace(/\s+$/,''); if(v.trim()){ body=v; break; } }
     if(!body) return;
-    body.split('\n').forEach(function(ln){ var t=ln.replace(/\s+$/,''); if(t.trim()) out[cur].push({t:t,c:''}); });
+    body.split('\n').forEach(function(ln){ var t=ln.replace(/\s+$/,''); if(t.trim()) out[cur].push([{t:t,c:''}]); });
   });
   return out;
 }
@@ -3918,23 +3933,49 @@ function ceoParse(txt){
 function ceoNormColor(c){
   var v=String(c||'').trim().toLowerCase();
   if(!v) return '';
-  if(v==='black'||v==='#000'||v==='#000000'||v==='windowtext'||v==='inherit'||v==='rgb(0, 0, 0)'||v==='rgb(0,0,0)') return '';
+  if(v==='black'||v==='#000'||v==='#000000'||v==='windowtext'||v==='inherit'||v==='auto') return '';
+  if(v.replace(/\s/g,'')==='rgb(0,0,0)') return '';
   return v;
 }
-function ceoColorOf(el){
-  function pick(x){
-    if(!x) return '';
-    if(x.style &amp;&amp; x.style.color) return x.style.color;
-    if(x.getAttribute &amp;&amp; x.getAttribute('color')) return x.getAttribute('color');
-    return '';
-  }
-  var v=pick(el);
-  if(v) return v;
-  var kids=el.querySelectorAll?el.querySelectorAll('*'):[];
-  for(var i=0;i<kids.length;i++){ var k=pick(kids[i]); if(k) return k; }
-  return '';
+function ceoElColor(el){
+  var v='';
+  if(el.style &amp;&amp; el.style.color) v=el.style.color;
+  if(!v &amp;&amp; el.getAttribute &amp;&amp; el.getAttribute('color')) v=el.getAttribute('color');
+  return ceoNormColor(v);
 }
-/* 엑셀에서 그대로 붙여넣으면 표(<table>)가 색까지 함께 들어온다. 그 색을 살려서 읽는다. */
+/* 칸 안을 훑으며 (글자, 색) 조각을 모은다. <br> 을 만나면 줄을 바꾼다. */
+function ceoWalk(node, color, lines){
+  var kids=node.childNodes;
+  for(var i=0;i<kids.length;i++){
+    var ch=kids[i];
+    if(ch.nodeType===3){
+      var t=String(ch.nodeValue||'');
+      if(t) lines[lines.length-1].push({t:t,c:color});
+    } else if(ch.nodeType===1){
+      var tag=String(ch.tagName||'').toLowerCase();
+      if(tag==='br'){ lines.push([]); continue; }
+      ceoWalk(ch, ceoElColor(ch)||color, lines);
+      if(tag==='div'||tag==='p') lines.push([]);
+    }
+  }
+}
+function ceoCellLines(td){
+  var lines=[[]];
+  ceoWalk(td, ceoElColor(td), lines);
+  var out=[];
+  lines.forEach(function(segs){
+    var m=[];
+    segs.forEach(function(s){
+      if(!s.t) return;
+      var last=m[m.length-1];
+      if(last &amp;&amp; last.c===s.c) last.t+=s.t; else m.push({t:s.t,c:s.c});
+    });
+    while(m.length){ var lastSeg=m[m.length-1]; lastSeg.t=lastSeg.t.replace(/\s+$/,''); if(lastSeg.t==='') m.pop(); else break; }
+    if(m.length &amp;&amp; m.map(function(x){return x.t;}).join('').trim()!=='') out.push(m);
+  });
+  return out;
+}
+/* 엑셀에서 그대로 붙여넣으면 표(<table>)가 색까지 함께 들어온다. 그 색을 조각째 살려서 읽는다. */
 function ceoParseEl(el){
   var tbl=el?el.querySelector('table'):null;
   if(!tbl) return ceoParse(el?(el.innerText||el.textContent||''):'');
@@ -3947,22 +3988,27 @@ function ceoParseEl(el){
     if(!cur) continue;
     for(var j=1;j<tds.length;j++){
       var td=tds[j];
-      var txt=String(td.innerText||td.textContent||'');
-      if(!txt.trim()) continue;
-      var col=ceoNormColor(ceoColorOf(td));
-      txt.split(/\r?\n/).forEach(function(ln){ var t=ln.replace(/\s+$/,''); if(t.trim()) out[cur].push({t:t,c:col}); });
+      if(!String(td.innerText||td.textContent||'').trim()) continue;
+      ceoCellLines(td).forEach(function(segs){ out[cur].push(segs); });
       break;
     }
   }
   return out;
 }
+/* 한 줄을 색 살려서 HTML 로 */
+function ceoLineHTML(v, bold){
+  return ceoSegs(v).map(function(o){
+    if(!o.c) return esc(o.t);
+    return '<span style=&quot;color:'+o.c+(bold?';font-weight:700':'')+'&quot;>'+esc(o.t)+'</span>';
+  }).join('');
+}
 /* 붙여넣기 칸을 다시 열 때: 저장해둔 내용을 같은 모양의 표로 되살린다(엑셀 원본 HTML은 너무 커서 저장하지 않는다) */
 function ceoBoxHTML(){
   if(!CEO) return '';
   function rows(lab,arr){
-    var L=ceoLines(arr);
+    var L=(arr||[]);
     if(!L.length) return '<tr><td>'+lab+'</td><td></td></tr>';
-    return L.map(function(o,i){ return '<tr><td>'+(i===0?lab:'')+'</td><td'+(o.c?(' style=&quot;color:'+o.c+'&quot;'):'')+'>'+esc(o.t)+'</td></tr>'; }).join('');
+    return L.map(function(v,i){ return '<tr><td>'+(i===0?lab:'')+'</td><td>'+ceoLineHTML(v,false)+'</td></tr>'; }).join('');
   }
   return '<table border=&quot;1&quot; cellspacing=&quot;0&quot; cellpadding=&quot;3&quot; style=&quot;border-collapse:collapse;font-size:12px&quot;>'+rows('금주업무보고',CEO.n)+rows('차주업무보고',CEO.x)+rows('기타',CEO.e)+'</table>';
 }
@@ -3983,11 +4029,10 @@ function ceoStore(obj){
 /* 대표님 페이지: 건수 칩·분류표·도넛 없이 금주/차주/기타 글만 (사용자 선택) */
 function ceoReport(){
   function sec(title,color,arr){
-    var L=ceoLines(arr);
-    function line(o){
+    var L=(arr||[]);
+    function line(v){
       var st='font-size:12.5px;line-height:1.65;margin:2px 0 2px 4px';
-      if(o.c) st+=';color:'+o.c+';font-weight:700';   /* 엑셀에서 색으로 강조한 줄 */
-      return '<div class=&quot;wr-item&quot; style=&quot;'+st+'&quot;>'+esc(o.t)+'</div>';
+      return '<div class=&quot;wr-item&quot; style=&quot;'+st+'&quot;>'+ceoLineHTML(v,true)+'</div>';   /* 엑셀에서 색칠한 부분만 색+굵게 */
     }
     var first=L.length?line(L[0]):'<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>';
     var rest=L.slice(1).map(line).join('');
@@ -4033,7 +4078,7 @@ function ceoOpen(){
   function recount(){
     var pr=ceoParseEl(pad);
     var col=0;
-    ['n','x','e'].forEach(function(k){ pr[k].forEach(function(o){ if(o.c) col++; }); });
+    ['n','x','e'].forEach(function(k){ pr[k].forEach(function(v){ if(ceoHasColor(v)) col++; }); });
     msg.textContent='읽어들인 줄 — 금주 '+pr.n.length+' · 차주 '+pr.x.length+' · 기타 '+pr.e.length+'   (색으로 강조된 줄 '+col+')';
     return pr;
   }
