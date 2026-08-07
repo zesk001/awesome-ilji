@@ -3937,19 +3937,38 @@ function ceoNormColor(c){
   if(v.replace(/\s/g,'')==='rgb(0,0,0)') return '';
   return v;
 }
-/* 글자색 읽기
-   엑셀이 클립보드에 넣는 표는 색을 (1) 칸에 직접 style=&quot;color:...&quot; 로 넣기도 하고
-   (2) 위쪽 <style> 의 반 이름(class)으로 넣기도 한다. 그래서 실제로 화면에 적용된 색
-   (getComputedStyle)을 보고, 붙여넣기 칸의 기본 글자색과 같으면 강조가 아닌 것으로 친다. */
-function ceoElColor(el, base){
+/* ── 글자색 읽기 ─────────────────────────────────────────────
+   엑셀이 클립보드에 넣는 표는 색을 세 가지 방식으로 준다.
+     (1) 칸에 직접 style=&quot;color:...&quot;
+     (2) <font color=...>
+     (3) 위쪽 <style> 에 반 이름으로 정의하고 (.font5{color:red}, .xl65{color:#FF0000})
+         칸이나 글자 조각에 class 로 붙이기  ← 대표님 파일이 이 방식
+   (3)은 붙여넣기 과정에서 <style> 이 떨어져 나가면 색이 통째로 사라진다.
+   그래서 붙여넣을 때 원본 HTML을 직접 받아 <style> 의 반 이름 → 색 표를 만들어 쓴다. */
+function ceoCssColors(html){
+  var map={}, css='', m;
+  var re=/<style[^>]*>([\s\S]*?)<\/style>/gi;
+  while((m=re.exec(String(html||'')))) css+=m[1]+'\n';
+  var rr=/\.([A-Za-z0-9_-]+)\s*\{([^}]*)\}/g, r2;
+  while((r2=rr.exec(css))){
+    var cm=/(?:^|[;{\s])color\s*:\s*([^;}]+)/i.exec(r2[2]);
+    if(cm) map[r2[1]]=cm[1].trim();
+  }
+  return map;
+}
+function ceoElColor(el, base, map){
   var v='';
-  try{
-    var win=el.ownerDocument &amp;&amp; el.ownerDocument.defaultView;
-    if(win &amp;&amp; win.getComputedStyle) v=win.getComputedStyle(el).color||'';
-  }catch(e){}
-  if(!v){
-    if(el.style &amp;&amp; el.style.color) v=el.style.color;
-    else if(el.getAttribute &amp;&amp; el.getAttribute('color')) v=el.getAttribute('color');
+  if(el.style &amp;&amp; el.style.color) v=el.style.color;
+  if(!v &amp;&amp; map &amp;&amp; el.getAttribute){
+    var cl=el.getAttribute('class');
+    if(cl){ cl.split(/\s+/).forEach(function(c){ if(!v &amp;&amp; map[c]) v=map[c]; }); }
+  }
+  if(!v &amp;&amp; el.getAttribute &amp;&amp; el.getAttribute('color')) v=el.getAttribute('color');
+  if(!v &amp;&amp; !map){
+    try{
+      var win=el.ownerDocument &amp;&amp; el.ownerDocument.defaultView;
+      if(win &amp;&amp; win.getComputedStyle) v=win.getComputedStyle(el).color||'';
+    }catch(e){}
   }
   v=ceoNormColor(v);
   if(!v) return '';
@@ -3957,7 +3976,7 @@ function ceoElColor(el, base){
   return v;
 }
 /* 칸 안을 훑으며 (글자, 색) 조각을 모은다. <br> 을 만나면 줄을 바꾼다. */
-function ceoWalk(node, color, lines, base){
+function ceoWalk(node, color, lines, base, map){
   var kids=node.childNodes;
   for(var i=0;i<kids.length;i++){
     var ch=kids[i];
@@ -3966,15 +3985,16 @@ function ceoWalk(node, color, lines, base){
       if(t) lines[lines.length-1].push({t:t,c:color});
     } else if(ch.nodeType===1){
       var tag=String(ch.tagName||'').toLowerCase();
+      if(tag==='style'||tag==='script') continue;
       if(tag==='br'){ lines.push([]); continue; }
-      ceoWalk(ch, ceoElColor(ch,base)||color, lines, base);
+      ceoWalk(ch, ceoElColor(ch,base,map)||color, lines, base, map);
       if(tag==='div'||tag==='p') lines.push([]);
     }
   }
 }
-function ceoCellLines(td, base){
+function ceoCellLines(td, base, map){
   var lines=[[]];
-  ceoWalk(td, ceoElColor(td,base), lines, base);
+  ceoWalk(td, ceoElColor(td,base,map), lines, base, map);
   var out=[];
   lines.forEach(function(segs){
     var m=[];
@@ -3988,19 +4008,13 @@ function ceoCellLines(td, base){
   });
   return out;
 }
-/* 엑셀 표에서 금주/차주/기타를 나눠 읽는다.
+/* 표에서 금주/차주/기타를 나눠 읽는다.
    ★주의: 대표님 시트의 구획 이름 칸은 위아래로 병합돼 있어서, 엑셀은 첫 줄에만 그 칸을 주고
    나머지 줄에는 아예 안 준다(rowspan). 그래서 둘째 줄부터는 내용이 첫 번째 칸으로 밀려온다.
    구획 이름이 있는 줄만 다음 칸부터 읽고, 없는 줄은 첫 칸부터 읽어야 한다. */
-function ceoParseEl(el){
-  var tbl=el?el.querySelector('table'):null;
-  if(!tbl) return ceoParse(el?(el.innerText||el.textContent||''):'');
-  var base='';
-  try{
-    var win=el.ownerDocument &amp;&amp; el.ownerDocument.defaultView;
-    if(win &amp;&amp; win.getComputedStyle) base=win.getComputedStyle(el).color||'';
-  }catch(e){}
+function ceoParseTable(tbl, base, map){
   var out={n:[],x:[],e:[]}, cur='';
+  if(!tbl) return out;
   var trs=tbl.querySelectorAll('tr');
   for(var i=0;i<trs.length;i++){
     var tds=trs[i].querySelectorAll('td,th');
@@ -4012,11 +4026,29 @@ function ceoParseEl(el){
     for(var j=start;j<tds.length;j++){
       var td=tds[j];
       if(!String(td.innerText||td.textContent||'').trim()) continue;
-      ceoCellLines(td, base).forEach(function(segs){ out[cur].push(segs); });
+      ceoCellLines(td, base, map).forEach(function(segs){ out[cur].push(segs); });
       break;
     }
   }
   return out;
+}
+/* 붙여넣기 칸(화면에 있는 표)에서 읽기 — 우리가 만든 표라 색이 style 에 직접 들어 있다 */
+function ceoParseEl(el){
+  var tbl=el?el.querySelector('table'):null;
+  if(!tbl) return ceoParse(el?(el.innerText||el.textContent||''):'');
+  var base='';
+  try{
+    var win=el.ownerDocument &amp;&amp; el.ownerDocument.defaultView;
+    if(win &amp;&amp; win.getComputedStyle) base=win.getComputedStyle(el).color||'';
+  }catch(e){}
+  return ceoParseTable(tbl, base, null);
+}
+/* 엑셀에서 막 붙여넣은 원본 HTML에서 읽기 — 반 이름(class) 색표를 만들어 쓴다 */
+function ceoParseHTML(html){
+  var doc=null;
+  try{ doc=(new DOMParser()).parseFromString(String(html||''),'text/html'); }catch(e){}
+  if(!doc) return {n:[],x:[],e:[]};
+  return ceoParseTable(doc.querySelector('table'), '', ceoCssColors(html));
 }
 /* 한 줄을 색 살려서 HTML 로 */
 function ceoLineHTML(v, bold){
@@ -4025,16 +4057,20 @@ function ceoLineHTML(v, bold){
     return '<span style=&quot;color:'+o.c+(bold?';font-weight:700':'')+'&quot;>'+esc(o.t)+'</span>';
   }).join('');
 }
-/* 붙여넣기 칸을 다시 열 때: 저장해둔 내용을 같은 모양의 표로 되살린다(엑셀 원본 HTML은 너무 커서 저장하지 않는다) */
-function ceoBoxHTML(){
-  if(!CEO) return '';
+/* 저장해둔 내용(또는 방금 읽은 내용)을 같은 모양의 표로 되살린다.
+   여기서 만드는 표는 색이 style 에 직접 들어가므로 다시 읽을 때 문제가 없다.
+   (엑셀 원본 HTML은 수십 KB라 저장하지 않는다) */
+function ceoBoxHTMLFrom(o){
+  if(!o) return '';
   function rows(lab,arr){
     var L=(arr||[]);
     if(!L.length) return '<tr><td>'+lab+'</td><td></td></tr>';
     return L.map(function(v,i){ return '<tr><td>'+(i===0?lab:'')+'</td><td>'+ceoLineHTML(v,false)+'</td></tr>'; }).join('');
   }
-  return '<table border=&quot;1&quot; cellspacing=&quot;0&quot; cellpadding=&quot;3&quot; style=&quot;border-collapse:collapse;font-size:12px&quot;>'+rows('금주업무보고',CEO.n)+rows('차주업무보고',CEO.x)+rows('기타',CEO.e)+'</table>';
+  return '<table border=&quot;1&quot; cellspacing=&quot;0&quot; cellpadding=&quot;3&quot; style=&quot;border-collapse:collapse;font-size:12px&quot;>'+rows('금주업무보고',o.n)+rows('차주업무보고',o.x)+rows('기타',o.e)+'</table>';
 }
+function ceoBoxHTML(){ return ceoBoxHTMLFrom(CEO); }
+
 function ceoStamp(){ var t=new Date(); return fmt(t)+' '+pad(t.getHours())+':'+pad(t.getMinutes()); }
 function ceoWho(){ try{ if(typeof window.parent.conWho==='function') return window.parent.conWho()||''; }catch(e){} return ''; }
 function ceoPost(key,val){
@@ -4106,7 +4142,21 @@ function ceoOpen(){
     return pr;
   }
   pad.oninput=recount;
-  pad.addEventListener('paste', function(){ setTimeout(recount,30); });
+  /* 붙여넣을 때 원본 HTML을 직접 받아 색(반 이름 포함)까지 읽은 뒤, 우리 표로 바꿔 넣는다 */
+  pad.addEventListener('paste', function(ev){
+    var html='';
+    try{ var cd=ev.clipboardData||window.clipboardData; if(cd) html=cd.getData('text/html')||''; }catch(e){}
+    if(html &amp;&amp; html.indexOf('<table')>=0){
+      try{ ev.preventDefault(); }catch(e){}
+      var pr=ceoParseHTML(html);
+      if(pr.n.length+pr.x.length+pr.e.length){
+        pad.innerHTML=ceoBoxHTMLFrom(pr);
+        recount();
+        return;
+      }
+    }
+    setTimeout(recount,30);
+  });
   if(pad.innerHTML) recount();
   var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-top:10px';
   var save=document.createElement('button'); save.textContent='저장';
