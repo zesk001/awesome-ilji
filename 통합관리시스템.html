@@ -3670,6 +3670,7 @@ function printHTML(bodyHTML){
     '.paper{box-shadow:none!important;border-radius:0!important;max-width:680px!important;width:100%!important;margin:0 auto!important;padding:10px 14px!important}'+
     '.wr-cols{column-count:2!important;column-gap:20px!important}.wr-item{break-inside:avoid}.wr-head{break-after:avoid}'+
     '.grp,.card,.sub{overflow:visible!important}'+
+    '.paper.loose .wr-blk{break-inside:auto!important}'+
     'td,th,.wr-item{overflow-wrap:anywhere}'+
     '.wr-blk{break-inside:avoid}.wr-keep{break-inside:avoid}'+
     '.pbreak{page-break-after:always}.pbreak:last-child{page-break-after:auto}'+
@@ -3680,7 +3681,7 @@ function printHTML(bodyHTML){
     '<style>'+styleEl.textContent+'</style>'+
     '<style>'+css+'</style>'+
     '</head><body>'+bodyHTML+
-    '<script>var __T=1000;'+'function __fit(p){p.style.zoom=1;if(p.getBoundingClientRect().height<=__T)return;'+'var z=1;for(var k=0;k<90;k++){z=z-0.005;if(z<0.55){z=0.55;p.style.zoom=z;break;}p.style.zoom=z;if(p.getBoundingClientRect().height<=__T)break;}}'+'function __go(){var ps=document.getElementsByClassName(&quot;paper&quot;);for(var i=0;i<ps.length;i++){__fit(ps[i]);}'+'setTimeout(function(){window.print();window.close();},200);}'+'window.onload=function(){var w=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();'+'w.then(function(){setTimeout(__go,350);}).catch(function(){setTimeout(__go,350);});}<\/script>'+
+    '<script>var __T=1000;'+'function __sh(p){p.style.zoom=1;if(p.getBoundingClientRect().height<=__T)return 1;'+'var z=1;for(var k=0;k<90;k++){z=z-0.005;if(z<0.55){z=0.55;p.style.zoom=z;return z;}p.style.zoom=z;if(p.getBoundingClientRect().height<=__T)return z;}return z;}'+'function __fit(p){var z=__sh(p);if(z>=0.9)return;'+'p.classList.add(&quot;loose&quot;);var z2=__sh(p);if(z2<z){p.classList.remove(&quot;loose&quot;);__sh(p);}}'+'function __go(){var ps=document.getElementsByClassName(&quot;paper&quot;);for(var i=0;i<ps.length;i++){__fit(ps[i]);}'+'setTimeout(function(){window.print();window.close();},200);}'+'window.onload=function(){var w=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();'+'w.then(function(){setTimeout(__go,350);}).catch(function(){setTimeout(__go,350);});}<\/script>'+
     '</body></html>'
   );
   pw.document.close();
@@ -3734,6 +3735,7 @@ function ensurePreviewStyle(){
    +'#printPreview .wr-cols{column-count:2;column-gap:20px}'
    +'#printPreview .wr-item{break-inside:avoid}'
    +'#printPreview .wr-blk{break-inside:avoid}#printPreview .wr-keep{break-inside:avoid}'
+   +'#printPreview .paper.loose .wr-blk{break-inside:auto}'
    +'#printPreview .grp,#printPreview .card,#printPreview .sub{overflow:visible}'
    +'#printPreview td,#printPreview th,#printPreview .wr-item{overflow-wrap:anywhere}'
    +'#printPreview table{font-size:10px}#printPreview th{font-size:9.5px}#printPreview td{padding:3px 4px}';
@@ -3776,15 +3778,19 @@ function openPreview(pages, labels, printFn){
 
   /* 미리보기 축소 기준을 인쇄와 똑같이 맞춘다(보이는 대로 나오게) — A4 세로에서 위아래 여백 14mm 뺀 높이 */
   var PV_T=1000;
+  function pvShrink(pp){
+    pp.style.zoom=1;
+    if(pp.getBoundingClientRect().height<=PV_T) return 1;
+    var z=1;
+    for(var k=0;k<90;k++){ z=z-0.005; if(z<0.55){ z=0.55; pp.style.zoom=z; return z; } pp.style.zoom=z; if(pp.getBoundingClientRect().height<=PV_T) return z; }
+    return z;
+  }
   function fitAll(){
     var pgs=scroll.getElementsByClassName('pvPage');
     for(var i=0;i<pgs.length;i++){
       var pp=pgs[i].getElementsByClassName('paper')[0]; if(!pp) continue;
-      pp.style.zoom=1;
-      if(pp.getBoundingClientRect().height>PV_T){
-        var z=1;
-        for(var k=0;k<90;k++){ z=z-0.005; if(z<0.55){ z=0.55; pp.style.zoom=z; break; } pp.style.zoom=z; if(pp.getBoundingClientRect().height<=PV_T)break; }
-      }
+      var z=pvShrink(pp);
+      if(z<0.9){ pp.classList.add('loose'); var z2=pvShrink(pp); if(z2<z){ pp.classList.remove('loose'); pvShrink(pp); } }
       var pc=pgs[i].getElementsByClassName('pvNo')[0];
       if(pc){ var zz=Math.round((parseFloat(pp.style.zoom)||1)*100); pc.textContent=pc.textContent.replace(/ · 축소 \d+%$/,'')+(zz<100?(' · 축소 '+zz+'%'):''); }
     }
