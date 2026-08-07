@@ -3937,14 +3937,27 @@ function ceoNormColor(c){
   if(v.replace(/\s/g,'')==='rgb(0,0,0)') return '';
   return v;
 }
-function ceoElColor(el){
+/* 글자색 읽기
+   엑셀이 클립보드에 넣는 표는 색을 (1) 칸에 직접 style=&quot;color:...&quot; 로 넣기도 하고
+   (2) 위쪽 <style> 의 반 이름(class)으로 넣기도 한다. 그래서 실제로 화면에 적용된 색
+   (getComputedStyle)을 보고, 붙여넣기 칸의 기본 글자색과 같으면 강조가 아닌 것으로 친다. */
+function ceoElColor(el, base){
   var v='';
-  if(el.style &amp;&amp; el.style.color) v=el.style.color;
-  if(!v &amp;&amp; el.getAttribute &amp;&amp; el.getAttribute('color')) v=el.getAttribute('color');
-  return ceoNormColor(v);
+  try{
+    var win=el.ownerDocument &amp;&amp; el.ownerDocument.defaultView;
+    if(win &amp;&amp; win.getComputedStyle) v=win.getComputedStyle(el).color||'';
+  }catch(e){}
+  if(!v){
+    if(el.style &amp;&amp; el.style.color) v=el.style.color;
+    else if(el.getAttribute &amp;&amp; el.getAttribute('color')) v=el.getAttribute('color');
+  }
+  v=ceoNormColor(v);
+  if(!v) return '';
+  if(base &amp;&amp; v===ceoNormColor(base)) return '';
+  return v;
 }
 /* 칸 안을 훑으며 (글자, 색) 조각을 모은다. <br> 을 만나면 줄을 바꾼다. */
-function ceoWalk(node, color, lines){
+function ceoWalk(node, color, lines, base){
   var kids=node.childNodes;
   for(var i=0;i<kids.length;i++){
     var ch=kids[i];
@@ -3954,14 +3967,14 @@ function ceoWalk(node, color, lines){
     } else if(ch.nodeType===1){
       var tag=String(ch.tagName||'').toLowerCase();
       if(tag==='br'){ lines.push([]); continue; }
-      ceoWalk(ch, ceoElColor(ch)||color, lines);
+      ceoWalk(ch, ceoElColor(ch,base)||color, lines, base);
       if(tag==='div'||tag==='p') lines.push([]);
     }
   }
 }
-function ceoCellLines(td){
+function ceoCellLines(td, base){
   var lines=[[]];
-  ceoWalk(td, ceoElColor(td), lines);
+  ceoWalk(td, ceoElColor(td,base), lines, base);
   var out=[];
   lines.forEach(function(segs){
     var m=[];
@@ -3975,21 +3988,31 @@ function ceoCellLines(td){
   });
   return out;
 }
-/* 엑셀에서 그대로 붙여넣으면 표(<table>)가 색까지 함께 들어온다. 그 색을 조각째 살려서 읽는다. */
+/* 엑셀 표에서 금주/차주/기타를 나눠 읽는다.
+   ★주의: 대표님 시트의 구획 이름 칸은 위아래로 병합돼 있어서, 엑셀은 첫 줄에만 그 칸을 주고
+   나머지 줄에는 아예 안 준다(rowspan). 그래서 둘째 줄부터는 내용이 첫 번째 칸으로 밀려온다.
+   구획 이름이 있는 줄만 다음 칸부터 읽고, 없는 줄은 첫 칸부터 읽어야 한다. */
 function ceoParseEl(el){
   var tbl=el?el.querySelector('table'):null;
   if(!tbl) return ceoParse(el?(el.innerText||el.textContent||''):'');
+  var base='';
+  try{
+    var win=el.ownerDocument &amp;&amp; el.ownerDocument.defaultView;
+    if(win &amp;&amp; win.getComputedStyle) base=win.getComputedStyle(el).color||'';
+  }catch(e){}
   var out={n:[],x:[],e:[]}, cur='';
   var trs=tbl.querySelectorAll('tr');
   for(var i=0;i<trs.length;i++){
     var tds=trs[i].querySelectorAll('td,th');
     if(!tds.length) continue;
-    var sec=ceoSection(tds[0].innerText||tds[0].textContent||''); if(sec) cur=sec;
+    var sec=ceoSection(tds[0].innerText||tds[0].textContent||'');
+    var start=0;
+    if(sec){ cur=sec; start=1; }
     if(!cur) continue;
-    for(var j=1;j<tds.length;j++){
+    for(var j=start;j<tds.length;j++){
       var td=tds[j];
       if(!String(td.innerText||td.textContent||'').trim()) continue;
-      ceoCellLines(td).forEach(function(segs){ out[cur].push(segs); });
+      ceoCellLines(td, base).forEach(function(segs){ out[cur].push(segs); });
       break;
     }
   }
