@@ -3572,6 +3572,7 @@ window.addEventListener('DOMContentLoaded', App.init);
   <span id=&quot;weekLabel&quot;></span>
   <button onclick=&quot;moveWeek(1)&quot;>다음주 ▶</button>
   <button onclick=&quot;loadWeek()&quot;>새로고침</button>
+  <button onclick=&quot;ceoOpen()&quot;>대표 업무일지 붙여넣기</button>
   <span class=&quot;seg&quot;>
     <button id=&quot;viewAll&quot; class=&quot;on&quot; onclick=&quot;setView('all')&quot;>통합</button>
     <button id=&quot;viewWriter&quot; onclick=&quot;setView('writer')&quot;>담당자별</button>
@@ -3698,7 +3699,7 @@ function onPrintClick(){
   });
 }
 /* 기록 있는 담당자 목록(직급순) — 화면 상태와 무관하게 계산 */
-function writerListNow(){ var s={}; DATA.forEach(function(r){ s[r.writer||'(미상)']=1; }); return Object.keys(s).sort(cmpWriter); }
+function writerListNow(){ var s={}; DATA.forEach(function(r){ s[r.writer||'(미상)']=1; }); if(ceoHas()) s[CEO_NAME]=1; return Object.keys(s).sort(cmpWriter); }
 /* 담당자 각자 렌더해 paper HTML 배열로 수집 (통합 보기에서 눌러도 동작) */
 function collectWriterPapers(){
   var savedW=selWriter, savedV=viewMode, papers=[], names=[];
@@ -3838,6 +3839,7 @@ async function loadWeek(){
   }catch(err){}
   const now=new Date();
   document.getElementById('genTxt').innerHTML='생성: '+fmt(now)+' '+pad(now.getHours())+':'+pad(now.getMinutes())+'<br>어썸조경 일일업무일지 자동취합';
+  ceoLoad();
   if(viewMode==='writer') buildWriterTabs();
   renderAll();
   loading=false;
@@ -3846,15 +3848,153 @@ async function loadWeek(){
 function esc(s){return String(s).replace(/&amp;/g,'&amp;amp;').replace(/</g,'&amp;lt;').replace(/>/g,'&amp;gt;');}
 function siteLabel(r){ var rg=(r.region==='기타지역'?'':r.region); return [rg,r.site].filter(Boolean).join(' ') || '-'; }
 
+
+/* ── 신현철 대표 주간업무보고 (엑셀 붙여넣기, 2026-08-07 추가) ──────────
+   대표님은 일일업무일지를 쓰지 않으시고 기존 엑셀 주간업무일지에 직접 쓰신다.
+   그 시트를 복사해 붙여넣으면 그 주의 구글 공유데이터(ceo_week:주시작일)에 저장되고,
+   담당자별 보기와 인쇄에 한 장으로 자동 포함된다. */
+const CEO_NAME='신현철 대표';
+let CEO=null;
+function ceoKey(){ return 'ceo_week:'+fmt(weekDays()[0]); }
+function ceoSharedMap(){ try{ var g=window.parent.gData; if(g){ if(!g.sharedMap) g.sharedMap={}; return g.sharedMap; } }catch(e){} return null; }
+function ceoLoad(){
+  CEO=null;
+  var m=ceoSharedMap(); if(!m) return;
+  var v=m[ceoKey()]; if(!v) return;
+  try{ var o=JSON.parse(v); if(o) CEO=o; }catch(e){}
+}
+function ceoHas(){ if(!CEO) return false; return ((CEO.n||[]).length+(CEO.x||[]).length+(CEO.e||[]).length)>0; }
+function isCeoView(){ if(viewMode!=='writer') return false; if(selWriter!==CEO_NAME) return false; return ceoHas(); }
+/* 엑셀에서 복사한 표를 읽는다.
+   엑셀은 칸을 탭으로, 줄을 줄바꿈으로 준다. 다만 칸 안에 줄바꿈이 들어있으면(대표님 시트의
+   세로쓰기 '금 주 업 무 보 고' 처럼) 그 칸 전체를 큰따옴표로 감싸서 준다. 그래서 그냥 줄 단위로
+   자르면 안 되고 아래처럼 따옴표를 봐가며 잘라야 한다. */
+function ceoRows(txt){
+  var s=String(txt||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  var rows=[], row=[], cell='', q=false;
+  for(var i=0;i<s.length;i++){
+    var ch=s.charAt(i);
+    if(q){
+      if(ch==='&quot;'){ if(s.charAt(i+1)==='&quot;'){ cell+='&quot;'; i++; } else { q=false; } }
+      else { cell+=ch; }
+    } else {
+      if(ch==='&quot;' &amp;&amp; cell===''){ q=true; }
+      else if(ch==='\t'){ row.push(cell); cell=''; }
+      else if(ch==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; }
+      else { cell+=ch; }
+    }
+  }
+  if(cell!=='' || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+/* 왼쪽 첫 칸의 구획 이름(금주업무보고·차주업무보고·기타)을 따라 내용을 나눠 담는다. */
+function ceoParse(txt){
+  var out={n:[],x:[],e:[]}, cur='';
+  ceoRows(txt).forEach(function(cols){
+    var head=String(cols[0]||'').replace(/\s+/g,'');
+    if(head.indexOf('금주업무보고')>=0){ cur='n'; }
+    else if(head.indexOf('차주업무보고')>=0){ cur='x'; }
+    else if(head==='기타'){ cur='e'; }
+    if(!cur) return;
+    var body='';
+    for(var i=1;i<cols.length;i++){ var v=String(cols[i]||'').replace(/\s+$/,''); if(v.trim()){ body=v; break; } }
+    if(!body) return;
+    body.split('\n').forEach(function(ln){ var t=ln.replace(/\s+$/,''); if(t.trim()) out[cur].push(t); });
+  });
+  return out;
+}
+function ceoStamp(){ var t=new Date(); return fmt(t)+' '+pad(t.getHours())+':'+pad(t.getMinutes()); }
+function ceoWho(){ try{ if(typeof window.parent.conWho==='function') return window.parent.conWho()||''; }catch(e){} return ''; }
+function ceoPost(key,val){
+  try{ if(typeof window.parent.postShared==='function'){ window.parent.postShared(key,val); return; } }catch(e){}
+  try{ fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'setshared',key:key,value:val,editor:ceoWho()})}).catch(function(){}); }catch(e){}
+}
+function ceoStore(obj){
+  var k=ceoKey(), json=obj?JSON.stringify(obj):'';
+  ceoPost(k,json);
+  var m=ceoSharedMap(); if(m) m[k]=json;
+  CEO=obj;
+  if(viewMode==='writer') buildWriterTabs();
+  renderAll();
+}
+/* 대표님 페이지: 건수 칩·분류표·도넛 없이 금주/차주/기타 글만 (사용자 선택) */
+function ceoReport(){
+  function sec(title,color,lines){
+    var body=(lines||[]).map(function(v){ return '<div class=&quot;wr-item&quot; style=&quot;font-size:12.5px;line-height:1.65;margin:2px 0 2px 4px&quot;>'+esc(v)+'</div>'; }).join('');
+    if(!body) body='<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>';
+    return '<div style=&quot;margin-bottom:12px&quot;><div class=&quot;wr-head&quot; style=&quot;color:#fff;font-weight:bold;padding:5px 11px;border-radius:5px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div><div style=&quot;padding:5px 4px 2px&quot;>'+body+'</div></div>';
+  }
+  var dd=weekDays();
+  var stamp=CEO.t?('입력: '+esc(CEO.t)+(CEO.by?(' · '+esc(CEO.by)):'')):'';
+  var h='<div style=&quot;background:#fff;border:1px solid #e5e9e6;border-radius:8px;padding:12px 16px&quot;>';
+  h+='<div style=&quot;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:8px&quot;>';
+  h+='<b style=&quot;font-size:16px&quot;>'+esc(CEO_NAME)+'</b>';
+  h+='<span style=&quot;font-size:12.5px;color:#666&quot;>'+fmt(dd[0])+' ~ '+fmt(dd[6])+'</span>';
+  h+='<span style=&quot;margin-left:auto;font-size:11.5px;color:#999&quot;>'+stamp+'</span></div>';
+  h+='<div class=&quot;wr-cols&quot;>';
+  h+=sec('금주업무보고','#1e5631',CEO.n);
+  h+=sec('차주업무보고','#2f6f9f',CEO.x);
+  h+=sec('기타','#8a6d1f',CEO.e);
+  h+='</div>';
+  return h+'</div>';
+}
+/* 붙여넣기 창 */
+function ceoOpen(){
+  var ex=document.getElementById('ceoDlg'); if(ex) ex.remove();
+  var ov=document.createElement('div'); ov.id='ceoDlg';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999';
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:10px;padding:18px 20px;width:760px;max-width:92vw;box-shadow:0 12px 34px rgba(0,0,0,.3);font-family:inherit';
+  var dd=weekDays();
+  var t=document.createElement('div');
+  t.textContent='신현철 대표 주간업무보고 · '+fmt(dd[0])+' ~ '+fmt(dd[6]);
+  t.style.cssText='font-weight:800;font-size:15px;color:#1e5631;margin-bottom:6px'; box.appendChild(t);
+  var g=document.createElement('div');
+  g.textContent='엑셀에서 대표님 시트의 표를 왼쪽 첫 칸부터 통째로 끌어 선택해 복사(Ctrl+C)한 뒤, 아래 칸에 붙여넣고(Ctrl+V) 저장을 누르세요. 금주업무보고·차주업무보고·기타 칸이 들어가야 제대로 읽습니다.';
+  g.style.cssText='font-size:12.5px;color:#555;line-height:1.6;margin-bottom:10px'; box.appendChild(g);
+  var ta=document.createElement('textarea');
+  ta.style.cssText='width:100%;height:230px;border:1px solid #cbd5cf;border-radius:8px;padding:9px 11px;font-size:12.5px;font-family:inherit;box-sizing:border-box';
+  ta.value=(CEO&amp;&amp;CEO.r)?CEO.r:'';
+  box.appendChild(ta);
+  var msg=document.createElement('div');
+  msg.style.cssText='font-size:12px;color:#666;margin:8px 0 2px;min-height:17px'; box.appendChild(msg);
+  function recount(){ var p=ceoParse(ta.value); msg.textContent='읽어들인 줄 — 금주 '+p.n.length+' · 차주 '+p.x.length+' · 기타 '+p.e.length; }
+  ta.oninput=recount; if(ta.value) recount();
+  var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-top:10px';
+  var save=document.createElement('button'); save.textContent='저장';
+  save.style.cssText='flex:1;padding:10px;border:none;border-radius:8px;background:#1e5631;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer;font-family:inherit';
+  save.onclick=function(){
+    var pr=ceoParse(ta.value);
+    if(!(pr.n.length+pr.x.length+pr.e.length)){ alert('금주업무보고 / 차주업무보고 / 기타 칸을 찾지 못했습니다.\n엑셀에서 왼쪽 첫 칸(구획 이름)까지 포함해 복사했는지 확인해 주세요.'); return; }
+    ceoStore({r:ta.value,n:pr.n,x:pr.x,e:pr.e,t:ceoStamp(),by:ceoWho()});
+    ov.remove();
+    alert('저장했습니다. 담당자별 보기와 인쇄에 대표님 페이지가 들어갑니다.');
+  };
+  row.appendChild(save);
+  var del=document.createElement('button'); del.textContent='이 주 내용 지우기';
+  del.style.cssText='padding:10px 14px;border:1px solid #d9b3b3;border-radius:8px;background:#fff;color:#a33;font-size:13px;cursor:pointer;font-family:inherit';
+  del.onclick=function(){ if(!confirm('이 주의 대표님 내용을 지울까요?')) return; ceoStore(null); ov.remove(); };
+  row.appendChild(del);
+  var cl=document.createElement('button'); cl.textContent='닫기';
+  cl.style.cssText='padding:10px 14px;border:1px solid #cbd5cf;border-radius:8px;background:#f4f7f4;font-size:13px;cursor:pointer;font-family:inherit';
+  cl.onclick=function(){ ov.remove(); };
+  row.appendChild(cl);
+  box.appendChild(row);
+  ov.appendChild(box);
+  ov.onclick=function(ev){ if(ev.target===ov) ov.remove(); };
+  document.body.appendChild(ov);
+  ta.focus();
+}
+
 /* ── 담당자 이름 탭 만들기 ── */
 function buildWriterTabs(){
-  WLIST=[...new Set(DATA.map(r=>r.writer||'(미상)'))].sort(cmpWriter);
+  WLIST=writerListNow();
   const bar=document.getElementById('writerTabBar');
   if(!WLIST.length){ bar.innerHTML='<span class=&quot;empty&quot; style=&quot;padding:6px 2px;&quot;>이번 주 전송된 기록이 없습니다</span>'; selWriter=''; return; }
   if(WLIST.indexOf(selWriter)<0) selWriter=WLIST[0];
   bar.innerHTML=WLIST.map(function(w,i){
     const n=DATA.filter(r=>(r.writer||'(미상)')===w).length;
-    return '<button class=&quot;wtab'+(w===selWriter?' on':'')+'&quot; onclick=&quot;selectWriter('+i+')&quot;>'+esc(w)+'<span class=&quot;tcnt&quot;>'+n+'</span></button>';
+    return '<button class=&quot;wtab'+(w===selWriter?' on':'')+'&quot; onclick=&quot;selectWriter('+i+')&quot;>'+esc(w)+(n?'<span class=&quot;tcnt&quot;>'+n+'</span>':'')+'</button>';
   }).join('');
 }
 function selectWriter(i){
@@ -3870,6 +4010,16 @@ function scopeData(){
 
 /* ── 전체 렌더 ── */
 function renderAll(){
+  /* 대표님 페이지는 칩·분류표·도넛 없이 글만 */
+  var _ceo=isCeoView();
+  var _chips=document.querySelector('.chips'), _grid=document.querySelector('.grid2');
+  if(_chips) _chips.style.display=_ceo?'none':'';
+  if(_grid) _grid.style.display=_ceo?'none':'';
+  if(_ceo){
+    document.getElementById('detailTitle').textContent=CEO_NAME+' · 주간업무보고';
+    document.getElementById('secDetail').innerHTML=ceoReport();
+    return;
+  }
   const scope=scopeData();
   renderChips(scope);
   renderSummary(scope);
@@ -4087,7 +4237,7 @@ let sites=[], logs=[], monthOffset=0;
 const APPS_URL='https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
 const ILJI_URL='https://zesk001.github.io/awesome-ilji';  // 일일업무일지 작성 폼(웹)
 function openIlji(){window.open(ILJI_URL,'_blank','noopener');}
-let gData={logs:[],estimates:{},wstat:{},recv:{},docrec:{},est:[],orders:[],matStatus:{},photoBoards:[],taxInvoices:[],_okeys:null,connected:false,loading:false,err:'',partial:''};
+let gData={logs:[],estimates:{},wstat:{},recv:{},docrec:{},est:[],orders:[],matStatus:{},photoBoards:[],taxInvoices:[],sharedMap:{},_okeys:null,connected:false,loading:false,err:'',partial:''};
 try{gData.matStatus=JSON.parse(localStorage.getItem('aws_matstatus')||'{}');}catch(e){gData.matStatus={};}
 // 수기 견적(견적 추가 버튼) — 구글 공유 + 로컬 백업(서버 미반영 시에도 본인 화면엔 유지)
 let manualEst=[];try{manualEst=JSON.parse(localStorage.getItem('aws_manual_est')||'[]');}catch(e){manualEst=[];}
@@ -4102,6 +4252,7 @@ function applyShared(res,ok){
      그러니 못 받았으면 아무것도 하지 않고 지금 화면 값을 그대로 둔다. */
   if(ok===false)return;
   const map=(res&&res.map)||{};
+  try{gData.sharedMap=map;}catch(e){}   /* 주간업무일지 iframe이 대표 보고 내용을 읽어감 */
   // 연차 휴가 데이터(금주 휴가자 카드용) — 연차 탭과 같은 공유 키에서 읽기만 함
   (function(){
     const lvE=[],lvR=[];
