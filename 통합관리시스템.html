@@ -5104,6 +5104,23 @@ function printBoard(){
     if(!has && txt.length-head.length<3) g.remove();
     else if(!has && g.querySelector('.empty')) g.remove();
   });
+  /* 달력을 크게 쓰려고 왼쪽 칸을 비운다 — 금주 일지·금주 휴가자는 빼고, 메모는 오른쪽 맨 아래로 */
+  ['pWeekly','pLeave'].forEach(function(id){
+    var e=deck.querySelector('#'+id); if(!e) return;
+    var g=e.closest ? e.closest('.glass') : null; if(g) g.remove();
+  });
+  var memo=deck.querySelector('#pMemo');
+  var colList=[].slice.call(deck.querySelectorAll('.col'));
+  if(memo && colList.length){
+    var mg=memo.closest ? memo.closest('.glass') : null;
+    if(mg) colList[colList.length-1].appendChild(mg);
+  }
+  colList.forEach(function(c){ if(!c.children.length) c.remove(); });
+  var nCol=deck.querySelectorAll('.col').length;
+  deck.style.gridTemplateColumns = (nCol<=1) ? 'minmax(0,1fr)'
+    : (nCol===2 ? 'minmax(0,2.8fr) minmax(0,1.15fr)'
+                : 'minmax(0,1.15fr) minmax(0,2.1fr) minmax(0,1.15fr)');
+
   var rows=Math.max(1,Math.ceil((grid.children.length-7)/7));
   var title=((document.getElementById('calTitle')||{}).textContent||'').replace(/\s+/g,' ').trim();
   var now=new Date();
@@ -5210,6 +5227,17 @@ function printBoard(){
    +'#inner .cell{min-width:0}#inner .wbchip{max-width:100%;overflow:hidden;text-overflow:ellipsis}'
    +'#inner .miniwrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}'
    +'#inner .lwgrid{grid-template-columns:repeat(5,minmax(0,1fr))}'
+   /* 소독 다회현장은 앱에서 인라인 글자크기(12px)가 박혀 있어 !important 로 눌러야 한다 */
+   +'#inner #wbList_sodahoe .nm{font-size:8.5px!important}'
+   +'#inner #wbList_sodahoe .meta{font-size:7px!important;margin-top:0!important}'
+   +'#inner #wbList_sodahoe .row{padding:1px 3px!important}'
+   +'#inner #wbList_sodahoe .lwhd{font-size:8px!important;padding:1px 0!important}'
+   +'#inner #wbList_sodahoe > div{gap:5px!important}'
+   /* 달력 칸: 공사|외주|AS 를 3등분하면 현장 이름이 잘린다 → 인쇄에선 줄바꿈으로 흘려 이름을 다 보여준다 */
+   +'#inner .cell{overflow:hidden}'
+   +'#inner .crow1{display:flex!important;flex-wrap:wrap;gap:2px}'
+   +'#inner .zone{min-width:0;flex:0 1 auto;overflow:hidden}'
+   +'#inner .cellchip{max-width:100%}'
    +'#inner .lwhd{background:transparent!important;color:#556!important;border-bottom:1px solid #e3e8ec}'
    +'#inner .wbchips:empty{display:none}'
    +'#inner .glass > div:empty{display:none}'
