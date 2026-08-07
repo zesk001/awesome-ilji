@@ -3831,11 +3831,15 @@ function fetchDaysAll(list){
   });
 }
 
-/* ── 점검·소독 진행 현황 자료 (2026-08-07 추가) ──────────────────
-   점검은 달마다 새로 도는 일이라 '이번 달' 기준, 소독은 상·하반기 1회가 기본이라 '이번 반기' 기준으로 센다.
-   회사 전체 기록(mapstat)을 보고 지역별로 몇 곳 끝냈는지 계산한다. */
-let MAPSTAT=null;                 /* [{r:지역, s:현장, i:[점검월], d:[소독월]}] */
+/* ── 점검·소독 진행 현황 자료 (2026-08-07) ──────────────────
+   점검은 달마다 새로 도는 일이라 '이번 달' 기준,
+   소독은 상·하반기 각 1회가 기본이라 '이번 반기' 기준으로 센다.
+   ※ 중요: 서버(mapstat)가 주는 월 번호는 0부터 시작한다(0=1월, 7=8월).
+      예전에는 1~12로 알고 세는 바람에 이번 달 숫자가 늘 0으로 나왔다. */
+let MAPSTAT=null;                 /* [{r:지역, s:현장, i:[점검월 0~11], d:[소독월 0~11]}] */
 let SCHOOLCNT=null;               /* 지역 -> 학교 수 (학교 명단 기준) */
+let DISCNT=null;                  /* 지역 -> 정기 소독현장 수 (현황판 명단 기준) */
+let DAHOE=null;                   /* 다회 소독현장 이름(띄어쓰기 뺀 것) -> &quot;3회&quot;/&quot;4회&quot; */
 const SCHOOLCNT_FALLBACK={'천안':79,'아산':53,'논산':35,'청주':33,'공주':30,'서산':26,'예산':25,'홍성':23,'부여':22,'평택':20,'안성':19,'보령':18,'태안':16,'금산':13,'청양':12,'당진':9,'세종':8,'서천':5,'진천':3,'증평':2,'괴산':1,'이천':1,'충주':1};
 function fetchMapStat(){
   if(typeof fetch!=='function') return Promise.resolve(null);
@@ -3861,19 +3865,47 @@ function loadSchoolCounts(){
     return SCHOOLCNT;
   }).catch(function(){ SCHOOLCNT=SCHOOLCNT_FALLBACK; return SCHOOLCNT; });
 }
-function halfMonths(){ const m=(new Date()).getMonth()+1; return (m<=6)?[1,2,3,4,5,6]:[7,8,9,10,11,12]; }
-function halfName(){ return ((new Date()).getMonth()+1<=6)?'상반기':'하반기'; }
+/* 정기 소독현장 수(지역별)와 다회 소독현장 목록은 현황판(부모 창)에 있는 것을 그대로 쓴다 */
+function loadDisRefs(){
+  if(DISCNT&amp;&amp;DAHOE) return;
+  DISCNT={}; DAHOE={};
+  try{
+    const S=window.parent&amp;&amp;window.parent.WB_DIS_SITES;
+    if(S&amp;&amp;S.length) S.forEach(function(x){ const r=String(x.r||'').trim(); if(r) DISCNT[r]=(DISCNT[r]||0)+1; });
+  }catch(e){}
+  try{
+    const d=JSON.parse(window.parent.localStorage.getItem('aws_wb_lists')||'{}');
+    (d.sodahoe||[]).forEach(function(it){
+      const nm=String(it.name||'').replace(/\s+/g,'');
+      if(nm) DAHOE[nm]=(String(it.note||'').trim()||'다회');
+    });
+  }catch(e){}
+}
+/* 이 현장이 다회 소독현장인가 — 지역+현장 / 현장 이름만, 띄어쓰기는 무시하고 맞춰본다 */
+function dahoeTag(region, site){
+  loadDisRefs();
+  const a=String(region||'').replace(/\s+/g,'')+String(site||'').replace(/\s+/g,'');
+  const b=String(site||'').replace(/\s+/g,'');
+  if(DAHOE[a]) return DAHOE[a];
+  if(DAHOE[b]) return DAHOE[b];
+  if(b.length>=3){ for(const k in DAHOE){ if(k.indexOf(b)>=0) return DAHOE[k]; } }
+  return '';
+}
+function thisMonth0(){ return (new Date()).getMonth(); }                       /* 0=1월 */
+function halfMonths0(){ return thisMonth0()<=5?[0,1,2,3,4,5]:[6,7,8,9,10,11]; }
+function halfName(){ return thisMonth0()<=5?'상반기':'하반기'; }
 /* 지역별 진행: kind 'insp'=이번 달 점검 / 'dis'=이번 반기 소독 */
 function regionProgress(kind, region){
   if(!MAPSTAT) return null;
-  const M=(new Date()).getMonth()+1, HM=halfMonths();
+  loadDisRefs();
+  const M=thisMonth0(), HM=halfMonths0();
   let done=0;
   MAPSTAT.forEach(function(x){
     if(String(x.r||'')!==String(region)) return;
     if(kind==='insp'){ if((x.i||[]).indexOf(M)>=0) done++; }
-    else { const d=x.d||[]; for(let k=0;k<HM.length;k++){ if(d.indexOf(HM[k])>=0){ done++; return; } } }
+    else { const dd=x.d||[]; for(let k=0;k<HM.length;k++){ if(dd.indexOf(HM[k])>=0){ done++; return; } } }
   });
-  const total=(kind==='insp' &amp;&amp; SCHOOLCNT)?(SCHOOLCNT[region]||0):0;
+  const total=(kind==='insp')?((SCHOOLCNT||SCHOOLCNT_FALLBACK)[region]||0):((DISCNT||{})[region]||0);
   return {done:done, total:total, left:Math.max(0,total-done)};
 }
 
@@ -4462,17 +4494,29 @@ function writerReport(scope){
         var chips='<span style=&quot;background:#eef1ef;color:#556;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px&quot;>이번 주 '+sites.length+'곳</span>';
         var pg=regionProgress(kind, rg);
         if(pg){
-          if(kind==='insp' &amp;&amp; pg.total>0){
-            var okAll=(pg.left<=0);
-            var bg=okAll?'#e6f4dc':'#fff2e2', fg=okAll?'#2f6b1a':'#8a4c10';
-            chips+=' <span style=&quot;background:'+bg+';color:'+fg+';font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px&quot;>이번 달 '+pg.done+'/'+pg.total+(okAll?' · 완료':' · 남은 '+pg.left)+'</span>';
-          } else if(kind==='dis' &amp;&amp; pg.done>0){
-            chips+=' <span style=&quot;background:#e3f2f9;color:#17607d;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px&quot;>'+halfName()+' '+pg.done+'곳 완료</span>';
+          if(kind==='insp'&amp;&amp;pg.total>0){
+            var okA=(pg.left<=0);
+            chips+=' <span style=&quot;background:'+(okA?'#e6f4dc':'#fff2e2')+';color:'+(okA?'#2f6b1a':'#8a4c10')+';font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px&quot;>이번 달 '+pg.done+'/'+pg.total+(okA?' · 완료':' · 남은 '+pg.left)+'</span>';
+          } else if(kind==='dis'){
+            if(pg.total>0){
+              var okD=(pg.left<=0);
+              chips+=' <span style=&quot;background:'+(okD?'#e6f4dc':'#e3f2f9')+';color:'+(okD?'#2f6b1a':'#17607d')+';font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px&quot;>'+halfName()+' '+pg.done+'/'+pg.total+(okD?' · 완료':' · 남은 '+pg.left)+'</span>';
+            } else if(pg.done>0){
+              chips+=' <span style=&quot;background:#e3f2f9;color:#17607d;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px&quot;>'+halfName()+' '+pg.done+'곳 완료</span>';
+            }
           }
         }
+        /* 현장 이름 — 소독은 다회현장이면 옆에 회차를 붙여 따로 눈에 띄게 한다 */
+        var nHoe=0;
+        var names=sites.map(function(sv){
+          var tg=(kind==='dis')?dahoeTag(rg,sv):'';
+          if(tg) nHoe++;
+          return esc(sv)+(tg?'<span style=&quot;margin-left:3px;background:#f0e6ff;color:#63409c;font-size:9.5px;font-weight:700;padding:0 5px;border-radius:8px&quot;>'+esc(tg)+'</span>':'');
+        }).join(' · ');
+        if(nHoe) chips+=' <span style=&quot;background:#f0e6ff;color:#63409c;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px&quot;>다회현장 '+nHoe+'곳</span>';
         return '<div class=&quot;wr-item&quot; style=&quot;margin:4px 0 5px 10px&quot;>'
           +'<div style=&quot;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap&quot;><b style=&quot;font-size:12.5px;color:#1f2937&quot;>'+esc(rg)+'</b>'+chips+'</div>'
-          +'<div style=&quot;font-size:11.5px;line-height:1.55;color:#4a4a4a;margin:1px 0 0 6px&quot;>'+sites.map(esc).join(' · ')+'</div>'
+          +'<div style=&quot;font-size:11.5px;line-height:1.55;color:#4a4a4a;margin:1px 0 0 6px&quot;>'+names+'</div>'
           +'</div>';
       }).join('');
     } else {
@@ -5366,6 +5410,7 @@ const WB=(function(){
   let sjRegion='';   // 선택된 지역
   let sjFilter='';
   const SJDATA=(typeof WB_DIS_SITES!=='undefined')?WB_DIS_SITES:[];
+  try{ window.WB_DIS_SITES=SJDATA; }catch(e){}   /* 주간업무일지(아이프레임)에서 지역별 정기 소독현장 수를 쓰기 위해 */
   function sjGroups(){
     const g={};SJDATA.forEach(s=>{(g[s.r]=g[s.r]||[]).push(s);});
     return Object.keys(g).sort((a,b)=>a.localeCompare(b,'ko')).map(r=>({region:r,sites:g[r]}));

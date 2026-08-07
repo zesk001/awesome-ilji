@@ -881,7 +881,9 @@
   }
   function loadMonthDone(){
     try{
-      var M=(new Date()).getMonth()+1;
+      /* 서버가 주는 월 번호는 0부터 시작한다(0=1월, 7=8월).
+         예전에는 1~12로 알고 비교해서 '이번 달 이미 한 곳' 표시가 한 번도 안 걸렸다. (2026-08-07 고침) */
+      var M=(new Date()).getMonth();
       gcall('action=mapstat', function(res){
         try{
           var items=(res&&res.items)||[]; var insp={}, dis={};
