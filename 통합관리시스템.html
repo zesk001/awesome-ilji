@@ -3856,7 +3856,7 @@ function siteLabel(r){ var rg=(r.region==='기타지역'?'':r.region); return [r
 const CEO_NAME='신현철 대표';
 let CEO=null;
 function ceoKey(){ return 'ceo_week:'+fmt(weekDays()[0]); }
-function ceoSharedMap(){ try{ var g=window.parent.gData; if(g){ if(!g.sharedMap) g.sharedMap={}; return g.sharedMap; } }catch(e){} return null; }
+function ceoSharedMap(){ try{ var p=window.parent; if(p){ if(!p.sharedMap) p.sharedMap={}; return p.sharedMap; } }catch(e){} return null; }
 function ceoLoad(){
   CEO=null;
   var m=ceoSharedMap(); if(!m) return;
@@ -4252,7 +4252,7 @@ function applyShared(res,ok){
      그러니 못 받았으면 아무것도 하지 않고 지금 화면 값을 그대로 둔다. */
   if(ok===false)return;
   const map=(res&&res.map)||{};
-  try{gData.sharedMap=map;}catch(e){}   /* 주간업무일지 iframe이 대표 보고 내용을 읽어감 */
+  try{gData.sharedMap=map; window.sharedMap=map;}catch(e){}   /* 주간업무일지 iframe이 대표 보고 내용을 읽어감. gData는 let이라 iframe에서 window.parent.gData로 안 보이므로 window.sharedMap 에도 올린다 */
   // 연차 휴가 데이터(금주 휴가자 카드용) — 연차 탭과 같은 공유 키에서 읽기만 함
   (function(){
     const lvE=[],lvR=[];
