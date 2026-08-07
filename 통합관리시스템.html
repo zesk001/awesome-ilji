@@ -454,6 +454,7 @@
               <button onclick="shiftMonth(-1)">‹</button>
               <button onclick="shiftMonth(0)">이번 달</button>
               <button onclick="shiftMonth(1)">›</button>
+              <button onclick="printHomeCal()" title="이 달력 인쇄 (A4/A3 가로)">🖨 인쇄</button>
             </div>
           </div>
           <div class="calgrid" id="calGrid"></div>
@@ -4851,6 +4852,95 @@ function renderCalendar(){
   }
   document.getElementById('calGrid').innerHTML=html;
   if(typeof WB!=='undefined')WB.ensureCalDnD();
+}
+
+/* ===== 첫 화면 달력 인쇄 (2026-08-07 추가)
+   화면은 어두운 바탕이라 그대로 뽑으면 잉크만 먹는다. 밝은 바탕 가로 한 장으로 다시 그려 새 창에 띄운다.
+   용지 A4/A3 선택, 칸 내용이 넘치면 글자 크기를 줄여 한 장에 맞춘다(연차 달력 인쇄와 같은 방식). */
+function printHomeCal(){
+  var grid=document.getElementById('calGrid');
+  if(!grid||!grid.children.length){ alert('달력을 아직 못 그렸습니다. 잠시 후 다시 눌러 주세요.'); return; }
+  var title=((document.getElementById('calTitle')||{}).textContent||'').replace(/\s+/g,' ').trim();
+  var rows=Math.max(1,Math.ceil((grid.children.length-7)/7));
+  var now=new Date();
+  var stamp=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')
+            +' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  var w=window.open('','_blank','width=1240,height=880');
+  if(!w){ alert('팝업 차단을 해제해 주세요 (주소창 오른쪽의 팝업 허용).'); return; }
+  var css=''
+   +'*{box-sizing:border-box}'
+   +'html{--ef:10px}'
+   +"body{margin:0;background:#e9edf0;color:#111;font-family:'Malgun Gothic','맑은 고딕',system-ui,sans-serif}"
+   +'.bar{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:8px;padding:10px 16px;background:#1e5631;color:#fff}'
+   +'.bar b{font-size:14px;font-weight:800}.bar .sp{flex:1}'
+   +'.bar button{padding:6px 13px;border:1px solid #fff;border-radius:6px;background:transparent;color:#fff;font-size:12.5px;cursor:pointer;font-family:inherit}'
+   +'.bar button.on{background:#fff;color:#1e5631;font-weight:800}'
+   +'.bar button.go{background:#fff;color:#1e5631;font-weight:800;border-color:#fff}'
+   +'#page{background:#fff;margin:16px auto;padding:8mm;display:flex;flex-direction:column;box-shadow:0 6px 22px rgba(0,0,0,.25)}'
+   +'#page.a4{width:297mm;height:210mm}#page.a3{width:420mm;height:297mm}'
+   +'.hd{flex:none;display:flex;align-items:baseline;gap:12px;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:7px}'
+   +'.hd h1{margin:0;font-size:19px;letter-spacing:.5px}'
+   +'.hd .sub{font-size:12px;color:#666}.hd .rt{margin-left:auto;font-size:11px;color:#888}'
+   +'.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;flex:1;min-height:0}'
+   +'.wd{text-align:center;font-size:11px;font-weight:800;color:#555;padding:2px 0}'
+   +'.wd.sun{color:#c33}.wd.sat{color:#2b6ea8}'
+   +'.cell{border:1px solid #cfd6da;border-radius:6px;padding:3px 4px;background:#fff;overflow:hidden;display:flex;flex-direction:column;gap:2px;min-height:0}'
+   +'.cell.empty{border-color:transparent;background:transparent}'
+   +'.cell.today{background:#eef8e6;border-color:#74c244}'
+   +'.cell.hol{background:#fdeeee;border-color:#e7b7b7}'
+   +'.dnum{font-size:11px;font-weight:800;color:#333;flex:none}'
+   +'.cell.sun .dnum{color:#c33}.cell.sat .dnum{color:#2b6ea8}.cell.hol .dnum{color:#c33}'
+   +'.dnum .holnm{font-size:8.5px;color:#c33;font-weight:700;margin-left:3px}'
+   +'.cev{font-size:var(--ef);padding:1px 5px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}'
+   +'.cev.jeom{background:#e4f5d6;color:#31651a}'
+   +'.cev.so{background:#dcf0f8;color:#1a5872}'
+   +'.cev.gong{background:#fbe6cf;color:#8a4c10}'
+   +'.cev.etc{background:#eceff1;color:#4a5157}'
+   +'.cev.plan{background:transparent;border:1px dashed #bbb;color:#777}'
+   +'.cellgrid{display:flex;flex-direction:column;gap:2px;margin-top:2px;min-height:0}'
+   +'.crow1{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}'
+   +'.zone{min-height:13px;border-radius:5px;padding:1px 2px;display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start}'
+   +'.crow1 .zone:empty::before{content:attr(data-lb);font-size:7.5px;color:#c3cbd1;font-weight:700;line-height:13px;padding-left:2px}'
+   +'.cellchip{max-width:100%;font-size:var(--ef);line-height:1.35;padding:1px 6px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.cellchip.c-gong{background:#fbe1c6;color:#8a4c10}'
+   +'.cellchip.c-out{background:#fbd8d8;color:#9c2f2f}'
+   +'.cellchip.c-as{background:#e3e9ed;color:#41505c}'
+   +'.teambadge{font-size:var(--ef);line-height:1.35;padding:1px 7px;border-radius:8px;display:inline-flex;align-items:center;gap:3px;background:#d8eef8;color:#1a5872}'
+   +'.teambadge.t2{background:#e2f3d3;color:#31651a}.teambadge.t3{background:#fbeecb;color:#7d5f10}.teambadge.t4{background:#efdff5;color:#63307a}'
+   +'.teambadge b{font-weight:700;font-size:8px;opacity:.75}'
+   +'.lg{flex:none;display:flex;gap:16px;justify-content:center;margin-top:7px;font-size:10.5px;color:#555}'
+   +'.lg span{display:flex;align-items:center;gap:5px}.lg i{width:9px;height:9px;border-radius:50%;display:inline-block}'
+   +'@page{size:A4 landscape;margin:6mm}'
+   +'@media print{.bar{display:none}body{background:#fff}#page{margin:0;box-shadow:none;width:auto;height:auto;padding:0}'
+   +'.cell{break-inside:avoid}html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+title+' 달력</title><style>'+css+'</style></head><body>'
+   +'<div class="bar"><b>달력 인쇄</b>'
+   +'<button id="bA4" class="on" onclick="setPaper(\'a4\')">A4 가로</button>'
+   +'<button id="bA3" onclick="setPaper(\'a3\')">A3 가로</button>'
+   +'<span class="sp"></span>'
+   +'<button class="go" onclick="window.print()">🖨 인쇄 / PDF 저장</button>'
+   +'<button onclick="window.close()">닫기</button></div>'
+   +'<div id="page" class="a4">'
+   +'<div class="hd"><h1>'+title+'</h1><span class="sub">어썸조경 월중 일정</span><span class="rt">출력 '+stamp+'</span></div>'
+   +'<div class="calgrid" id="g">'+grid.innerHTML+'</div>'
+   +'<div class="lg"><span><i style="background:#74c244"></i>점검</span><span><i style="background:#6cc3df"></i>소독</span><span><i style="background:#ed9b4a"></i>공사</span>'
+   +'<span><i style="background:#e96e6e"></i>외주</span><span><i style="background:#96aab9"></i>AS</span></div>'
+   +'</div>'
+   +'<scr'+'ipt>'
+   +'var ROWS='+rows+';'
+   +'function layout(){document.getElementById("g").style.gridTemplateRows="16px repeat("+ROWS+",1fr)";}'
+   +'function fit(){var ef=10.5;var root=document.documentElement;'
+   +'for(var k=0;k<14;k++){root.style.setProperty("--ef",ef+"px");var cs=document.getElementsByClassName("cell"),over=false;'
+   +'for(var i=0;i<cs.length;i++){if(cs[i].scrollHeight>cs[i].clientHeight+1){over=true;break;}}'
+   +'if(!over)break;ef=ef-0.5;if(ef<5.5){root.style.setProperty("--ef","5.5px");break;}}}'
+   +'function setPaper(p){var pg=document.getElementById("page");pg.className=p;'
+   +'document.getElementById("bA4").className=(p==="a4"?"on":"");document.getElementById("bA3").className=(p==="a3"?"on":"");'
+   +'var st=document.getElementById("pg");if(!st){st=document.createElement("style");st.id="pg";document.head.appendChild(st);}'
+   +'st.textContent="@page{size:"+(p==="a3"?"A3":"A4")+" landscape;margin:6mm}";layout();fit();}'
+   +'window.onload=function(){layout();fit();};'
+   +'<\/scr'+'ipt></body></html>';
+  w.document.write(html);
+  w.document.close();
 }
 
 /* ===== 점검·소독 달력 (완료=일지 기록 / 예정=등록 현장) ===== */
