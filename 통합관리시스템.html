@@ -3560,6 +3560,8 @@ window.addEventListener('DOMContentLoaded', App.init);
     .wr-cols{column-count:2; column-gap:20px;}
     .wr-item{break-inside:avoid;}
     .wr-head{break-after:avoid;}
+    .wr-blk{break-inside:avoid;}      /* 소단원(제목+내용)이 단 사이에서 쪼개지지 않게 */
+    .wr-keep{break-inside:avoid;}     /* 대분류 제목과 첫 소단원이 떨어지지 않게 */
     .pbreak{page-break-after:always;}
     .pbreak:last-child{page-break-after:auto;}
   }
@@ -3663,6 +3665,7 @@ function printHTML(bodyHTML){
     '.toolbar,.wtabs{display:none!important}'+
     '.paper{box-shadow:none!important;border-radius:0!important;max-width:700px!important;width:100%!important;margin:0 auto!important;padding:12px 16px!important}'+
     '.wr-cols{column-count:2!important;column-gap:20px!important}.wr-item{break-inside:avoid}.wr-head{break-after:avoid}'+
+    '.wr-blk{break-inside:avoid}.wr-keep{break-inside:avoid}'+
     '.pbreak{page-break-after:always}.pbreak:last-child{page-break-after:auto}'+
     'table{font-size:10px!important}th{font-size:9.5px!important}td{padding:3px 4px!important}'+
     '.chip .num{font-size:15px!important}.rpt-head h1{font-size:17px!important}';
@@ -3722,6 +3725,7 @@ function ensurePreviewStyle(){
    +'#printPreview .wtabs,#printPreview .toolbar{display:none!important}'
    +'#printPreview .wr-cols{column-count:2;column-gap:20px}'
    +'#printPreview .wr-item{break-inside:avoid}'
+   +'#printPreview .wr-blk{break-inside:avoid}#printPreview .wr-keep{break-inside:avoid}'
    +'#printPreview table{font-size:10px}#printPreview th{font-size:9.5px}#printPreview td{padding:3px 4px}';
   document.head.appendChild(st);
 }
@@ -3887,21 +3891,80 @@ function ceoRows(txt){
   if(cell!=='' || row.length){ row.push(cell); rows.push(row); }
   return rows;
 }
-/* 왼쪽 첫 칸의 구획 이름(금주업무보고·차주업무보고·기타)을 따라 내용을 나눠 담는다. */
+/* 한 줄 = {t:글자, c:색}. 옛 저장분은 그냥 글자만 있으므로 둘 다 받아준다. */
+function ceoLine(v){ if(v &amp;&amp; typeof v==='object') return {t:String(v.t||''), c:String(v.c||'')}; return {t:String(v||''), c:''}; }
+function ceoLines(a){ return (a||[]).map(ceoLine); }
+function ceoSection(head){
+  var h=String(head||'').replace(/\s+/g,'');
+  if(h.indexOf('금주업무보고')>=0) return 'n';
+  if(h.indexOf('차주업무보고')>=0) return 'x';
+  if(h==='기타') return 'e';
+  return '';
+}
+/* 왼쪽 첫 칸의 구획 이름(금주업무보고·차주업무보고·기타)을 따라 내용을 나눠 담는다(색 없는 글자 붙여넣기). */
 function ceoParse(txt){
   var out={n:[],x:[],e:[]}, cur='';
   ceoRows(txt).forEach(function(cols){
-    var head=String(cols[0]||'').replace(/\s+/g,'');
-    if(head.indexOf('금주업무보고')>=0){ cur='n'; }
-    else if(head.indexOf('차주업무보고')>=0){ cur='x'; }
-    else if(head==='기타'){ cur='e'; }
+    var sec=ceoSection(cols[0]); if(sec) cur=sec;
     if(!cur) return;
     var body='';
     for(var i=1;i<cols.length;i++){ var v=String(cols[i]||'').replace(/\s+$/,''); if(v.trim()){ body=v; break; } }
     if(!body) return;
-    body.split('\n').forEach(function(ln){ var t=ln.replace(/\s+$/,''); if(t.trim()) out[cur].push(t); });
+    body.split('\n').forEach(function(ln){ var t=ln.replace(/\s+$/,''); if(t.trim()) out[cur].push({t:t,c:''}); });
   });
   return out;
+}
+/* 검정(기본) 글씨는 강조가 아니므로 색으로 치지 않는다 */
+function ceoNormColor(c){
+  var v=String(c||'').trim().toLowerCase();
+  if(!v) return '';
+  if(v==='black'||v==='#000'||v==='#000000'||v==='windowtext'||v==='inherit'||v==='rgb(0, 0, 0)'||v==='rgb(0,0,0)') return '';
+  return v;
+}
+function ceoColorOf(el){
+  function pick(x){
+    if(!x) return '';
+    if(x.style &amp;&amp; x.style.color) return x.style.color;
+    if(x.getAttribute &amp;&amp; x.getAttribute('color')) return x.getAttribute('color');
+    return '';
+  }
+  var v=pick(el);
+  if(v) return v;
+  var kids=el.querySelectorAll?el.querySelectorAll('*'):[];
+  for(var i=0;i<kids.length;i++){ var k=pick(kids[i]); if(k) return k; }
+  return '';
+}
+/* 엑셀에서 그대로 붙여넣으면 표(<table>)가 색까지 함께 들어온다. 그 색을 살려서 읽는다. */
+function ceoParseEl(el){
+  var tbl=el?el.querySelector('table'):null;
+  if(!tbl) return ceoParse(el?(el.innerText||el.textContent||''):'');
+  var out={n:[],x:[],e:[]}, cur='';
+  var trs=tbl.querySelectorAll('tr');
+  for(var i=0;i<trs.length;i++){
+    var tds=trs[i].querySelectorAll('td,th');
+    if(!tds.length) continue;
+    var sec=ceoSection(tds[0].innerText||tds[0].textContent||''); if(sec) cur=sec;
+    if(!cur) continue;
+    for(var j=1;j<tds.length;j++){
+      var td=tds[j];
+      var txt=String(td.innerText||td.textContent||'');
+      if(!txt.trim()) continue;
+      var col=ceoNormColor(ceoColorOf(td));
+      txt.split(/\r?\n/).forEach(function(ln){ var t=ln.replace(/\s+$/,''); if(t.trim()) out[cur].push({t:t,c:col}); });
+      break;
+    }
+  }
+  return out;
+}
+/* 붙여넣기 칸을 다시 열 때: 저장해둔 내용을 같은 모양의 표로 되살린다(엑셀 원본 HTML은 너무 커서 저장하지 않는다) */
+function ceoBoxHTML(){
+  if(!CEO) return '';
+  function rows(lab,arr){
+    var L=ceoLines(arr);
+    if(!L.length) return '<tr><td>'+lab+'</td><td></td></tr>';
+    return L.map(function(o,i){ return '<tr><td>'+(i===0?lab:'')+'</td><td'+(o.c?(' style=&quot;color:'+o.c+'&quot;'):'')+'>'+esc(o.t)+'</td></tr>'; }).join('');
+  }
+  return '<table border=&quot;1&quot; cellspacing=&quot;0&quot; cellpadding=&quot;3&quot; style=&quot;border-collapse:collapse;font-size:12px&quot;>'+rows('금주업무보고',CEO.n)+rows('차주업무보고',CEO.x)+rows('기타',CEO.e)+'</table>';
 }
 function ceoStamp(){ var t=new Date(); return fmt(t)+' '+pad(t.getHours())+':'+pad(t.getMinutes()); }
 function ceoWho(){ try{ if(typeof window.parent.conWho==='function') return window.parent.conWho()||''; }catch(e){} return ''; }
@@ -3919,10 +3982,18 @@ function ceoStore(obj){
 }
 /* 대표님 페이지: 건수 칩·분류표·도넛 없이 금주/차주/기타 글만 (사용자 선택) */
 function ceoReport(){
-  function sec(title,color,lines){
-    var body=(lines||[]).map(function(v){ return '<div class=&quot;wr-item&quot; style=&quot;font-size:12.5px;line-height:1.65;margin:2px 0 2px 4px&quot;>'+esc(v)+'</div>'; }).join('');
-    if(!body) body='<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>';
-    return '<div style=&quot;margin-bottom:12px&quot;><div class=&quot;wr-head&quot; style=&quot;color:#fff;font-weight:bold;padding:5px 11px;border-radius:5px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div><div style=&quot;padding:5px 4px 2px&quot;>'+body+'</div></div>';
+  function sec(title,color,arr){
+    var L=ceoLines(arr);
+    function line(o){
+      var st='font-size:12.5px;line-height:1.65;margin:2px 0 2px 4px';
+      if(o.c) st+=';color:'+o.c+';font-weight:700';   /* 엑셀에서 색으로 강조한 줄 */
+      return '<div class=&quot;wr-item&quot; style=&quot;'+st+'&quot;>'+esc(o.t)+'</div>';
+    }
+    var first=L.length?line(L[0]):'<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>';
+    var rest=L.slice(1).map(line).join('');
+    var titleHTML='<div class=&quot;wr-head&quot; style=&quot;color:#fff;font-weight:bold;padding:5px 11px;border-radius:5px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div>';
+    /* 대분류 제목과 첫 줄을 한 덩어리로 묶어 단 사이에서 갈라지지 않게 */
+    return '<div style=&quot;margin-bottom:12px&quot;><div class=&quot;wr-keep&quot;>'+titleHTML+'<div style=&quot;padding:5px 4px 0&quot;>'+first+'</div></div><div style=&quot;padding:0 4px 2px&quot;>'+rest+'</div></div>';
   }
   var dd=weekDays();
   var stamp=CEO.t?('입력: '+esc(CEO.t)+(CEO.by?(' · '+esc(CEO.by)):'')):'';
@@ -3938,35 +4009,44 @@ function ceoReport(){
   h+='</div>';
   return h+'</div>';
 }
-/* 붙여넣기 창 */
+/* 붙여넣기 창 — 엑셀에서 그대로 붙여넣으면 색까지 들어오도록 일반 입력칸 대신 서식이 살아있는 칸을 쓴다 */
 function ceoOpen(){
   var ex=document.getElementById('ceoDlg'); if(ex) ex.remove();
   var ov=document.createElement('div'); ov.id='ceoDlg';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999';
   var box=document.createElement('div');
-  box.style.cssText='background:#fff;border-radius:10px;padding:18px 20px;width:760px;max-width:92vw;box-shadow:0 12px 34px rgba(0,0,0,.3);font-family:inherit';
+  box.style.cssText='background:#fff;border-radius:10px;padding:18px 20px;width:820px;max-width:94vw;box-shadow:0 12px 34px rgba(0,0,0,.3);font-family:inherit';
   var dd=weekDays();
   var t=document.createElement('div');
   t.textContent='신현철 대표 주간업무보고 · '+fmt(dd[0])+' ~ '+fmt(dd[6]);
   t.style.cssText='font-weight:800;font-size:15px;color:#1e5631;margin-bottom:6px'; box.appendChild(t);
   var g=document.createElement('div');
-  g.textContent='엑셀에서 대표님 시트의 표를 왼쪽 첫 칸부터 통째로 끌어 선택해 복사(Ctrl+C)한 뒤, 아래 칸에 붙여넣고(Ctrl+V) 저장을 누르세요. 금주업무보고·차주업무보고·기타 칸이 들어가야 제대로 읽습니다.';
+  g.textContent='엑셀에서 대표님 시트의 표를 왼쪽 첫 칸부터 통째로 끌어 선택해 복사(Ctrl+C)한 뒤, 아래 칸에 붙여넣고(Ctrl+V) 저장을 누르세요. 엑셀에서 색으로 강조한 줄은 색 그대로 들어옵니다.';
   g.style.cssText='font-size:12.5px;color:#555;line-height:1.6;margin-bottom:10px'; box.appendChild(g);
-  var ta=document.createElement('textarea');
-  ta.style.cssText='width:100%;height:230px;border:1px solid #cbd5cf;border-radius:8px;padding:9px 11px;font-size:12.5px;font-family:inherit;box-sizing:border-box';
-  ta.value=(CEO&amp;&amp;CEO.r)?CEO.r:'';
-  box.appendChild(ta);
+  var pad=document.createElement('div');
+  pad.contentEditable='true';
+  pad.style.cssText='width:100%;height:250px;overflow:auto;border:1px solid #cbd5cf;border-radius:8px;padding:9px 11px;font-size:12.5px;font-family:inherit;box-sizing:border-box;background:#fcfdfc';
+  pad.innerHTML=ceoBoxHTML();
+  box.appendChild(pad);
   var msg=document.createElement('div');
   msg.style.cssText='font-size:12px;color:#666;margin:8px 0 2px;min-height:17px'; box.appendChild(msg);
-  function recount(){ var p=ceoParse(ta.value); msg.textContent='읽어들인 줄 — 금주 '+p.n.length+' · 차주 '+p.x.length+' · 기타 '+p.e.length; }
-  ta.oninput=recount; if(ta.value) recount();
+  function recount(){
+    var pr=ceoParseEl(pad);
+    var col=0;
+    ['n','x','e'].forEach(function(k){ pr[k].forEach(function(o){ if(o.c) col++; }); });
+    msg.textContent='읽어들인 줄 — 금주 '+pr.n.length+' · 차주 '+pr.x.length+' · 기타 '+pr.e.length+'   (색으로 강조된 줄 '+col+')';
+    return pr;
+  }
+  pad.oninput=recount;
+  pad.addEventListener('paste', function(){ setTimeout(recount,30); });
+  if(pad.innerHTML) recount();
   var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-top:10px';
   var save=document.createElement('button'); save.textContent='저장';
   save.style.cssText='flex:1;padding:10px;border:none;border-radius:8px;background:#1e5631;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer;font-family:inherit';
   save.onclick=function(){
-    var pr=ceoParse(ta.value);
+    var pr=ceoParseEl(pad);
     if(!(pr.n.length+pr.x.length+pr.e.length)){ alert('금주업무보고 / 차주업무보고 / 기타 칸을 찾지 못했습니다.\n엑셀에서 왼쪽 첫 칸(구획 이름)까지 포함해 복사했는지 확인해 주세요.'); return; }
-    ceoStore({r:ta.value,n:pr.n,x:pr.x,e:pr.e,t:ceoStamp(),by:ceoWho()});
+    ceoStore({n:pr.n,x:pr.x,e:pr.e,t:ceoStamp(),by:ceoWho()});
     ov.remove();
     alert('저장했습니다. 담당자별 보기와 인쇄에 대표님 페이지가 들어갑니다.');
   };
@@ -3983,7 +4063,7 @@ function ceoOpen(){
   ov.appendChild(box);
   ov.onclick=function(ev){ if(ev.target===ov) ov.remove(); };
   document.body.appendChild(ov);
-  ta.focus();
+  pad.focus();
 }
 
 /* ── 담당자 이름 탭 만들기 ── */
@@ -4138,12 +4218,21 @@ function writerReport(scope){
     } else {
       body=d.list.map(function(v){ return '<div class=&quot;wr-item&quot; style=&quot;font-size:12px;line-height:1.55;margin:1px 0 1px 15px&quot;>· '+esc(v)+'</div>'; }).join('');
     }
-    return head+body;
+    return '<div class=&quot;wr-blk&quot;>'+head+body+'</div>';
   }
-  function blocks(s){ return ord[s].map(function(lab){ return blockHTML(s,lab); }).join(''); }
+  function blockList(s){ return ord[s].map(function(lab){ return blockHTML(s,lab); }); }
+  function blocks(s){ return blockList(s).join(''); }
   function edit(s,ph){ var k='wk_'+selWriter+'_'+wkStart+'_'+s; var sv=''; try{ sv=localStorage.getItem(k)||''; }catch(e){} return '<textarea data-k=&quot;'+esc(k)+'&quot; oninput=&quot;wkSave(this)&quot; placeholder=&quot;'+ph+'&quot; style=&quot;width:100%;min-height:48px;border:1px solid #cbd5cf;border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:inherit;margin-top:6px;box-sizing:border-box&quot;>'+esc(sv)+'</textarea>'; }
   function catSummary(){ var cc={}; scope.forEach(function(r){ cc[r.cat]=(cc[r.cat]||0)+1; }); return CATS.filter(function(c){return cc[c];}).map(function(c){ return '<span style=&quot;color:'+CATCOLOR[c]+';font-weight:700&quot;>'+c+' '+cc[c]+'</span>'; }).join(' <span style=&quot;color:#ccc&quot;>|</span> '); }
-  function sec(title,color,s,ed,ph){ var body=blocks(s); if(ed){ body+=edit(s,ph); } if(!body){ body='<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>'; } return '<div style=&quot;margin-bottom:12px&quot;><div style=&quot;color:#fff;font-weight:bold;padding:5px 11px;border-radius:5px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div><div style=&quot;padding:5px 4px 2px&quot;>'+body+'</div></div>'; }
+  function sec(title,color,s,ed,ph){
+    var bl=blockList(s);
+    var titleHTML='<div style=&quot;color:#fff;font-weight:bold;padding:5px 11px;border-radius:5px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div>';
+    var first=bl.length?bl[0]:'<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>';
+    var rest=bl.slice(1).join('');
+    if(ed){ rest+=edit(s,ph); }
+    /* 대분류 제목 + 첫 소단원을 한 덩어리로 묶어 단 사이에서 갈라지지 않게 한다 */
+    return '<div style=&quot;margin-bottom:12px&quot;><div class=&quot;wr-keep&quot;><div style=&quot;padding:0 0 0&quot;>'+titleHTML+'</div><div style=&quot;padding:5px 4px 0&quot;>'+first+'</div></div><div style=&quot;padding:0 4px 2px&quot;>'+rest+'</div></div>';
+  }
   var h='<div style=&quot;background:#fff;border:1px solid #e5e9e6;border-radius:8px;padding:12px 16px&quot;>';
   h+='<div style=&quot;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:8px&quot;><b style=&quot;font-size:16px&quot;>'+esc(selWriter)+'</b><span style=&quot;font-size:12.5px&quot;>'+catSummary()+'</span><span style=&quot;margin-left:auto;font-size:12px;color:#666&quot;>총 '+scope.length+'건</span></div>';
   h+='<div class=&quot;wr-cols&quot;>';
