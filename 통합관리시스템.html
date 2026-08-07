@@ -454,7 +454,7 @@
               <button onclick="shiftMonth(-1)">‹</button>
               <button onclick="shiftMonth(0)">이번 달</button>
               <button onclick="shiftMonth(1)">›</button>
-              <button onclick="printHomeCal()" title="이 달력 인쇄 (A4/A3 가로)">🖨 인쇄</button>
+              <button onclick="printHomeCal()" title="이 달력만 인쇄 (A4/A3 가로)">🖨 달력</button><button onclick="printBoard()" title="이 화면 전체 인쇄 — 달력·현장목록·휴가·메모까지 한 장에 (A3/A4 가로)">🖨 화면 전체</button>
             </div>
           </div>
           <div class="calgrid" id="calGrid"></div>
@@ -5071,6 +5071,170 @@ function printHomeCal(){
    +'var st=document.getElementById("pg");if(!st){st=document.createElement("style");st.id="pg";document.head.appendChild(st);}'
    +'st.textContent="@page{size:"+(p==="a3"?"A3":"A4")+" landscape;margin:10mm}";layout();fit();}'
    +'window.onload=function(){layout();fit();};'
+   +'<\/scr'+'ipt></body></html>';
+  w.document.write(html);
+  w.document.close();
+}
+
+/* ── 첫 화면(통합 현황) 전체 인쇄 (2026-08-07) ────────────────────────────
+   대표님이 첫 화면을 통째로 스크린샷 떠서 뽑으시던 것을 제대로 인쇄할 수 있게 만든 것.
+   · A3 가로 기본 / A4 가로 선택
+   · 화면은 검지만 종이에는 흰 바탕 + 검은 글씨 (잉크·선명도)
+   · 내용이 없는 칸은 인쇄에서 생략
+   · 한 장에 다 들어가도록 전체를 조금씩 줄여 맞춘다 */
+function printBoard(){
+  var deckEl=document.querySelector('#page-overview .deck');
+  if(!deckEl){ alert('첫 화면을 찾지 못했습니다.'); return; }
+  var grid=document.getElementById('calGrid');
+  if(!grid||!grid.children.length){ alert('달력을 아직 못 그렸습니다. 잠시 후 다시 눌러 주세요.'); return; }
+
+  var deck=deckEl.cloneNode(true);
+  /* 종이에 필요 없는 조작 요소 제거 */
+  deck.querySelectorAll('.go,.wbadd,.wtab,.calnav,.wbdel,.wbsearchwrap,.wbhint,button,input,textarea,select').forEach(function(x){ x.remove(); });
+  /* 제목이 비어 버린 첫 칸(일일업무/주간업무 버튼만 있던 칸)에 이름을 붙인다 */
+  deck.querySelectorAll('.glass > h3').forEach(function(h){
+    if(!(h.textContent||'').trim()) h.textContent='금주 일지';
+  });
+  /* 내용이 없는 칸은 통째로 뺀다 */
+  deck.querySelectorAll('.glass').forEach(function(g){
+    var body=g.querySelector('.scroll,div:not(h3)');
+    var has=g.querySelector('.wbchip,.row,.lwgrid,.wbregtab,.mini');
+    var txt=(g.textContent||'').replace(/\s+/g,'');
+    var head=((g.querySelector('h3')||{}).textContent||'').replace(/\s+/g,'');
+    if(!has && txt.length-head.length<3) g.remove();
+    else if(!has && g.querySelector('.empty')) g.remove();
+  });
+  var rows=Math.max(1,Math.ceil((grid.children.length-7)/7));
+  var title=((document.getElementById('calTitle')||{}).textContent||'').replace(/\s+/g,' ').trim();
+  var now=new Date();
+  var stamp=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')
+            +' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+
+  var w=window.open('','_blank','width=1400,height=900');
+  if(!w){ alert('팝업 차단을 해제해 주세요 (주소창 오른쪽의 팝업 허용).'); return; }
+
+  var css=''
+   +'*{box-sizing:border-box}'
+   +'html{--ef:8.5px}'
+   +"body{margin:0;background:#e9edf0;color:#111;font-family:'Malgun Gothic','맑은 고딕',system-ui,sans-serif}"
+   +'.bar{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:8px;padding:10px 16px;background:#1e5631;color:#fff}'
+   +'.bar b{font-size:14px;font-weight:800}.bar .sp{flex:1}'
+   +'.bar button{padding:6px 13px;border:1px solid #fff;border-radius:6px;background:transparent;color:#fff;font-size:12.5px;cursor:pointer;font-family:inherit}'
+   +'.bar button.on{background:#fff;color:#1e5631;font-weight:800}'
+   +'.bar button.go{background:#fff;color:#1e5631;font-weight:800;border-color:#fff}'
+   +'#page{background:#fff;margin:16px auto;padding:10mm;display:flex;flex-direction:column;box-shadow:0 6px 22px rgba(0,0,0,.25)}'
+   +'#page.a4{width:297mm;height:210mm}#page.a3{width:420mm;height:297mm}'
+   +'.hd{flex:none;display:flex;align-items:baseline;gap:12px;border-bottom:2px solid #333;padding-bottom:5px;margin-bottom:6px}'
+   +'.hd h1{margin:0;font-size:18px;letter-spacing:.5px}'
+   +'.hd .sub{font-size:11.5px;color:#666}.hd .rt{margin-left:auto;font-size:10.5px;color:#888}'
+   +'#wrap{flex:1;min-height:0;overflow:hidden}'
+   /* 화면과 같은 3단 배치 */
+   +'.deck{display:grid;grid-template-columns:1fr 2.15fr 1.15fr;gap:7px;align-items:start}'
+   +'.col{display:flex;flex-direction:column;gap:7px;min-width:0}'
+   +'.glass{border:1px solid #d3dae0;border-radius:7px;padding:6px 8px;background:#fff}'
+   +'.glass h3{margin:0 0 5px;font-size:11.5px;font-weight:800;color:#1e5631;display:flex;align-items:center;gap:6px;border-bottom:1px solid #e3e8ec;padding-bottom:3px}'
+   +'.cnt{margin-left:auto;font-size:9.5px;color:#667;font-weight:700}'
+   +'.hgrp{margin-left:auto;display:flex;gap:6px;align-items:center}'
+   +'.scroll{max-height:none!important;overflow:visible!important}'
+   +'.empty{font-size:9.5px;color:#98a0a8;padding:3px 0}'
+   +'.small{font-size:9px;color:#78818a}'
+   /* 요약 숫자 */
+   +'.miniwrap{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}'
+   +'.mini{border:1px solid #dde3e8;border-radius:6px;padding:5px 7px;background:#f7f9fa}'
+   +'.mini .n{font-size:16px;font-weight:800;color:#1e5631;line-height:1.1}'
+   +'.mini .l{font-size:9px;color:#667;margin-top:1px}'
+   /* 목록 행 */
+   +'.row{display:flex;align-items:flex-start;gap:6px;padding:3px 0;border-bottom:1px solid #eef1f3}'
+   +'.row:last-child{border-bottom:none}'
+   +'.nm{font-size:10px;font-weight:700;color:#222}'
+   +'.meta{font-size:8.5px;color:#78818a;margin-top:1px}'
+   +'.amt{margin-left:auto;font-size:9.5px;font-weight:700;color:#1e5631}'
+   +'.badge{font-size:8px;padding:1px 5px;border-radius:4px;background:#eef1f4;color:#445;font-weight:700;white-space:nowrap;margin-left:auto}'
+   /* 현장 칩 */
+   +'.wbchips{display:flex;flex-wrap:wrap;gap:3px}'
+   +'.wbchip{font-size:9px;padding:1.5px 6px;border-radius:9px;background:#f0f3f5;border:1px solid #dfe5ea;color:#2b3138;white-space:nowrap}'
+   +'.wbchip.c-gong{background:#fdeedd;border-color:#f2d9bd;color:#8a4c10}'
+   +'.wbchip.c-out{background:#fde1e1;border-color:#f3c7c7;color:#9c2f2f}'
+   +'.wbchip.c-as{background:#e8eef3;border-color:#d3dde6;color:#41505c}'
+   +'.wbchip.c-so{background:#e0f0f8;border-color:#c6e2ee;color:#1a5872}'
+   /* 지역 목록 */
+   +'.wbregrow{display:flex;flex-wrap:wrap;gap:3px}'
+   +'.wbregtab{font-size:9px;padding:1.5px 6px;border-radius:6px;border:1px solid #dfe5ea;background:#f7f9fa;color:#333}'
+   +'.wbregtab b{margin-left:3px;color:#1e5631}'
+   /* 휴가자 */
+   +'.lwgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}'
+   +'.lwcol{border:1px solid #e0e5ea;border-radius:6px;padding:3px;background:#fafbfc;text-align:center}'
+   +'.lwcol.today{background:#eef8e6;border-color:#a9d98a}'
+   +'.lwhd{font-size:8.5px;color:#667;font-weight:700}.lwhd b{color:#111}'
+   +'.lwnm{font-size:9.5px;font-weight:700;color:#222;margin-top:1px}'
+   +'.lwnm.plan{color:#7a828a}'
+   +'.lwnm i{font-style:normal;font-size:7.5px;color:#8a6d1a;margin-left:2px}'
+   +'.lwdash{color:#c6ccd2;font-size:9px}'
+   +'.lwwk{font-size:9px;margin-top:3px;color:#445}'
+   /* 메모 */
+   +'#pMemo,#pMemo div{font-size:9.5px!important;line-height:1.65!important;color:#333!important}'
+   /* 달력 */
+   +'.calwrap{border:1px solid #d3dae0;border-radius:7px;padding:6px 8px;background:#fff;display:flex;flex-direction:column}'
+   +'.calhead{display:flex;align-items:baseline;gap:8px;border-bottom:1px solid #e3e8ec;padding-bottom:3px;margin-bottom:5px}'
+   +'.calhead .title{font-size:13px;font-weight:800;color:#1e5631}'
+   +'.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}'
+   +'.wd{text-align:center;font-size:9.5px;font-weight:800;color:#555;padding:1px 0}'
+   +'.wd.sun{color:#c33}.wd.sat{color:#2b6ea8}'
+   +'.cell{border:1px solid #cfd6da;border-radius:5px;padding:2px 3px;background:#fff;display:flex;flex-direction:column;gap:1px;min-height:34px;overflow:visible}'
+   +'.cell.empty{border-color:transparent;background:transparent;min-height:0;padding:0}'
+   +'.cell.today{background:#eef8e6;border-color:#74c244}'
+   +'.cell.hol{background:#fdeeee;border-color:#e7b7b7}'
+   +'.dnum{font-size:9.5px;font-weight:800;color:#333;flex:none}'
+   +'.cell.sun .dnum{color:#c33}.cell.sat .dnum{color:#2b6ea8}.cell.hol .dnum{color:#c33}'
+   +'.dnum .holnm{font-size:7.5px;color:#c33;font-weight:700;margin-left:3px}'
+   +'.cev{font-size:var(--ef);padding:0 4px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}'
+   +'.cev.jeom{background:#e4f5d6;color:#31651a}.cev.so{background:#dcf0f8;color:#1a5872}'
+   +'.cev.gong{background:#fbe6cf;color:#8a4c10}.cev.etc{background:#eceff1;color:#4a5157}'
+   +'.cev.plan{background:transparent;border:1px dashed #bbb;color:#777}'
+   +'.cellgrid{display:flex;flex-direction:column;gap:1px;margin-top:1px}'
+   +'.crow1{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}'
+   +'.zone{min-height:11px;border-radius:4px;padding:0 1px;display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start}'
+   +'.zone:empty{min-height:0;padding:0}.crow1 .zone:empty::before{content:none}'
+   +'.cellchip{max-width:100%;font-size:var(--ef);line-height:1.3;padding:0 5px;border-radius:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#f0f3f5;color:#2b3138}'
+   +'.cellchip.c-gong{background:#fbe1c6;color:#8a4c10}'
+   +'.cellchip.c-out{background:#fbd8d8;color:#9c2f2f}'
+   +'.cellchip.c-as{background:#e3e9ed;color:#41505c}'
+   +'.teambadge{font-size:var(--ef);line-height:1.3;padding:0 6px;border-radius:7px;display:inline-flex;align-items:center;gap:3px;background:#d8eef8;color:#1a5872}'
+   +'.teambadge.t2{background:#e2f3d3;color:#31651a}.teambadge.t3{background:#fbeecb;color:#7d5f10}.teambadge.t4{background:#efdff5;color:#63307a}'
+   +'.teambadge b{font-weight:700;font-size:7px;opacity:.75}'
+   +'.calleg{display:flex;gap:14px;justify-content:center;margin-top:4px;font-size:8.5px;color:#556}'
+   +'.calleg span{display:inline-flex;align-items:center;gap:4px}'
+   +'.calleg .dot{width:7px;height:7px;border-radius:50%;display:inline-block}'
+   +'.schpair{display:grid;grid-template-columns:1fr 1fr;gap:7px}'
+   +'@page{size:A3 landscape;margin:10mm}'
+   +'@media print{.bar{display:none}body{background:#fff}#page{margin:0;box-shadow:none;width:auto;height:auto;padding:0}'
+   +'html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+title+' 통합 현황</title><style>'+css+'</style></head><body>'
+   +'<div class="bar"><b>통합 현황 인쇄</b>'
+   +'<button id="bA3" class="on" onclick="setPaper(\'a3\')">A3 가로</button>'
+   +'<button id="bA4" onclick="setPaper(\'a4\')">A4 가로</button>'
+   +'<span class="sp"></span>'
+   +'<button class="go" onclick="window.print()">🖨 인쇄 / PDF 저장</button>'
+   +'<button onclick="window.close()">닫기</button></div>'
+   +'<div id="page" class="a3">'
+   +'<div class="hd"><h1>'+title+' 통합 현황</h1><span class="sub">어썸조경</span><span class="rt">출력 '+stamp+'</span></div>'
+   +'<div id="wrap"><div id="inner">'+deck.outerHTML+'</div></div>'
+   +'</div>'
+   +'<scr'+'ipt>'
+   +'var ROWS='+rows+';'
+   +'function layout(){var g=document.querySelector("#inner .calgrid");if(g)g.style.gridTemplateRows="14px repeat("+ROWS+",auto)";}'
+   +'function fit(){var wrap=document.getElementById("wrap"),inner=document.getElementById("inner");'
+   +'inner.style.zoom=1;var avail=wrap.clientHeight;'
+   +'if(inner.getBoundingClientRect().height<=avail)return;'
+   +'var z=1;for(var k=0;k<80;k++){z=z-0.01;if(z<0.4){z=0.4;inner.style.zoom=z;break;}inner.style.zoom=z;'
+   +'if(inner.getBoundingClientRect().height<=avail)break;}}'
+   +'function setPaper(p){var pg=document.getElementById("page");pg.className=p;'
+   +'document.getElementById("bA3").className=(p==="a3"?"on":"");document.getElementById("bA4").className=(p==="a4"?"on":"");'
+   +'var st=document.getElementById("pg");if(!st){st=document.createElement("style");st.id="pg";document.head.appendChild(st);}'
+   +'st.textContent="@page{size:"+(p==="a3"?"A3":"A4")+" landscape;margin:10mm}";layout();fit();}'
+   +'window.onload=function(){var f=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();'
+   +'f.then(function(){setPaper("a3");}).catch(function(){setPaper("a3");});};'
    +'<\/scr'+'ipt></body></html>';
   w.document.write(html);
   w.document.close();
