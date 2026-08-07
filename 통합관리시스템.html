@@ -3613,7 +3613,7 @@ const CATS=['점검','소독','공사','견적','계약','사무','대표'];
 const CATCOLOR={'점검':'#2e7d32','소독':'#0277bd','공사':'#ef6c00','견적':'#00acc1','계약':'#8d6e63','사무':'#6a1b9a','대표':'#c2185b'};
 
 /* 담당자 표시 순서(직급순) — 일일업무일지 명단과 동일 */
-const ORDER=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','원채아 대리','김지훈 주임'];
+const ORDER=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','김지훈 주임','원채아 대리'];
 function nameKey(w){ return String(w==null?'':w).trim().split(/\s+/)[0]; }
 /* 같은 사람인데 '김재성'·'김재성 이사'·오타 등으로 나뉘는 것을 하나로 → 공식 '이름 직책'으로 정규화 */
 const WRITER_CANON=(function(){ const m={}; ORDER.forEach(function(full){ m[nameKey(full)]=full; }); return m; })();
@@ -3677,22 +3677,37 @@ function printHTML(bodyHTML){
 }
 /* 현재 담당자(또는 통합)만 인쇄 */
 function doPrint(){ var p=document.querySelector('.paper'); if(p) printHTML(p.outerHTML); }
-/* 인쇄 버튼: 담당자별 보기면 선택창, 통합 보기면 바로 인쇄 */
-function onPrintClick(){ if(viewMode!=='writer'){ var p=document.querySelector('.paper'); if(p) openPreview([p.outerHTML], function(){ printHTML(p.outerHTML); }); return; } showPrintDialog(); }
-/* WLIST(기록 있는 사람) 각자 렌더해 paper HTML 배열로 수집 */
-function collectWriterPapers(){
-  var saved=selWriter, papers=[];
-  WLIST.forEach(function(w){ selWriter=w; renderAll(); var p=document.querySelector('.paper'); if(p) papers.push(p.outerHTML); });
-  selWriter=saved; renderAll();
-  return papers;
+/* 인쇄 버튼 (2026-08-07 개편)
+   - 통합 보기: 1페이지=통합, 2페이지부터 담당자별 전원을 한 번에
+   - 담당자별 보기: 지금 보고 있는 담당자 한 장만 */
+function onPrintClick(){
+  if(viewMode==='writer'){
+    var p1=document.querySelector('.paper');
+    if(p1) openPreview([p1.outerHTML], [selWriter||'담당자'], function(){ printHTML(p1.outerHTML); });
+    return;
+  }
+  var pAll=document.querySelector('.paper');
+  if(!pAll) return;
+  var pages=[pAll.outerHTML], labels=['통합'];
+  var wp=collectWriterPapers(), wn=collectWriterPapers.names||[];
+  wp.forEach(function(h,i){ pages.push(h); labels.push(wn[i]||''); });
+  openPreview(pages, labels, function(){
+    var body='';
+    pages.forEach(function(h){ body+='<div class=pbreak>'+h+'</div>'; });
+    printHTML(body);
+  });
 }
-/* 전체 인원 순서대로 인쇄 — 전체를 reps벌 반복 */
-function doPrintAll(reps){
-  reps=Math.max(1,parseInt(reps,10)||1);
-  if(!WLIST.length){ alert('이번 주 기록이 있는 담당자가 없습니다.'); return; }
-  var papers=collectWriterPapers(), body='';
-  for(var i=0;i<reps;i++){ papers.forEach(function(h){ body+='<div class=pbreak>'+h+'</div>'; }); }
-  printHTML(body);
+/* 기록 있는 담당자 목록(직급순) — 화면 상태와 무관하게 계산 */
+function writerListNow(){ var s={}; DATA.forEach(function(r){ s[r.writer||'(미상)']=1; }); return Object.keys(s).sort(cmpWriter); }
+/* 담당자 각자 렌더해 paper HTML 배열로 수집 (통합 보기에서 눌러도 동작) */
+function collectWriterPapers(){
+  var savedW=selWriter, savedV=viewMode, papers=[], names=[];
+  WLIST=writerListNow();
+  viewMode='writer';
+  WLIST.forEach(function(w){ selWriter=w; renderAll(); var p=document.querySelector('.paper'); if(p){ papers.push(p.outerHTML); names.push(w); } });
+  selWriter=savedW; viewMode=savedV; renderAll();
+  collectWriterPapers.names=names;
+  return papers;
 }
 /* ── 인쇄 미리보기: A4 한 장 크기로 실제 인쇄 모습·페이지 경계선 표시 ── */
 function ensurePreviewStyle(){
@@ -3701,7 +3716,7 @@ function ensurePreviewStyle(){
   st.textContent='#printPreview .pvPage{width:210mm;min-height:297mm;padding:10mm 12mm;box-sizing:border-box;background:#fff;position:relative;margin:0 auto 22px;box-shadow:0 3px 16px rgba(0,0,0,.35)}'
    +'#printPreview .pvCut{position:absolute;left:0;right:0;top:297mm;border-top:2px dashed #d33}'
    +'#printPreview .pvCut span{position:absolute;right:6px;top:2px;font-size:11px;color:#d33;background:#fff;padding:0 5px;border-radius:3px}'
-   +'#printPreview .pvNo{position:absolute;left:8px;top:5px;font-size:11px;color:#aaa}'
+   +'#printPreview .pvNo{position:absolute;left:0;top:0;font-size:11.5px;font-weight:700;color:#fff;background:#1e5631;padding:3px 10px;border-radius:0 0 8px 0;letter-spacing:.2px}'
    +'#printPreview .paper{max-width:none;width:100%;margin:0;padding:0;box-shadow:none;border-radius:0}'
    +'#printPreview .wtabs,#printPreview .toolbar{display:none!important}'
    +'#printPreview .wr-cols{column-count:2;column-gap:20px}'
@@ -3709,22 +3724,39 @@ function ensurePreviewStyle(){
    +'#printPreview table{font-size:10px}#printPreview th{font-size:9.5px}#printPreview td{padding:3px 4px}';
   document.head.appendChild(st);
 }
-function openPreview(pages, printFn){
+function openPreview(pages, labels, printFn){
+  if(typeof labels==='function'){ printFn=labels; labels=null; }
+  labels=labels||[];
   ensurePreviewStyle();
   var ex=document.getElementById('printPreview'); if(ex) ex.remove();
   var ov=document.createElement('div'); ov.id='printPreview';
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;flex-direction:column';
   var bar=document.createElement('div');
   bar.style.cssText='flex:none;display:flex;align-items:center;gap:10px;padding:10px 16px;background:#1e5631;color:#fff';
-  var ttl=document.createElement('div'); ttl.textContent='인쇄 미리보기 · 총 '+pages.length+'장 (한 장씩)'; ttl.style.cssText='font-weight:800;font-size:14px'; bar.appendChild(ttl);
+  var ttl=document.createElement('div');
+  ttl.innerHTML='인쇄 미리보기 · 총 '+pages.length+'장'+(labels.length>1?'<div style=&quot;font-weight:500;font-size:11.5px;opacity:.9;margin-top:2px&quot;>한 사람만 뽑으려면 인쇄창의 페이지 범위에 아래 번호를 넣으세요</div>':'');
+  ttl.style.cssText='font-weight:800;font-size:14px;line-height:1.3'; bar.appendChild(ttl);
   var sp=document.createElement('div'); sp.style.cssText='flex:1'; bar.appendChild(sp);
   var pbtn=document.createElement('button'); pbtn.textContent='🖨 인쇄하기'; pbtn.style.cssText='padding:7px 16px;border:none;border-radius:6px;background:#fff;color:#1e5631;font-weight:800;font-size:13px;cursor:pointer'; pbtn.onclick=function(){ printFn(); }; bar.appendChild(pbtn);
   var cbtn=document.createElement('button'); cbtn.textContent='닫기'; cbtn.style.cssText='padding:7px 14px;border:1px solid #fff;border-radius:6px;background:transparent;color:#fff;font-size:13px;cursor:pointer'; cbtn.onclick=function(){ ov.remove(); }; bar.appendChild(cbtn);
   ov.appendChild(bar);
+  /* 페이지 차례표: 몇 페이지가 누구인지 한눈에 */
+  if(labels.length>1){
+    var idx=document.createElement('div');
+    idx.style.cssText='flex:none;display:flex;flex-wrap:wrap;gap:6px;padding:8px 16px;background:#2f6f45;color:#fff;font-size:12px';
+    labels.forEach(function(nm,i){
+      var t=document.createElement('span');
+      t.textContent=(i+1)+'p '+(nm||'');
+      t.style.cssText='background:rgba(255,255,255,.16);border-radius:11px;padding:2px 9px;cursor:pointer';
+      t.onclick=function(){ var el=ov.getElementsByClassName('pvPage')[i]; if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); };
+      idx.appendChild(t);
+    });
+    ov.appendChild(idx);
+  }
   var scroll=document.createElement('div'); scroll.style.cssText='flex:1;overflow:auto;padding:22px 10px;background:#555';
   pages.forEach(function(html,i){
     var pg=document.createElement('div'); pg.className='pvPage'; pg.innerHTML=html;
-    var no=document.createElement('div'); no.className='pvNo'; no.textContent=(i+1)+' / '+pages.length; pg.appendChild(no);
+    var no=document.createElement('div'); no.className='pvNo'; no.textContent=(i+1)+'페이지'+(labels[i]?(' · '+labels[i]):('  /  '+pages.length)); pg.appendChild(no);
     var cut=document.createElement('div'); cut.className='pvCut'; var cs=document.createElement('span'); cs.textContent='여기까지가 1페이지'; cut.appendChild(cs); pg.appendChild(cut);
     scroll.appendChild(pg);
   });
@@ -3733,34 +3765,6 @@ function openPreview(pages, printFn){
   var _pgs=ov.getElementsByClassName('pvPage');
   for(var _i=0;_i<_pgs.length;_i++){ var _pp=_pgs[_i].getElementsByClassName('paper')[0]; if(!_pp) continue; _pp.style.zoom=1; if(_pp.getBoundingClientRect().height>1010){ var _z=1; for(var _k=0;_k<16;_k++){ _z=_z-0.02; if(_z<0.6)_z=0.6; _pp.style.zoom=_z; if(_pp.getBoundingClientRect().height<=1010)break; } } }
 }
-function hidePrintDialog(){ var ov=document.getElementById('printDlg'); if(ov) ov.remove(); }
-function showPrintDialog(){
-  hidePrintDialog();
-  var ov=document.createElement('div'); ov.id='printDlg';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999';
-  var box=document.createElement('div');
-  box.style.cssText='background:#fff;border-radius:10px;padding:18px 20px;min-width:300px;box-shadow:0 12px 34px rgba(0,0,0,.3);font-family:inherit';
-  var t=document.createElement('div'); t.textContent='인쇄 방식'; t.style.cssText='font-weight:800;font-size:15px;margin-bottom:14px;color:#1e5631'; box.appendChild(t);
-  var b1=document.createElement('button'); b1.textContent='현재 담당자만 인쇄 ('+(selWriter||'-')+')';
-  b1.style.cssText='display:block;width:100%;padding:9px;margin-bottom:14px;border:1px solid #cbd5cf;border-radius:7px;background:#f4f7f4;font-size:13px;cursor:pointer;font-family:inherit';
-  b1.onclick=function(){ hidePrintDialog(); var p=document.querySelector('.paper'); if(p) openPreview([p.outerHTML], function(){ printHTML(p.outerHTML); }); }; box.appendChild(b1);
-  var row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:2px';
-  var lab=document.createElement('span'); lab.textContent='반복(장수)'; lab.style.cssText='font-size:12.5px;color:#444'; row.appendChild(lab);
-  var inp=document.createElement('input'); inp.type='number'; inp.min='1'; inp.value='1';
-  inp.style.cssText='width:64px;padding:6px 8px;border:1px solid #cbd5cf;border-radius:6px;font-size:13px'; row.appendChild(inp);
-  var cnt=document.createElement('span'); cnt.textContent='· 전체 '+WLIST.length+'명 (총 '+WLIST.length+'장씩)'; cnt.style.cssText='font-size:12px;color:#888'; row.appendChild(cnt);
-  box.appendChild(row);
-  var b2=document.createElement('button'); b2.textContent='전체 순서대로 인쇄';
-  b2.style.cssText='display:block;width:100%;padding:9px;margin:10px 0 4px;border:none;border-radius:7px;background:#1e5631;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit';
-  b2.onclick=function(){ var n=parseInt(inp.value,10)||1; hidePrintDialog(); if(!WLIST.length){ alert('이번 주 기록이 있는 담당자가 없습니다.'); return; } var papers=collectWriterPapers(); openPreview(papers, function(){ var body=''; for(var r=0;r<n;r++){ papers.forEach(function(h){ body+='<div class=pbreak>'+h+'</div>'; }); } printHTML(body); }); }; box.appendChild(b2);
-  var b3=document.createElement('button'); b3.textContent='취소';
-  b3.style.cssText='display:block;width:100%;padding:7px;margin-top:8px;border:none;background:none;color:#888;font-size:12.5px;cursor:pointer;font-family:inherit';
-  b3.onclick=hidePrintDialog; box.appendChild(b3);
-  ov.appendChild(box);
-  ov.onclick=function(e){ if(e.target===ov) hidePrintDialog(); };
-  document.body.appendChild(ov);
-}
-
 /* 주간 7일치를 서버 한 번 호출로 받기 (2026-08-07 추가). 실패하면 아래 옛 방식으로 하루씩 받는다 */
 function fetchDaysAll(list){
   if(typeof fetch!=='function') return Promise.resolve(null);
