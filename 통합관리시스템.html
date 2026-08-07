@@ -3761,7 +3761,23 @@ function showPrintDialog(){
   document.body.appendChild(ov);
 }
 
-/* ── JSONP: action=day 를 7일치 호출 ── */
+/* 주간 7일치를 서버 한 번 호출로 받기 (2026-08-07 추가). 실패하면 아래 옛 방식으로 하루씩 받는다 */
+function fetchDaysAll(list){
+  if(typeof fetch!=='function') return Promise.resolve(null);
+  const url=APPS_URL+'?action=days&amp;list='+encodeURIComponent(list.join(','));
+  function once(n){
+    return new Promise(function(res){
+      let done=false;
+      const to=setTimeout(function(){ if(!done){ done=true; res(null); } },20000);
+      fetch(url+'&amp;t='+Date.now()+n).then(function(r){ return r.json(); })
+        .then(function(d){ if(done) return; done=true; clearTimeout(to); res((d&amp;&amp;d.days)||null); })
+        .catch(function(){ if(done) return; done=true; clearTimeout(to); res(null); });
+    });
+  }
+  return once(0).then(function(a){ return a || once(1); });
+}
+
+/* ── (예비) 옛 방식: action=day 를 하루씩 ── */
 let CBSEQ=0;
 function fetchDay(dateStr){
   return new Promise(function(resolve){
@@ -3786,9 +3802,13 @@ async function loadWeek(){
   const msg=document.getElementById('loadMsg');
   const all=[];
   try{
+    msg.textContent='불러오는 중…';
+    const dstrs=[]; for(let k=0;k<7;k++) dstrs.push(fmt(days[k]));
+    const bulk=await fetchDaysAll(dstrs);
     for(let i=0;i<7;i++){
-      msg.textContent='불러오는 중… ('+(i+1)+'/7)';
-      const rows=await fetchDay(fmt(days[i]));
+      let rows;
+      if(bulk){ rows=((bulk[dstrs[i]]||{}).rows)||[]; }
+      else { msg.textContent='불러오는 중… ('+(i+1)+'/7)'; rows=await fetchDay(dstrs[i]); }
       rows.forEach(function(r){
         all.push({date:fmt(days[i]), dateK:fmtK(days[i]),
           cat:(String(r[0]||'')==='영업'?'대표':String(r[0]||'')), region:String(r[1]||''), site:String(r[2]||''),
