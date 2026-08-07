@@ -3956,24 +3956,25 @@ function ceoCssColors(html){
   }
   return map;
 }
-function ceoElColor(el, base, map){
+/* 그 조각에 색이 &quot;지정돼 있는지&quot;를 본다. 지정 안 됐으면 빈 문자열.
+   ★중요: 지정은 됐는데 검정이면(엑셀이 windowtext/black 로 되돌린 경우) 그건 '색 없음'이지
+   '위에서 물려받기'가 아니다. 이걸 구분 못 하면, 칸 전체가 빨간 줄에서 뒷부분 검정 글씨까지
+   통째로 빨갛게 나온다(예: ' 잔공사 ' 만 빨강인데 '- 세종연양유치원' 까지 빨개짐). */
+function ceoRawColor(el, map){
   var v='';
   if(el.style &amp;&amp; el.style.color) v=el.style.color;
   if(!v &amp;&amp; map &amp;&amp; el.getAttribute){
     var cl=el.getAttribute('class');
-    if(cl){ cl.split(/\s+/).forEach(function(c){ if(!v &amp;&amp; map[c]) v=map[c]; }); }
+    if(cl){ cl.split(/\s+/).forEach(function(c){ if(!v &amp;&amp; map[c]!=null) v=map[c]; }); }
   }
   if(!v &amp;&amp; el.getAttribute &amp;&amp; el.getAttribute('color')) v=el.getAttribute('color');
-  if(!v &amp;&amp; !map){
-    try{
-      var win=el.ownerDocument &amp;&amp; el.ownerDocument.defaultView;
-      if(win &amp;&amp; win.getComputedStyle) v=win.getComputedStyle(el).color||'';
-    }catch(e){}
-  }
-  v=ceoNormColor(v);
-  if(!v) return '';
-  if(base &amp;&amp; v===ceoNormColor(base)) return '';
   return v;
+}
+/* 지정된 색이 있으면 그 색(검정이면 ''), 없으면 위에서 물려받은 색 */
+function ceoColorAt(el, inherited, map){
+  var raw=ceoRawColor(el, map);
+  if(!raw) return inherited||'';
+  return ceoNormColor(raw);
 }
 /* 칸 안을 훑으며 (글자, 색) 조각을 모은다. <br> 을 만나면 줄을 바꾼다. */
 function ceoWalk(node, color, lines, base, map){
@@ -3987,14 +3988,14 @@ function ceoWalk(node, color, lines, base, map){
       var tag=String(ch.tagName||'').toLowerCase();
       if(tag==='style'||tag==='script') continue;
       if(tag==='br'){ lines.push([]); continue; }
-      ceoWalk(ch, ceoElColor(ch,base,map)||color, lines, base, map);
+      ceoWalk(ch, ceoColorAt(ch, color, map), lines, base, map);
       if(tag==='div'||tag==='p') lines.push([]);
     }
   }
 }
 function ceoCellLines(td, base, map){
   var lines=[[]];
-  ceoWalk(td, ceoElColor(td,base,map), lines, base, map);
+  ceoWalk(td, ceoColorAt(td, '', map), lines, base, map);
   var out=[];
   lines.forEach(function(segs){
     var m=[];
