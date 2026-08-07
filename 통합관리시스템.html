@@ -5233,6 +5233,9 @@ function printBoard(){
    +'#inner #wbList_sodahoe .row{padding:1px 3px!important}'
    +'#inner #wbList_sodahoe .lwhd{font-size:8px!important;padding:1px 0!important}'
    +'#inner #wbList_sodahoe > div{gap:5px!important}'
+   /* 한 줄에 두 곳씩 — 세로로 길게 늘어지지 않게 (사용자 요청 2026-08-07) */
+   +'#inner #wbList_sodahoe > div > div{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1px 6px;align-content:start}'
+   +'#inner #wbList_sodahoe .lwhd{grid-column:1/-1}'
    /* 달력 칸: 공사|외주|AS 를 3등분하면 현장 이름이 잘린다 → 인쇄에선 줄바꿈으로 흘려 이름을 다 보여준다 */
    +'#inner .cell{overflow:hidden}'
    +'#inner .crow1{display:flex!important;flex-wrap:wrap;gap:2px}'
@@ -5260,6 +5263,12 @@ function printBoard(){
    +'<scr'+'ipt>'
    +'var ROWS='+rows+';'
    +'function layout(){var g=document.querySelector("#inner .calgrid");if(g)g.style.gridTemplateRows="14px repeat("+ROWS+",auto)";}'
+   /* 달력 칸 높이를 전부 같게 맞춘다 — 내용이 가장 많은 칸에 맞춰 모든 줄을 같은 높이로 (사용자 요청) */
+   +'function evenRows(){var g=document.querySelector("#inner .calgrid");if(!g)return;'
+   +'g.style.gridTemplateRows="14px repeat("+ROWS+",auto)";'
+   +'var cs=g.getElementsByClassName("cell"),mx=0;'
+   +'for(var i=0;i<cs.length;i++){var h=cs[i].scrollHeight;if(h>mx)mx=h;}'
+   +'if(mx>0)g.style.gridTemplateRows="14px repeat("+ROWS+","+mx+"px)";}'
    +'function fit(){var wrap=document.getElementById("wrap"),inner=document.getElementById("inner");'
    +'inner.style.zoom=1;var avail=wrap.clientHeight;'
    +'if(inner.getBoundingClientRect().height>avail){'
@@ -5271,7 +5280,7 @@ function printBoard(){
    +'function setPaper(p){var pg=document.getElementById("page");pg.className=p;'
    +'document.getElementById("bA3").className=(p==="a3"?"on":"");document.getElementById("bA4").className=(p==="a4"?"on":"");'
    +'var st=document.getElementById("pg");if(!st){st=document.createElement("style");st.id="pg";document.head.appendChild(st);}'
-   +'st.textContent="@page{size:"+(p==="a3"?"A3":"A4")+" landscape;margin:10mm}";layout();fit();}'
+   +'st.textContent="@page{size:"+(p==="a3"?"A3":"A4")+" landscape;margin:10mm}";layout();evenRows();fit();evenRows();fit();}'
    +'window.onload=function(){var f=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();'
    +'f.then(function(){setPaper("a3");}).catch(function(){setPaper("a3");});};'
    +'<\/scr'+'ipt></body></html>';
