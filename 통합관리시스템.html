@@ -4119,17 +4119,32 @@ function ceoBoxHTML(){ return ceoBoxHTMLFrom(CEO); }
 
 function ceoStamp(){ var t=new Date(); return fmt(t)+' '+pad(t.getHours())+':'+pad(t.getMinutes()); }
 function ceoWho(){ try{ if(typeof window.parent.conWho==='function') return window.parent.conWho()||''; }catch(e){} return ''; }
-function ceoPost(key,val){
-  try{ if(typeof window.parent.postShared==='function'){ window.parent.postShared(key,val); return; } }catch(e){}
-  try{ fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'setshared',key:key,value:val,editor:ceoWho()})}).catch(function(){}); }catch(e){}
+/* 저장은 구글에 실제로 올라갔는지 확인까지 한다.
+   예전엔 보내놓고 확인을 안 해서, 구글이 느릴 때 화면엔 저장된 것처럼 보이는데
+   실제로는 안 올라가는 일이 있었다(다음에 열면 사라짐). */
+function ceoPostOnce(key,val){
+  try{
+    return fetch(APPS_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'setshared',key:key,value:val,editor:ceoWho()})})
+      .then(function(){ return true; }).catch(function(){ return false; });
+  }catch(e){ return Promise.resolve(false); }
 }
-function ceoStore(obj){
+function ceoVerify(key,val){
+  return fetch(APPS_URL+'?action=shared&amp;t='+Date.now()).then(function(r){ return r.json(); })
+    .then(function(r){ var m=(r&amp;&amp;r.map)||{}; var got=(m[key]==null)?'':String(m[key]); return got===String(val); })
+    .catch(function(){ return false; });
+}
+function ceoStore(obj, done){
   var k=ceoKey(), json=obj?JSON.stringify(obj):'';
-  ceoPost(k,json);
   var m=ceoSharedMap(); if(m) m[k]=json;
   CEO=obj;
   if(viewMode==='writer') buildWriterTabs();
   renderAll();
+  ceoPostOnce(k,json)
+    .then(function(){ return ceoVerify(k,json); })
+    .then(function(ok){ if(ok) return true; return ceoPostOnce(k,json).then(function(){ return ceoVerify(k,json); }); })
+    .then(function(ok){ if(done) done(!!ok); })
+    .catch(function(){ if(done) done(false); });
 }
 /* 대표님 페이지: 건수 칩·분류표·도넛 없이 금주/차주/기타 글만 (사용자 선택) */
 function ceoReport(){
@@ -4207,17 +4222,26 @@ function ceoOpen(){
   var row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;margin-top:10px';
   var save=document.createElement('button'); save.textContent='저장';
   save.style.cssText='flex:1;padding:10px;border:none;border-radius:8px;background:#1e5631;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer;font-family:inherit';
+  function busy(txt){ save.disabled=true; del.disabled=true; save.textContent=txt; msg.textContent=txt; }
+  function unbusy(){ save.disabled=false; del.disabled=false; save.textContent='저장'; }
   save.onclick=function(){
     var pr=ceoParseEl(pad);
     if(!(pr.n.length+pr.x.length+pr.e.length)){ alert('금주업무보고 / 차주업무보고 / 기타 칸을 찾지 못했습니다.\n엑셀에서 왼쪽 첫 칸(구획 이름)까지 포함해 복사했는지 확인해 주세요.'); return; }
-    ceoStore({n:pr.n,x:pr.x,e:pr.e,t:ceoStamp(),by:ceoWho()});
-    ov.remove();
-    alert('저장했습니다. 담당자별 보기와 인쇄에 대표님 페이지가 들어갑니다.');
+    busy('구글에 저장하는 중… (10초쯤 걸립니다)');
+    ceoStore({n:pr.n,x:pr.x,e:pr.e,t:ceoStamp(),by:ceoWho()}, function(ok){
+      unbusy();
+      if(ok){ ov.remove(); alert('저장했습니다. 담당자별 보기와 인쇄에 대표님 페이지가 들어갑니다.'); }
+      else { msg.textContent='⚠ 구글에 저장되지 않았습니다. 잠시 뒤 저장을 다시 눌러 주세요.'; alert('구글에 저장되지 않았습니다.\n(화면에는 보이지만 다른 PC나 다음 접속 때는 사라집니다)\n\n잠시 뒤 저장을 한 번 더 눌러 주세요.'); }
+    });
   };
   row.appendChild(save);
   var del=document.createElement('button'); del.textContent='이 주 내용 지우기';
   del.style.cssText='padding:10px 14px;border:1px solid #d9b3b3;border-radius:8px;background:#fff;color:#a33;font-size:13px;cursor:pointer;font-family:inherit';
-  del.onclick=function(){ if(!confirm('이 주의 대표님 내용을 지울까요?')) return; ceoStore(null); ov.remove(); };
+  del.onclick=function(){
+    if(!confirm('이 주의 대표님 내용을 지울까요?')) return;
+    busy('지우는 중…');
+    ceoStore(null, function(ok){ unbusy(); ov.remove(); if(!ok) alert('구글에서 지우지 못했습니다. 잠시 뒤 다시 시도해 주세요.'); });
+  };
   row.appendChild(del);
   var cl=document.createElement('button'); cl.textContent='닫기';
   cl.style.cssText='padding:10px 14px;border:1px solid #cbd5cf;border-radius:8px;background:#f4f7f4;font-size:13px;cursor:pointer;font-family:inherit';
