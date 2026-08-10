@@ -2008,6 +2008,7 @@ loadFromIlji();
               <label>직원 선택</label>
               <select id=&quot;empSel&quot; onchange=&quot;App.selectEmp(this.value)&quot;></select>
             </div>
+            <span style=&quot;display:flex;align-items:center;gap:4px;font-size:12px;color:#666;white-space:nowrap&quot;><input type=&quot;checkbox&quot; id=&quot;showRetiredChk&quot; onchange=&quot;App.toggleRetired(this.checked)&quot;>퇴사자 보기</span>
             <button class=&quot;btn gray&quot; id=&quot;masterBtn&quot; onclick=&quot;App.masterLogin()&quot; style=&quot;white-space:nowrap&quot;>마스터 로그인</button>
             <button class=&quot;btn edit-only&quot; onclick=&quot;App.openEmpModal()&quot;>+ 직원 추가</button>
             <button class=&quot;btn gray edit-only&quot; id=&quot;editEmpBtn&quot; onclick=&quot;App.openEmpModal(true)&quot;>정보 수정</button>
@@ -2026,6 +2027,7 @@ loadFromIlji();
     <div class=&quot;field&quot;><label>이름 *</label><input id=&quot;m_name&quot; placeholder=&quot;홍길동&quot;></div>
     <div class=&quot;field&quot;><label>부서 / 직책</label><input id=&quot;m_dept&quot; placeholder=&quot;예: 시공팀 / 반장&quot;></div>
     <div class=&quot;field&quot;><label>입사일 *</label><input id=&quot;m_join&quot; type=&quot;date&quot;></div>
+    <div class=&quot;field&quot;><label>퇴사일 <span class=&quot;muted&quot;>(비우면 재직중 · 넣으면 명단에서 숨김)</span></label><input id=&quot;m_retire&quot; type=&quot;date&quot;></div>
     <div class=&quot;field&quot;><label>메모</label><input id=&quot;m_note&quot; placeholder=&quot;비고 (선택)&quot;></div>
     <div class=&quot;field&quot;><label>본인 확인 비밀번호 <span class=&quot;muted&quot;>(직원이 배포본에서 자기 연차 볼 때)</span></label><input id=&quot;m_pw&quot; placeholder=&quot;예: 생년월일 4자리 (비우면 공개)&quot;></div>
     <div class=&quot;hint&quot;>입사일 기준으로 회계연도(1/1) 연차가 자동 계산됩니다. 비밀번호를 정하면 배포한 보기전용 파일에서 그 직원은 비밀번호를 넣어야 자기 연차를 볼 수 있어요(관리자 비밀번호는 전체 열람).</div>
@@ -2121,7 +2123,8 @@ const App = (function(){
     {id:'e7', name:'김지훈', dept:'주임', joinDate:'2023-10-05'},
     {id:'e8', name:'강나래', dept:'과장', joinDate:'2023-02-15'},
     {id:'e9', name:'원채아', dept:'대리', joinDate:'2023-10-23'},
-    {id:'e10', name:'김재성', dept:'이사', joinDate:'2026-04-07', note:'경력직 입사 · 기존 연차 보존', ent:{'2026':22}}
+    {id:'e10', name:'김재성', dept:'이사', joinDate:'2026-04-07', note:'경력직 입사 · 기존 연차 보존', ent:{'2026':22}},
+    {id:'e11', name:'최연주', dept:'주임', joinDate:'2026-08-04', note:'경리 사무'}
   ];
 
   /* ---------- 대한민국 공식 공휴일 (빨간날) 2024~2027 ---------- */
@@ -2769,9 +2772,9 @@ const App = (function(){
     document.getElementById('delEmpBtn').style.display = edit?'':'none';
     if(edit){
       const e=state.employees.find(x=>x.id===curEmpId);
-      m_name.value=e.name; m_dept.value=e.dept||''; m_join.value=e.joinDate; m_note.value=e.note||''; m_pw.value=e.pw||'';
+      m_name.value=e.name; m_dept.value=e.dept||''; m_join.value=e.joinDate; m_retire.value=e.retire||''; m_note.value=e.note||''; m_pw.value=e.pw||'';
     }else{
-      m_name.value=''; m_dept.value=''; m_join.value=''; m_note.value=''; m_pw.value='';
+      m_name.value=''; m_dept.value=''; m_join.value=''; m_retire.value=''; m_note.value=''; m_pw.value='';
     }
     show('empModal');
   }
@@ -2783,10 +2786,10 @@ const App = (function(){
     let emp;
     if(editingEmp){
       emp=state.employees.find(x=>x.id===curEmpId);
-      emp.name=name; emp.dept=m_dept.value.trim(); emp.joinDate=join; emp.note=m_note.value.trim(); emp.pw=m_pw.value.trim();
+      emp.name=name; emp.dept=m_dept.value.trim(); emp.joinDate=join; emp.retire=m_retire.value||''; emp.note=m_note.value.trim(); emp.pw=m_pw.value.trim();
     }else{
       const id='e'+Date.now();
-      emp={id,name,dept:m_dept.value.trim(),joinDate:join,note:m_note.value.trim(),pw:m_pw.value.trim()};
+      emp={id,name,dept:m_dept.value.trim(),joinDate:join,retire:m_retire.value||'',note:m_note.value.trim(),pw:m_pw.value.trim()};
       state.employees.push(emp); curEmpId=id;
     }
     save(); pushEmp(emp); closeModal('empModal'); renderAll();
@@ -2829,8 +2832,8 @@ const App = (function(){
     if(empId){ recTargetFixed=empId; field.style.display='none'; }
     else {
       recTargetFixed=null; field.style.display='';
-      if(state.employees.length===0){ alert('먼저 직원을 추가해 주세요.'); return; }
-      document.getElementById('r_emp').innerHTML = state.employees.map(e=>`<option value=&quot;${e.id}&quot;>${esc(e.name)}${e.dept?' · '+esc(e.dept):''}</option>`).join('');
+      if(listEmps().length===0){ alert('먼저 직원을 추가해 주세요.'); return; }
+      document.getElementById('r_emp').innerHTML = listEmps().map(e=>`<option value=&quot;${e.id}&quot;>${empLabel(e)}</option>`).join('');
     }
     r_date.value = date || new Date().toISOString().slice(0,10);
     r_type.value='연차'; r_days.value=1; r_status.value='계획'; r_reason.value='';
@@ -2886,7 +2889,7 @@ const App = (function(){
     if(empId){ otTargetFixed=empId; field.style.display='none'; }
     else{
       otTargetFixed=null; field.style.display='';
-      document.getElementById('o_emp').innerHTML = state.employees.map(e=>`<option value=&quot;${e.id}&quot;>${esc(e.name)}${e.dept?' · '+esc(e.dept):''}</option>`).join('');
+      document.getElementById('o_emp').innerHTML = listEmps().map(e=>`<option value=&quot;${e.id}&quot;>${empLabel(e)}</option>`).join('');
     }
     const dv = date || new Date().toISOString().slice(0,10);
     o_date.value = dv;
@@ -3217,14 +3220,22 @@ const App = (function(){
     sel.innerHTML = yearOptions().map(y=>`<option value=&quot;${y}&quot; ${y===curYear?'selected':''}>${y}년</option>`).join('');
   }
   // 직원 표시 순서 (지정 순서 → 그 외는 뒤로)
-  const EMP_ORDER=['김재성','김남진','박인순','박진수','박홍민','강나래','김동현','이은광','김지훈','원채아'];
+  const EMP_ORDER=['김재성','김남진','박인순','박진수','박홍민','강나래','김동현','이은광','김지훈','최연주','원채아'];
   function empRank(e){ const i=EMP_ORDER.indexOf(e.name); return i<0?999:i; }
   function sortEmps(){ if(state.employees) state.employees.sort((a,b)=>{ const d=empRank(a)-empRank(b); return d!==0?d:(a.name<b.name?-1:1); }); }
+  /* ---------- 퇴사자 처리 (기록은 그대로 두고 명단에서만 숨김) ---------- */
+  let showRetired=false;
+  function todayYmd(){ const t=new Date(); return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
+  function isRetired(e){ return !!(e &amp;&amp; e.retire &amp;&amp; e.retire<=todayYmd()); }
+  function listEmps(){ const all=state.employees||[]; return showRetired?all.slice():all.filter(e=>!isRetired(e)); }
+  function empLabel(e){ return esc(e.name)+(e.dept?' · '+esc(e.dept):'')+(isRetired(e)?' (퇴사)':''); }
+  function toggleRetired(v){ showRetired=!!v; renderAll(); }
   function renderEmpSel(){
     const sel=document.getElementById('empSel');
-    if(state.employees.length===0){ sel.innerHTML='<option>등록된 직원 없음</option>'; return; }
-    if(!curEmpId || !state.employees.find(e=>e.id===curEmpId)) curEmpId=state.employees[0].id;
-    sel.innerHTML = state.employees.map(e=>`<option value=&quot;${e.id}&quot; ${e.id===curEmpId?'selected':''}>${esc(e.name)} ${e.dept?'· '+esc(e.dept):''}</option>`).join('');
+    const list=listEmps();
+    if(list.length===0){ sel.innerHTML='<option>등록된 직원 없음</option>'; return; }
+    if(!curEmpId || !list.find(e=>e.id===curEmpId)) curEmpId=list[0].id;
+    sel.innerHTML = list.map(e=>`<option value=&quot;${e.id}&quot; ${e.id===curEmpId?'selected':''}>${empLabel(e)}</option>`).join('');
   }
   function autoCompletePastLeaves(){
     if(READ_ONLY) return;
@@ -3251,7 +3262,7 @@ const App = (function(){
            openRecModal, calClick, evDelete, syncDays, saveRec, delRec, closeModal, exportData, importData, exportViewer,
            openOtModal, saveOt, delOt, pickDate, otDateChanged, otDay, otToday,
            setCalMode, printCal,
-           unlockCurrent, setupPw, adminToggle, setAdminPw, masterLogin, openLeaveForm, syncNow };
+           unlockCurrent, setupPw, adminToggle, setAdminPw, masterLogin, openLeaveForm, syncNow, toggleRetired };
 })();
 window.addEventListener('DOMContentLoaded', App.init);
 </script>
@@ -3620,7 +3631,7 @@ const CATS=['점검','소독','공사','견적','계약','사무','대표'];
 const CATCOLOR={'점검':'#2e7d32','소독':'#0277bd','공사':'#ef6c00','견적':'#00acc1','계약':'#8d6e63','사무':'#6a1b9a','대표':'#c2185b'};
 
 /* 담당자 표시 순서(직급순) — 일일업무일지 명단과 동일 */
-const ORDER=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','김지훈 주임','원채아 대리'];
+const ORDER=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','김지훈 주임','최연주 주임','원채아 대리'];
 function nameKey(w){ return String(w==null?'':w).trim().split(/\s+/)[0]; }
 /* 같은 사람인데 '김재성'·'김재성 이사'·오타 등으로 나뉘는 것을 하나로 → 공식 '이름 직책'으로 정규화 */
 const WRITER_CANON=(function(){ const m={}; ORDER.forEach(function(full){ m[nameKey(full)]=full; }); return m; })();

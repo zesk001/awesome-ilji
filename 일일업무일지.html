@@ -824,7 +824,7 @@
   panels['사무']=setupCategory('etc','사무','#8a8f98','📋',{office:OFFICE_CATS});
 
   // ===== 작성자 · PIN · 전송 =====
-  const NAMES=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','원채아 대리','김지훈 주임'];
+  const NAMES=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','김지훈 주임','최연주 주임'];
   // 작성자를 항상 공식 '이름 직책'으로 맞춰 저장(이름만/직책 섞임 방지)
   const CANON_W=(function(){ var m={}; NAMES.forEach(function(n){ m[n.split(/\s+/)[0]]=n; }); return m; })();
   function canonWriter(w){ var s=String(w==null?'':w).trim(); return CANON_W[s.split(/\s+/)[0]]||s; }
