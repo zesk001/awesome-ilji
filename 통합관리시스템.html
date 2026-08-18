@@ -5807,13 +5807,22 @@ function vLoadLog(){
   return VLOG_P;
 }
 
+/* 같은 이름이 여러 지역에 있는 학교(광덕초=안성·천안, 갈산초=홍성·아산 등 13쌍)
+   -> 이름만 같다고 붙이면 안 가본 학교에도 방문 기록이 생긴다. 이런 이름은 지역까지 같아야 인정. */
+const VDUP={};
+VISIT_IDX.forEach(function(e){ const k=vNorm(e.n); VDUP[k]=(VDUP[k]||0)+1; });
 /* 일지 기록 중 이 학교 것 골라내기(이름은 '갈산초'처럼 짧게, 지역은 따로 옴) */
 function vLogFor(e){
-  const n=vNorm(e.n), f=vNorm(e.f);
+  const n=vNorm(e.n), f=vNorm(e.f), r=vNorm(e.r), amb=(VDUP[n]||0)>1;
   return VLOG.filter(function(x){
-    const s=vNorm(x.s);
+    const s=vNorm(x.s), xr=vNorm(x.r);
     if(!s)return false;
-    return s===n || vNorm(x.r+x.s)===f || (s.length>=2 && (s.indexOf(n)===0||n.indexOf(s)===0) && vNorm(x.r)===vNorm(e.r));
+    if(xr+s===f) return true;                 /* 지역+이름이 그대로 맞으면 확실 */
+    const nameHit = (s===n) || (s.length>=2 && (s.indexOf(n)===0||n.indexOf(s)===0));
+    if(!nameHit) return false;
+    if(amb) return xr===r;                    /* 이름이 겹치는 학교는 지역까지 같아야 */
+    if(s===n) return true;                    /* 이름이 한 곳뿐이면 지역이 '기타지역'이어도 인정 */
+    return xr===r;                            /* 앞부분만 같은 경우는 지역 확인 */
   });
 }
 /* 이 학교의 전체 방문 목록(확정본 + 일지) — [{ds,type,worker,memo,src}] */
