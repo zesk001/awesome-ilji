@@ -178,8 +178,10 @@
   .dwcnt.none{color:var(--dim);font-weight:700;}
   .dwcnt.so{color:#9bd7ea;}
   /* ===== 모바일 화면 (2026-08-19) — 아이콘 6개 홈. 보기 전용. PC 화면(위 규칙들)은 그대로 둔다 ===== */
-  html.mob-on body{overflow:hidden;}
-  #mobRoot{display:none;position:fixed;inset:0;z-index:8000;background:var(--bg,#0e1013);overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  html.mob-on{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+  html.mob-on body{background:var(--bg,#0e1013);}
+  html.mob-on body > *:not(#mobRoot):not(#mobBackBtn){display:none!important;}
+  #mobRoot{display:none;position:relative;z-index:1;min-height:100vh;background:var(--bg,#0e1013);}
   #mobRoot *{box-sizing:border-box}
   .mo-top{padding:16px 16px 4px;display:flex;align-items:flex-start;gap:10px}
   .mo-lg{font-size:19px;font-weight:800;letter-spacing:-.4px}
@@ -201,10 +203,17 @@
   .mo-sum{margin:6px 14px 10px;background:var(--card);border:1px solid var(--stroke);border-radius:15px;padding:13px 15px}
   .mo-sum .h{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px}
   .mo-sum .v{font-size:14px;font-weight:700;line-height:1.7}
+  .mo-act{padding:4px 14px 6px}
+  .mo-act button{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+    background:var(--g2);border:0;color:#0e1013;border-radius:14px;padding:15px 0;font-size:15.5px;font-weight:800;font-family:inherit;letter-spacing:-.3px}
+  .mo-act button:active{filter:brightness(.92)}
+  .mo-act button svg{width:19px;height:19px;flex:0 0 auto}
   .mo-pc{text-align:center;padding:4px 0 26px}
   .mo-pc button{background:none;border:1px solid var(--stroke2);color:var(--dim);border-radius:20px;padding:7px 16px;font-size:12px;font-family:inherit}
-  .mo-scr{display:none;position:fixed;inset:0;z-index:8100;background:var(--bg,#0e1013);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .mo-scr{display:none;position:relative;min-height:100vh;background:var(--bg,#0e1013)}
   .mo-scr.on{display:block}
+  #mobHome{display:block}
+  #mobHome.hide{display:none}
   .mo-nav{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:10px;padding:12px 14px;
     background:rgba(14,16,19,.97);backdrop-filter:blur(10px);border-bottom:1px solid var(--stroke)}
   .mo-nav .bk{background:none;border:0;color:var(--muted);font-size:24px;line-height:1;padding:0 4px;font-family:inherit;cursor:pointer}
@@ -250,7 +259,7 @@
   .mo-lv{display:flex;flex-wrap:wrap;gap:8px}
   .mo-lv span{font-size:13.5px;font-weight:700;background:var(--card);border:1px solid var(--stroke);border-radius:10px;padding:8px 12px}
   .mo-lv span b{color:var(--amber);font-weight:800;font-size:11.5px;margin-left:5px}
-  .mo-memo{white-space:pre-line;font-size:14px;line-height:1.8;color:#d9e1e7;background:var(--card);border:1px solid var(--stroke);border-radius:13px;padding:14px}
+  .mo-memo{white-space:pre-wrap;font-size:14px;line-height:1.8;color:#d9e1e7;background:var(--card);border:1px solid var(--stroke);border-radius:13px;padding:14px}
   .mo-inp{width:100%;background:var(--card);border:1px solid var(--stroke2);border-radius:12px;padding:12px 14px;color:var(--txt);font-size:15px;font-family:inherit}
   .mo-inp:focus{outline:none;border-color:var(--g2)}
   #mobBackBtn{display:none;position:fixed;right:12px;bottom:14px;z-index:7999;background:rgba(116,194,68,.16);
@@ -6953,7 +6962,7 @@ loadGoogle();  // 시작 시 구글 시트(일일업무일지)에서 실제 데�
    휴대폰(폭 700px 이하)에서 열면 아이콘 6개짜리 간단 화면이 위에 덮인다.
    **보기 전용** — 추가·수정·드래그는 없다. PC 화면 코드는 하나도 건드리지 않았다.
    자료는 PC와 똑같은 것(현황판 달력 배치·연차·메모)을 그대로 읽어 쓴다. */
-var MOB={off:false,cal:0,pick:''};
+var MOB={off:false,cal:0,pick:'',top:0};
 try{ MOB.off=(sessionStorage.getItem('aws_mob_off')==='1'); }catch(e){}
 function mobPhone(){ try{return window.matchMedia('(max-width:700px)').matches;}catch(e){return innerWidth<=700;} }
 function mobP2(n){return String(n).padStart(2,'0');}
@@ -7050,6 +7059,10 @@ function mobHome(){
     +'</div>'
     +'<div class="mo-sum"><div class="h">오늘 ('+(now.getMonth()+1)+'/'+now.getDate()+' '+MOB_DOW[now.getDay()]+')</div>'
     +'<div class="v">'+(todaySum.length?todaySum.join(' · '):'등록된 일정이 없습니다.')+'</div></div>'
+    +'<div class="mo-act"><button onclick="mobIlji()">'
+      +'<svg viewBox="0 0 24 24" fill="none" stroke="#0e1013" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+      +'<path d="M5 3.5h9l5 5v12H5z"/><path d="M14 3.5v5h5"/><path d="M8.5 13h7M8.5 16.5h4"/></svg>'
+      +'일일업무일지 쓰기</button></div>'
     +'<div class="mo-pc"><button onclick="mobToPC()">PC 화면으로 보기</button></div>';
 }
 
@@ -7161,15 +7174,21 @@ function mobGo(id){
   var d=mobScreen(id);
   sc.innerHTML='<div class="mo-nav"><button class="bk" onclick="mobBack()">‹</button><span class="ti">'+d.ti+'</span>'
     +(d.ct?'<span class="ct">'+d.ct+'</span>':'')+'</div><div class="mo-body" id="mobScrBody">'+d.body+'</div>';
-  sc.classList.add('on'); sc.scrollTop=0;
+  MOB.top=(window.pageYOffset||document.documentElement.scrollTop||0);
+  var hm=document.getElementById('mobHome'); if(hm) hm.classList.add('hide');
+  sc.classList.add('on'); window.scrollTo(0,0);
   if(id==='cal') mobPick(MOB.pick||mobYmd(new Date()));
   if(id==='srch') mobSearch('');
 }
-function mobBack(){ var sc=document.getElementById('mobScr'); if(sc){sc.classList.remove('on'); sc.innerHTML='';} }
+function mobBack(){ var sc=document.getElementById('mobScr'); if(sc){sc.classList.remove('on'); sc.innerHTML='';}
+  var hm=document.getElementById('mobHome'); if(hm) hm.classList.remove('hide');
+  try{ window.scrollTo(0,MOB.top||0); }catch(e){} }
 function mobToPC(){ MOB.off=true; try{sessionStorage.setItem('aws_mob_off','1');}catch(e){} mobApply(); }
 function mobToPhone(){ MOB.off=false; try{sessionStorage.removeItem('aws_mob_off');}catch(e){} mobApply(); }
 
-function mobRender(){ var r=document.getElementById('mobRoot'); if(r) r.innerHTML=mobHome()+'<div class="mo-scr" id="mobScr"></div>'; }
+function mobRender(){ var r=document.getElementById('mobRoot');
+  if(r) r.innerHTML='<div id="mobHome">'+mobHome()+'</div><div class="mo-scr" id="mobScr"></div>'; }
+function mobIlji(){ try{ window.open(ILJI_URL,'_blank','noopener'); }catch(e){ location.href=ILJI_URL; } }
 function mobApply(){
   var r=document.getElementById('mobRoot');
   if(!r){ r=document.createElement('div'); r.id='mobRoot'; document.body.appendChild(r); }
