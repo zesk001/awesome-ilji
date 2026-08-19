@@ -233,6 +233,10 @@
   .wbtip .wbtiprow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:2px 0;white-space:normal;}
   .wbtip .wbtiprow i{color:var(--dim);font-style:normal;font-size:10.5px;}
   .wbtip .wbtiprow b{cursor:pointer;color:#ff8a8a;font-weight:700;padding-left:6px;}
+  .wbtip .wbtipsep{border-top:1px solid var(--stroke2);margin:6px 0 5px;}
+  .wbtip .wbtipemps{display:flex;flex-wrap:wrap;gap:4px;white-space:normal;}
+  .wbtip .wbtipemp{cursor:pointer;background:rgba(255,255,255,.05);border:1px solid var(--stroke2);border-radius:7px;padding:2px 7px;font-size:11px;color:#cfd8dd;user-select:none;}
+  .wbtip .wbtipemp.on{background:rgba(116,194,68,.16);border-color:var(--g2);color:#e3f6cf;font-weight:800;}
 
   .stagebar{display:flex;gap:2px;margin-top:4px;}
   .stagebar .s{flex:1;height:6px;border-radius:2px;background:rgba(255,255,255,.07);}
@@ -5460,8 +5464,10 @@ function renderWeekly(){
     const so=WB.dayView(ds).so||{}; const out=[];
     for(let k=1;k<=4;k++){
       const list=so[k]||[]; if(!list.length) continue;
-      out.push({name:'소독'+k+'팀', sub:list.length+'곳', so:true,
-        tip:'소독'+k+'팀 · '+list.length+'곳\n'+list.map(function(x){return '· '+x.name+(x.note?' ('+x.note+')':'');}).join('\n')});
+      const es=WB.soEmpsOf(ds,k);
+      out.push({name:'소독'+k+'팀', sub:list.length+'곳 · '+(es.length?es.length+'명':'미정'), so:true, none:!es.length,
+        tip:'소독'+k+'팀 · '+list.length+'곳\n'+list.map(function(x){return '· '+x.name+(x.note?' ('+x.note+')':'');}).join('\n')
+            +'\n'+(es.length?'투입 '+es.length+'명: '+es.join(', '):'투입 인원 미정 — 달력의 소독'+k+'팀 배지를 눌러 체크하세요')});
     }
     return out;
   }
@@ -5472,10 +5478,10 @@ function renderWeekly(){
         +'<div class="dwcnt'+(o.none?' none':'')+(o.so?' so':'')+'">'+esc(o.sub)+'</div></div>';
     }).join('');
   }
-  function lineFor(label,color,getter){
+  function lineFor(label,color,getter,unit){
     const per=days.map(function(d){return getter(ymd(d));});
     let cnt=0; per.forEach(function(a){cnt+=a.length;});
-    let h='<div class="dwrow"><div class="dwlab"><i style="background:'+color+'"></i>금주 '+label+'<span>'+(cnt?cnt+'건':'없음')+'</span></div>';
+    let h='<div class="dwrow"><div class="dwlab"><i style="background:'+color+'"></i>금주 '+label+'<span>'+(cnt?cnt+(unit||'건'):'없음')+'</span></div>';
     h+='<div class="lwgrid">'+[0,1,2,3,4].map(function(i){
       const ds=ymd(days[i]);
       return '<div class="lwcol'+(ds===ts?' today':'')+'"><div class="lwhd">'+DOW[i]+' <b>'+days[i].getDate()+'</b></div>'+cellHtml(per[i])+'</div>';
@@ -5488,7 +5494,7 @@ function renderWeekly(){
     }).join(' &nbsp; ')+'</div>';
     return h+'</div>';
   }
-  el.innerHTML=lineFor('공사','#ed9b4a',gongItems)+lineFor('소독','#6cc3df',soItems);
+  el.innerHTML=lineFor('공사','#ed9b4a',gongItems,'건')+lineFor('소독','#6cc3df',soItems,'팀');
 }
 /* 금주 휴가자: 월~금 요일별 칸에 그날 휴가자 이름 표시 (주말 기록은 아래 한 줄) */
 function renderLeaveWeek(){
@@ -5689,14 +5695,26 @@ const WB=(function(){
   const CALKEY='aws_wb_cal';
   let placed={};try{placed=JSON.parse(localStorage.getItem(CALKEY)||'{}');}catch(e){placed={};}
   function persistCal(){try{localStorage.setItem(CALKEY,JSON.stringify(placed));}catch(e){} wbLastEdit=Date.now(); try{postShared('wbcal',JSON.stringify(placed));}catch(e){}}
-  function emptyDay(){return {gong:[],out:[],as:[],so:{1:[],2:[],3:[],4:[]}};}
+  function emptyDay(){return {gong:[],out:[],as:[],so:{1:[],2:[],3:[],4:[]},soEmp:{1:[],2:[],3:[],4:[]}};}
+  function normEmp(e){var o={1:[],2:[],3:[],4:[]};if(e)for(var k=1;k<=4;k++)if(Array.isArray(e[k]))o[k]=e[k].slice();return o;}
   function dayView(date){var o=placed[date];if(!o)return emptyDay();
     if(Array.isArray(o)){var n=emptyDay();o.forEach(function(pp){var c=catOf(pp.src);if(c==='gong')n.gong.push(pp);else if(c==='out')n.out.push(pp);else if(c==='as')n.as.push(pp);else n.so[1].push(pp);});return n;}
     var g0=o.gong||[],g=[],ot=(o.out||[]).slice();
     g0.forEach(function(x){if(catOf(x.src)==='out')ot.push(x);else g.push(x);});
-    return {gong:g,out:ot,as:o.as||[],so:{1:(o.so&&o.so[1])||[],2:(o.so&&o.so[2])||[],3:(o.so&&o.so[3])||[],4:(o.so&&o.so[4])||[]}};}
+    return {gong:g,out:ot,as:o.as||[],so:{1:(o.so&&o.so[1])||[],2:(o.so&&o.so[2])||[],3:(o.so&&o.so[3])||[],4:(o.so&&o.so[4])||[]},soEmp:normEmp(o.soEmp)};}
   function dayEdit(date){if(!placed[date]||Array.isArray(placed[date]))placed[date]=dayView(date);return placed[date];}
   function isEmptyDay(o){return !o.gong.length&&!o.out.length&&!o.as.length&&!o.so[1].length&&!o.so[2].length&&!o.so[3].length&&!o.so[4].length;}
+  /* 그날 그 소독팀에 나가는 사람 — 팀 고정 명단이 아니라 '그날 그 팀' 기준 */
+  function soEmpsOf(date,team){var o=dayView(date);return (o.soEmp&&o.soEmp[team])||[];}
+  function toggleSoEmp(date,team,name){
+    if(!wbAuth())return;
+    var o=dayEdit(date); if(!o.soEmp)o.soEmp={1:[],2:[],3:[],4:[]};
+    var a=o.soEmp[team]||(o.soEmp[team]=[]); var i=a.indexOf(name);
+    if(i<0)a.push(name); else a.splice(i,1);
+    persistCal(); refreshHome();
+    var badge=document.querySelector('#calGrid .teambadge[data-date="'+date+'"][data-team="'+team+'"]');
+    if(badge)openTeamPop(badge); else hideTip(true);
+  }
   function chipCls(k){return k==='outsrc'?'c-out':k==='as'?'c-as':k==='sodan'?'c-dan':'c-gong';}
   function onDragStart(e,list,id){var it=(data[list]||[]).find(function(x){return x.id===id;});if(!it)return;try{e.dataTransfer.setData('text/wb',JSON.stringify({list:list,name:it.name,note:it.note||'',emps:(it.emps||[])}));e.dataTransfer.setData('wbcat-'+catOf(list),'1');e.dataTransfer.setData('text/plain',it.name);e.dataTransfer.effectAllowed='copy';}catch(err){}}
   function placeInZone(date,zone,team,pl){if(!date||!pl||!pl.name)return;var o=dayEdit(date);var item={id:'wc'+Date.now()+Math.floor(Math.random()*1000),name:pl.name,note:pl.note||'',src:pl.list,emps:(pl.emps||[]).slice()};
@@ -5714,7 +5732,9 @@ const WB=(function(){
     persistCal();hideTip(true);refreshHome();}
   function chipCell(it,zone,date){var es=empsOf(it);var tip=[(it.note||''),(es.length?'투입 '+es.length+'명: '+es.join(', '):'')].filter(Boolean).join(' / ');
     return '<span class="cellchip '+chipCls(it.src)+'" data-date="'+date+'" data-zone="'+zone+'" data-id="'+it.id+'"'+(tip?' data-tip="'+escAttr(tip)+'"':'')+'>'+escAttr(it.name)+(es.length?' <b>'+es.length+'</b>':'')+'</span>';}
-  function teamBadge(date,team,list){var tip=list.map(function(x){return x.name+(x.note?' ('+x.note+')':'');}).join('\n');return '<span class="teambadge t'+team+'" data-date="'+date+'" data-zone="so" data-team="'+team+'" data-tip="'+escAttr(tip)+'">소독'+team+'팀<b>'+list.length+'</b></span>';}
+  function teamBadge(date,team,list){var es=soEmpsOf(date,team);
+    var tip=list.map(function(x){return x.name+(x.note?' ('+x.note+')':'');}).join('\n')+(es.length?'\n투입 '+es.length+'명: '+es.join(', '):'\n투입 인원 미정');
+    return '<span class="teambadge t'+team+'" data-date="'+date+'" data-zone="so" data-team="'+team+'" data-tip="'+escAttr(tip)+'">소독'+team+'팀<b>'+list.length+(es.length?'·'+es.length+'명':'')+'</b></span>';}
   function renderCell(date){var o=dayView(date);var h='<div class="cellgrid"><div class="crow crow1">';
     h+='<div class="zone zgong" data-lb="공사" data-date="'+date+'" data-zone="gong">'+o.gong.map(function(it){return chipCell(it,'gong',date);}).join('')+'</div>';
     h+='<div class="zone zout" data-lb="외주" data-date="'+date+'" data-zone="out">'+(o.out||[]).map(function(it){return chipCell(it,'out',date);}).join('')+'</div>';
@@ -5728,7 +5748,16 @@ const WB=(function(){
   function showTipText(target,text){var t=tipEl();t.textContent=text;tipPinned=false;placeTip(t,target);}
   function showTipHtml(target,html){var t=tipEl();t.innerHTML=html;tipPinned=true;placeTip(t,target);}
   function hideTip(force){if(tipPinned&&!force)return;var t=document.getElementById('wbTip');if(t)t.style.display='none';}
-  function openTeamPop(badge){var date=badge.getAttribute('data-date'),team=badge.getAttribute('data-team');var o=dayView(date);var list=o.so[team]||[];var html='<div class="wbtiphd">소독'+team+'팀 ('+list.length+')</div>'+list.map(function(x){return '<div class="wbtiprow"><span>'+escAttr(x.name)+(x.note?' <i>'+escAttr(x.note)+'</i>':'')+'</span><b onclick="WB.removeItem(\''+date+'\',\'so\','+team+',\''+x.id+'\')">✕</b></div>';}).join('');showTipHtml(badge,html);}
+  function openTeamPop(badge){var date=badge.getAttribute('data-date'),team=badge.getAttribute('data-team');var o=dayView(date);var list=o.so[team]||[];
+    var sel=soEmpsOf(date,team);
+    var html='<div class="wbtiphd">소독'+team+'팀 · '+list.length+'곳</div>'
+      +list.map(function(x){return '<div class="wbtiprow"><span>'+escAttr(x.name)+(x.note?' <i>'+escAttr(x.note)+'</i>':'')+'</span><b onclick="WB.removeItem(\''+date+'\',\'so\','+team+',\''+x.id+'\')">✕</b></div>';}).join('')
+      +'<div class="wbtipsep"></div>'
+      +'<div class="wbtiphd">이 날 이 팀 투입 인원'+(sel.length?' ('+sel.length+'명)':' — 미정')+'</div>'
+      +'<div class="wbtipemps">'+fieldEmps().map(function(n){
+          return '<span class="wbtipemp'+(sel.indexOf(n)>=0?' on':'')+'" onclick="WB.toggleSoEmp(\''+date+'\','+team+',\''+n.replace(/'/g,"\\'")+'\')">'+esc(n)+'</span>';
+        }).join('')+'</div>';
+    showTipHtml(badge,html);}
   function contains(list,v){for(var i=0;i<list.length;i++)if(list[i]===v)return true;return false;}
   var dndReady=false;
   function ensureCalDnD(){
@@ -5788,7 +5817,7 @@ const WB=(function(){
     const anyC=Object.keys(placed||{}).length>0;
     return {d:JSON.stringify(data), c:JSON.stringify(placed||{}), any:any, anyC:anyC};
   }
-  return {auth:wbAuth,applySharedWb,exportShared,renderAll,render,openAdd,openEdit,save,del,delCurrent,onDragStart,renderCell,removeItem,ensureCalDnD,selectRegion,filterSojung,onDragStartDB,dayView,empsOf,fieldEmps};
+  return {auth:wbAuth,applySharedWb,exportShared,renderAll,render,openAdd,openEdit,save,del,delCurrent,onDragStart,renderCell,removeItem,ensureCalDnD,selectRegion,filterSojung,onDragStartDB,dayView,empsOf,fieldEmps,soEmpsOf,toggleSoEmp};
 })();
 
 /* 메모(특별 사항) 카드: 보기는 누구나, 수정은 관리자(마스터 비밀번호) — 전 기기 공유(wbmemo 키) */
