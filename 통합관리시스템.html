@@ -262,6 +262,10 @@
   .mo-memo{white-space:pre-wrap;font-size:14px;line-height:1.8;color:#d9e1e7;background:var(--card);border:1px solid var(--stroke);border-radius:13px;padding:14px}
   .mo-inp{width:100%;background:var(--card);border:1px solid var(--stroke2);border-radius:12px;padding:12px 14px;color:var(--txt);font-size:15px;font-family:inherit}
   .mo-inp:focus{outline:none;border-color:var(--g2)}
+  #mobToast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;z-index:9500;background:rgba(20,23,26,.96);
+    border:1px solid var(--stroke2);color:#e8eef2;border-radius:22px;padding:11px 18px;font-size:13px;font-weight:700;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .18s}
+  #mobToast.on{opacity:1}
   #mobBackBtn{display:none;position:fixed;right:12px;bottom:14px;z-index:7999;background:rgba(116,194,68,.16);
     border:1px solid var(--g2);color:#dbf3c4;border-radius:22px;padding:9px 16px;font-size:12.5px;font-weight:700;font-family:inherit}
   /* 현장 카드: 투입 담당자 체크 */
@@ -6962,7 +6966,7 @@ loadGoogle();  // 시작 시 구글 시트(일일업무일지)에서 실제 데�
    휴대폰(폭 700px 이하)에서 열면 아이콘 6개짜리 간단 화면이 위에 덮인다.
    **보기 전용** — 추가·수정·드래그는 없다. PC 화면 코드는 하나도 건드리지 않았다.
    자료는 PC와 똑같은 것(현황판 달력 배치·연차·메모)을 그대로 읽어 쓴다. */
-var MOB={off:false,cal:0,pick:'',top:0};
+var MOB={off:false,cal:0,pick:'',top:0,exitArm:0,histReady:false};
 try{ MOB.off=(sessionStorage.getItem('aws_mob_off')==='1'); }catch(e){}
 function mobPhone(){ try{return window.matchMedia('(max-width:700px)').matches;}catch(e){return innerWidth<=700;} }
 function mobP2(n){return String(n).padStart(2,'0');}
@@ -7211,6 +7215,30 @@ function mobBack(){ var sc=document.getElementById('mobScr'); if(sc){sc.classLis
   var hm=document.getElementById('mobHome'); if(hm) hm.classList.remove('hide');
   try{ window.scrollTo(0,MOB.top||0); }catch(e){} }
 function mobToPC(){ MOB.off=true; try{sessionStorage.setItem('aws_mob_off','1');}catch(e){} mobApply(); }
+/* 안내 쪽지 */
+var mobToastT=null;
+function mobToast(msg){
+  var t=document.getElementById('mobToast');
+  if(!t){ t=document.createElement('div'); t.id='mobToast'; document.body.appendChild(t); }
+  t.textContent=msg; t.classList.add('on');
+  clearTimeout(mobToastT); mobToastT=setTimeout(function(){ t.classList.remove('on'); },1800);
+}
+/* 휴대폰 뒤로가기(← 버튼·스와이프) 처리
+   - 상세 화면이 열려 있으면 → 홈으로
+   - 홈에서 누르면 → 안내만 띄우고, 2초 안에 한 번 더 누르면 진짜 나감
+   방법: 우리 화면 위에 '문지기' 기록을 하나 얹어 두고, 뒤로가기로 그게 빠질 때마다 우리가 판단한 뒤 다시 얹는다. */
+function mobPushGuard(){ try{ history.pushState({mobGuard:1},''); }catch(e){} }
+function mobHistInit(){
+  if(MOB.histReady) return; MOB.histReady=true;
+  mobPushGuard();
+  window.addEventListener('popstate',function(){
+    if(!mobPhone()||MOB.off) return;              /* PC 화면일 땐 손대지 않는다 */
+    var sc=document.getElementById('mobScr');
+    if(sc&&sc.classList.contains('on')){ mobBack(); mobPushGuard(); return; }
+    if(MOB.exitArm&&(Date.now()-MOB.exitArm)<2000){ MOB.exitArm=0; try{history.back();}catch(e){} return; }
+    MOB.exitArm=Date.now(); mobPushGuard(); mobToast('한 번 더 누르면 화면을 나갑니다');
+  });
+}
 function mobToPhone(){ MOB.off=false; try{sessionStorage.removeItem('aws_mob_off');}catch(e){} mobApply(); }
 
 function mobRender(){ var r=document.getElementById('mobRoot');
@@ -7223,7 +7251,7 @@ function mobApply(){
   r.style.display=on?'block':'none';
   document.documentElement.classList.toggle('mob-on',on);
   if(on){ var open=document.getElementById('mobScr'); var wasOpen=open&&open.classList.contains('on');
-    if(!wasOpen) mobRender(); }
+    if(!wasOpen) mobRender(); mobHistInit(); }
   var bb=document.getElementById('mobBackBtn');
   if(!bb){ bb=document.createElement('button'); bb.id='mobBackBtn'; bb.textContent='간단 화면으로'; bb.onclick=mobToPhone; document.body.appendChild(bb); }
   bb.style.display=(!on&&mobPhone())?'block':'none';
