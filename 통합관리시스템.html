@@ -74,8 +74,9 @@
   .glass h3 .go{font-size:10.5px;color:var(--g1);cursor:pointer;font-weight:700;border:1px solid var(--stroke2);padding:3px 10px;border-radius:8px;background:var(--glass);white-space:nowrap;transition:.15s;}
   .glass h3 .go:hover{border-color:var(--g2);color:#fff;background:rgba(116,194,68,.14);}
   .scroll{max-height:230px;overflow:auto;}
+  #pLeave{max-height:none;overflow:visible;}   /* 금주 휴가자는 요일 표라 스크롤에 가두면 이름이 잘린다 */
   /* 현황판 6개 카드: 항목이 늘어도 틀 고정·내부 스크롤 (작은 화면 기본값) */
-  [id^="wbList_"]{height:158px;max-height:158px;overflow-y:auto;}
+  [id^="wbList_"]{height:210px;max-height:210px;overflow-y:auto;}
   [id^="wbList_"] .empty{padding:14px;}
   /* 넓은 화면(3단): 발주서 정보(왼쪽) 끝선에 맞춰 가운데·오른쪽 바닥선 정렬 */
   @media(min-width:1151px){
@@ -86,7 +87,7 @@
     .deck>.col:nth-child(2)>.calwrap{flex:0 0 auto;}
     .deck>.col:nth-child(2)>.schpair{flex:0 0 auto;}
     .deck>.col:nth-child(2)>.schpair>.glass{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
-    .deck>.col:nth-child(2)>.schpair>.glass>[id^="wbList_"]{height:200px;max-height:200px;}
+    .deck>.col:nth-child(2)>.schpair>.glass>[id^="wbList_"]{height:400px;max-height:400px;}
     /* 오른쪽 카드 안 목록: 남는 높이만큼 늘고 넘치면 스크롤 */
     .deck>.col:nth-child(3)>.glass>[id^="wbList_"]{flex:1 1 auto;height:auto;max-height:none;min-height:0;}
   }
@@ -157,7 +158,7 @@
   .lwhd b{color:#fff;font-weight:800;}
   .lwcol .lwhd{margin-bottom:4px;}
   .lwcol.today .lwhd{color:#bfe89a;}
-  .lwnm{font-size:12px;font-weight:700;color:#eaf0f4;line-height:1.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .lwnm{font-size:12px;font-weight:700;color:#eaf0f4;line-height:1.45;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;}
   .lwnm i{font-style:normal;font-size:9.5px;color:var(--amber);margin-left:2px;font-weight:700;}
   .lwnm.plan{opacity:.6;}
   .lwdash{color:var(--dim);font-size:11px;}
