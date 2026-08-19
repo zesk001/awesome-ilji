@@ -6985,6 +6985,20 @@ function mobLeaveOn(ds){
   });
 }
 function mobMemo(){ return (gData.wbMemo!=null?gData.wbMemo:(localStorage.getItem('aws_wbmemo')||'')); }
+/* 메모는 '8월 소독 요청 ...(공백 여러 칸)... 9월 소독 요청' 처럼 두 칸을 나란히 적어 둔 형태다.
+   넓은 PC에선 두 줄로 보이지만 휴대폰에선 뒤엉킨다 → 공백 3칸 이상에서 갈라 위아래 두 덩어리로 만든다. */
+function mobMemoCols(txt){
+  var lines=String(txt||'').replace(/\r/g,'').split('\n'), L=[], R=[], two=false;
+  lines.forEach(function(ln){
+    if(!ln.trim())return;
+    var m=/\s{3,}/.exec(ln);
+    if(m && ln.slice(m.index+m[0].length).trim()){ two=true; 
+      var a=ln.slice(0,m.index).trim(), bb=ln.slice(m.index+m[0].length).trim();
+      if(a)L.push(a); if(bb)R.push(bb);
+    } else { L.push(ln.trim()); }
+  });
+  return two?{L:L,R:R}:null;
+}
 
 /* 한 줄짜리 항목 그리기 */
 function mobItem(color,name,sub,who,whoNone){
@@ -7018,7 +7032,9 @@ function mobCounts(){
     g+=((o.gong||[]).length);
     for(var t=1;t<=4;t++) if(((o.so&&o.so[t])||[]).length) so++;
     lv+=mobLeaveOn(ds).length;});
-  var m=mobMemo().split('\n').filter(function(x){return x.trim();}).length;
+  var mc=mobMemoCols(mobMemo());
+  var m=mc?((mc.L.length?mc.L.length-1:0)+(mc.R.length?mc.R.length-1:0))
+          :mobMemo().split('\n').filter(function(x){return x.trim();}).length;
   return {gong:g,so:so,lv:lv,memo:m};
 }
 
@@ -7095,10 +7111,21 @@ function mobScreen(id){
     return {ti:'금주 휴가',ct:tot?tot+'명':'',body:h};
   }
   if(id==='memo'){
-    var m=mobMemo();
+    var m=mobMemo(), body='';
+    if(!String(m).trim()) body='<div class="mo-none">기재된 특별 사항이 없습니다.</div>';
+    else{
+      var col=mobMemoCols(m);
+      if(col){
+        var blk=function(arr){ if(!arr.length)return '';
+          var head=arr[0], rest=arr.slice(1);
+          return '<div class="mo-grp"><div class="mo-dh"><span class="n" style="font-size:14.5px">'+esc(head)+'</span>'
+            +'<span class="sm">'+rest.length+'곳</span></div>'
+            +(rest.length?'<div class="mo-memo">'+rest.map(function(x){return esc(x);}).join('\n')+'</div>':'<div class="mo-none">항목 없음</div>')+'</div>'; };
+        body=blk(col.L)+blk(col.R);
+      } else body='<div class="mo-memo">'+esc(m)+'</div>';
+    }
     return {ti:'메모',ct:'특별 사항',
-      body:(m?'<div class="mo-memo">'+esc(m)+'</div>':'<div class="mo-none">기재된 특별 사항이 없습니다.</div>')
-        +'<div class="mo-none">※ 수정은 사무실 화면(PC)에서만 됩니다.</div>'};
+      body:body+'<div class="mo-none">※ 수정은 사무실 화면(PC)에서만 됩니다.</div>'};
   }
   if(id==='srch'){
     return {ti:'현장 찾기',ct:'',
