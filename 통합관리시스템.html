@@ -262,6 +262,18 @@
   .mo-memo{white-space:pre-wrap;font-size:14px;line-height:1.8;color:#d9e1e7;background:var(--card);border:1px solid var(--stroke);border-radius:13px;padding:14px}
   .mo-inp{width:100%;background:var(--card);border:1px solid var(--stroke2);border-radius:12px;padding:12px 14px;color:var(--txt);font-size:15px;font-family:inherit}
   .mo-inp:focus{outline:none;border-color:var(--g2)}
+  .mo-tap{cursor:pointer;align-items:center}
+  .mo-tap:active{background:rgba(255,255,255,.09)}
+  .mo-arw{color:var(--dim);font-size:20px;line-height:1;flex:0 0 auto;align-self:center}
+  .mo-sh{padding:2px 2px 12px;border-bottom:1px solid var(--stroke);margin-bottom:12px}
+  .mo-sh .nm{font-size:20px;font-weight:800;letter-spacing:-.4px;word-break:keep-all}
+  .mo-sh .sub{font-size:12.5px;color:var(--muted);margin-top:5px;font-weight:600}
+  .mo-two{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:16px}
+  .mo-kpi{background:var(--card);border:1px solid var(--stroke);border-radius:13px;padding:12px 13px}
+  .mo-kpi .k{font-size:11px;color:var(--muted);font-weight:800}
+  .mo-kpi .v{font-size:15px;font-weight:800;margin-top:5px;word-break:keep-all}
+  .mo-kpi .v .none{color:var(--dim);font-size:13px;font-weight:600}
+  .mo-kpi .s{font-size:11px;color:var(--dim);font-weight:700;margin-top:4px;min-height:13px}
   #mobToast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;z-index:9500;background:rgba(20,23,26,.96);
     border:1px solid var(--stroke2);color:#e8eef2;border-radius:22px;padding:11px 18px;font-size:13px;font-weight:700;
     box-shadow:0 8px 24px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .18s}
@@ -6966,7 +6978,7 @@ loadGoogle();  // 시작 시 구글 시트(일일업무일지)에서 실제 데�
    휴대폰(폭 700px 이하)에서 열면 아이콘 6개짜리 간단 화면이 위에 덮인다.
    **보기 전용** — 추가·수정·드래그는 없다. PC 화면 코드는 하나도 건드리지 않았다.
    자료는 PC와 똑같은 것(현황판 달력 배치·연차·메모)을 그대로 읽어 쓴다. */
-var MOB={off:false,cal:0,pick:'',top:0,exitArm:0,histReady:false};
+var MOB={off:false,cal:0,pick:'',top:0,exitArm:0,histReady:false,nav:[],q:'',vlog:0};
 try{ MOB.off=(sessionStorage.getItem('aws_mob_off')==='1'); }catch(e){}
 function mobPhone(){ try{return window.matchMedia('(max-width:700px)').matches;}catch(e){return innerWidth<=700;} }
 function mobP2(n){return String(n).padStart(2,'0');}
@@ -7098,7 +7110,7 @@ function mobWeekScreen(title,getter,unit){
   return {html:h,total:n};
 }
 
-function mobScreen(id){
+function mobScreen(id,arg){
   var days=mobWeekDays(), ts=mobYmd(new Date());
   if(id==='gong'){ var r=mobWeekScreen('금주 공사',mobGongOf,'건');
     return {ti:'금주 공사',ct:days[0].getDate()+'~'+days[6].getDate()+'일 · 공사 '+mobCounts().gong+'건',
@@ -7133,8 +7145,12 @@ function mobScreen(id){
   }
   if(id==='srch'){
     return {ti:'현장 찾기',ct:'',
-      body:'<input class="mo-inp" id="mobQ" placeholder="학교 이름 또는 지역" autocomplete="off" oninput="mobSearch(this.value)">'
+      body:'<input class="mo-inp" id="mobQ" placeholder="학교 이름 또는 지역" autocomplete="off" value="'+esc(MOB.q||'')+'" oninput="mobSearch(this.value)">'
         +'<div id="mobQR" style="margin-top:14px"></div>'};
+  }
+  if(id==='site'){
+    var a=arg||{};
+    return {ti:(a.n||'현장'),ct:'현장 정보',body:mobSiteHtml(a.n||'',a.r||'')};
   }
   if(id==='cal'){ return {ti:'전체 달력',ct:'날짜를 눌러 보세요',body:mobCalHtml()}; }
   return {ti:'',ct:'',body:''};
@@ -7184,34 +7200,167 @@ function mobPick(ds){
 }
 function mobCalMove(v){ MOB.cal+=v; MOB.pick=''; var b=document.getElementById('mobScrBody'); if(b){b.innerHTML=mobCalHtml(); mobPick(MOB.pick||'');} }
 
-function mobSearch(q){
-  var box=document.getElementById('mobQR'); if(!box)return;
-  q=(q||'').trim(); if(q.length<1){box.innerHTML='<div class="mo-none">학교 이름을 한 글자만 쳐도 찾습니다.</div>';return;}
-  var lo=q.toLowerCase(), out=[];
-  (typeof WB_DIS_SITES!=='undefined'?WB_DIS_SITES:[]).forEach(function(s){
-    if(s.n.toLowerCase().indexOf(lo)>=0||s.r.toLowerCase().indexOf(lo)>=0) out.push({n:s.n,r:s.r,k:'정기 소독현장',c:'#6cc3df'});
-  });
-  (gData.est||[]).forEach(function(e){var nm=e.site||e.school||''; if(nm&&nm.toLowerCase().indexOf(lo)>=0) out.push({n:nm,r:e.region||'',k:'견적·계약'+(e.work?' · '+e.work:''),c:'#ed9b4a'});});
-  var seen={},uniq=[];
-  out.forEach(function(x){var k=x.n+'|'+x.k; if(seen[k])return; seen[k]=1; uniq.push(x);});
-  box.innerHTML = uniq.length
-    ? '<div class="mo-none">'+uniq.length+'곳</div>'+uniq.slice(0,60).map(function(x){return mobItem(x.c,x.n,esc(x.r||'')+(x.k?' · '+esc(x.k):''),'',false);}).join('')
-      +(uniq.length>60?'<div class="mo-none">※ 앞 60곳만 표시했습니다. 더 정확히 쳐 보세요.</div>':'')
-    : '<div class="mo-none">찾는 현장이 없습니다.</div>';
+/* ===== 현장 상세 (2026-08-19) =====
+   검색 결과에서 현장 이름을 누르면 그 현장의 모든 것을 한 화면에 모아 보여준다.
+   ★같은 이름 학교가 여러 곳 있으므로(교훈 19번) 지역까지 확인해서 붙인다. */
+function mobNm(v){ return (typeof vNorm==='function')?vNorm(v):String(v||'').replace(/\s+/g,'').toLowerCase(); }
+function mobIdxOf(full){
+  if(typeof VISIT_IDX==='undefined')return null;
+  var f=mobNm(full);
+  for(var i=0;i<VISIT_IDX.length;i++) if(mobNm(VISIT_IDX[i].f)===f) return VISIT_IDX[i];
+  return null;
+}
+/* 이 현장의 자료 한 묶음 */
+function mobSiteInfo(full,region){
+  var e=mobIdxOf(full);
+  var reg=region||(e?e.r:'');
+  var shortN=e?e.n:(function(){ var p=String(full).split(' '); return p.length>1?p.slice(1).join(' '):full; })();
+  var sameName=function(a){                       /* 이름 맞추기 — 지역까지 확인 */
+    var x=mobNm(a); if(!x)return false;
+    if(x===mobNm(full))return true;
+    return (x===mobNm(shortN));
+  };
+  var visits=(e&&typeof vAllVisits==='function')?vAllVisits(e):[];
+  var last=function(t){ var a=visits.filter(function(v){return v.type===t;}); return a.length?a[a.length-1]:null; };
+  var est=(gData.est||[]).filter(function(x){ var nm=x.site||x.school||'';
+    if(!sameName(nm))return false;
+    if(mobNm(nm)===mobNm(full))return true;
+    return !reg || !x.region || mobNm(x.region)===mobNm(reg); });
+  var ord=(gData.orders||[]).filter(function(x){ return sameName(x.site||''); });
+  var reg2=(typeof WB_DIS_SITES!=='undefined'?WB_DIS_SITES:[]).some(function(x){return mobNm(x.n)===mobNm(full);});
+  /* 달력에 잡혀 있는 앞으로의 일정 */
+  var plan=[], today=mobYmd(new Date());
+  try{
+    var cal=JSON.parse(localStorage.getItem('aws_wb_cal')||'{}');
+    Object.keys(cal).sort().forEach(function(ds){
+      if(ds<today)return; var o=mobDV(ds);
+      (o.gong||[]).forEach(function(it){ if(sameName(it.name)) plan.push({ds:ds,k:'공사',c:'#ed9b4a'}); });
+      (o.out||[]).forEach(function(it){ if(sameName(it.name)) plan.push({ds:ds,k:'외주',c:'#e08a8a'}); });
+      (o.as||[]).forEach(function(it){ if(sameName(it.name)) plan.push({ds:ds,k:'AS',c:'#9aa9b6'}); });
+      for(var t=1;t<=4;t++)((o.so&&o.so[t])||[]).forEach(function(it){ if(sameName(it.name)) plan.push({ds:ds,k:'소독 '+t+'팀',c:'#6cc3df'}); });
+    });
+  }catch(err){}
+  return {full:full,reg:reg,mgr:(e?e.p:''),idx:e,visits:visits,
+    lastI:last('점검'),lastS:last('소독'),
+    cntI:visits.filter(function(v){return v.type==='점검';}).length,
+    cntS:visits.filter(function(v){return v.type==='소독';}).length,
+    est:est,ord:ord,regular:reg2,plan:plan};
+}
+function mobDK(ds){ return (typeof vDateKs==='function')?vDateKs(ds):String(ds||''); }
+function mobMoney(v){ var n=Number(v)||0; return n?n.toLocaleString('ko-KR')+'원':''; }
+
+function mobSiteHtml(full,region){
+  var I=mobSiteInfo(full,region);
+  var h='<div class="mo-sh"><div class="nm">'+esc(I.full)+'</div><div class="sub">'
+    +[I.reg,(I.regular?'정기 소독현장':''),(I.mgr?'담당 '+I.mgr:'')].filter(Boolean).map(esc).join(' · ')+'</div></div>';
+  /* 최근 점검·소독 */
+  h+='<div class="mo-two">'
+    +'<div class="mo-kpi"><div class="k">최근 점검</div><div class="v" style="color:#a7e07d">'
+      +(I.lastI?esc(mobDK(I.lastI.ds)):'<span class="none">기록 없음</span>')+'</div>'
+      +'<div class="s">'+(I.cntI?'올해 '+I.cntI+'회'+(I.lastI&&I.lastI.worker?' · '+esc(I.lastI.worker):''):'')+'</div></div>'
+    +'<div class="mo-kpi"><div class="k">최근 소독</div><div class="v" style="color:#8fd4e8">'
+      +(I.lastS?esc(mobDK(I.lastS.ds)):'<span class="none">기록 없음</span>')+'</div>'
+      +'<div class="s">'+(I.cntS?'올해 '+I.cntS+'회'+(I.lastS&&I.lastS.memo?' · '+esc(I.lastS.memo):''):'')+'</div></div>'
+    +'</div>';
+  /* 앞으로 예정 */
+  if(I.plan.length){
+    h+='<div class="mo-grp"><div class="mo-dh"><span class="n" style="font-size:14.5px">앞으로 예정</span><span class="sm">'+I.plan.length+'건</span></div>'
+      +I.plan.slice(0,8).map(function(p){ return mobItem(p.c,mobDK(p.ds),esc(p.k),'',false); }).join('')+'</div>';
+  }
+  /* 견적·계약 */
+  h+='<div class="mo-grp"><div class="mo-dh"><span class="n" style="font-size:14.5px">견적·계약</span><span class="sm">'+I.est.length+'건</span></div>';
+  h+= I.est.length
+    ? I.est.slice().sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));}).slice(0,10).map(function(x){
+        return mobItem('#ed9b4a', x.work||x.name||'견적',
+          [x.date?esc(x.date):'', x.no?'No.'+esc(x.no):''].filter(Boolean).join(' · '),
+          mobMoney(x.amount), !Number(x.amount)); }).join('')
+    : '<div class="mo-none">견적 기록이 없습니다.</div>';
+  h+='</div>';
+  /* 발주 */
+  if(I.ord.length){
+    h+='<div class="mo-grp"><div class="mo-dh"><span class="n" style="font-size:14.5px">발주</span><span class="sm">'+I.ord.length+'건</span></div>'
+      +I.ord.slice(0,8).map(function(x){ return mobItem('#9aa9b6', x.vendor||'거래처',
+          [x.date?esc(x.date):'', esc(x.goods||x.work||'')].filter(Boolean).join(' · '),'',false); }).join('')+'</div>';
+  }
+  /* 방문 이력 */
+  h+='<div class="mo-grp"><div class="mo-dh"><span class="n" style="font-size:14.5px">올해 방문 이력</span><span class="sm">'+I.visits.length+'회</span></div>';
+  h+= I.visits.length
+    ? I.visits.slice().reverse().slice(0,14).map(function(v){
+        return mobItem(v.type==='점검'?'#74c244':'#6cc3df', mobDK(v.ds),
+          esc(v.type)+(v.worker?' · '+esc(v.worker):'')+(v.memo?' · '+esc(v.memo):''),'',false); }).join('')
+      +(I.visits.length>14?'<div class="mo-none">※ 최근 14회만 표시</div>':'')
+    : '<div class="mo-none">'+(I.idx?'올해 방문 기록이 없습니다.':'방문 이력 자료가 없는 현장입니다.')+'</div>';
+  h+='</div>';
+  return h;
 }
 
-function mobGo(id){
+function mobSearch(q){
+  var box=document.getElementById('mobQR'); if(!box)return;
+  MOB.q=(q==null?MOB.q:q);
+  q=String(MOB.q||'').trim();
+  if(q.length<1){box.innerHTML='<div class="mo-none">학교 이름을 한 글자만 쳐도 찾습니다.<br>이름을 누르면 견적·최근 점검일·최근 소독일까지 볼 수 있습니다.</div>';return;}
+  var lo=q.toLowerCase(), list=[], seen={};
+  var add=function(nm,rg,tag){ if(!nm)return; var k=mobNm(nm); if(seen[k]){ if(tag&&list[seen[k]-1].tags.indexOf(tag)<0)list[seen[k]-1].tags.push(tag); return; }
+    list.push({n:nm,r:rg||'',tags:tag?[tag]:[]}); seen[k]=list.length; };
+  /* ① 방문 이력 색인(연간점검 명단) */
+  if(typeof vSearch==='function'){ try{ vSearch(q).forEach(function(e){ add(e.f,e.r,'점검 명단'); }); }catch(err){} }
+  /* ② 정기 소독현장 */
+  (typeof WB_DIS_SITES!=='undefined'?WB_DIS_SITES:[]).forEach(function(s){
+    if(s.n.toLowerCase().indexOf(lo)>=0||s.r.toLowerCase().indexOf(lo)>=0) add(s.n,s.r,'정기 소독'); });
+  /* ③ 견적 현장 */
+  (gData.est||[]).forEach(function(e){ var nm=e.site||e.school||''; if(nm&&nm.toLowerCase().indexOf(lo)>=0) add(nm,e.region||'','견적'); });
+  /* 8월~ 일지 기록은 한 번만 불러오고, 다 오면 화면을 한 번만 다시 그린다.
+     ★매번 다시 그리게 하면 무한 반복에 빠진다(2026-08-19에 실제로 화면이 멈췄음) */
+  if(!MOB.vlog && typeof vLoadLog==='function'){
+    MOB.vlog=1;
+    try{ vLoadLog().then(function(){ MOB.vlog=2;
+      var t=MOB.nav[MOB.nav.length-1];
+      if(t&&t.id==='srch') mobSearch(null); else if(t&&t.id==='site') mobGoRefresh();
+    }).catch(function(){ MOB.vlog=2; }); }catch(err){ MOB.vlog=2; }
+  }
+  box.innerHTML = list.length
+    ? '<div class="mo-none">'+list.length+'곳 — 이름을 누르면 자세히 보입니다</div>'
+      +list.slice(0,60).map(function(x){
+        return '<div class="mo-it mo-tap" onclick="mobGo(\'site\',{n:\''+escAttrJs(x.n)+'\',r:\''+escAttrJs(x.r)+'\'})">'
+          +'<i class="b4" style="background:#8fb7e8"></i><div class="bd">'
+          +'<div class="nm">'+esc(x.n)+'</div>'
+          +'<div class="sub">'+[esc(x.r||''),x.tags.map(esc).join(' · ')].filter(Boolean).join(' · ')+'</div></div>'
+          +'<span class="mo-arw">›</span></div>'; }).join('')
+      +(list.length>60?'<div class="mo-none">※ 앞 60곳만 표시했습니다. 더 정확히 쳐 보세요.</div>':'')
+    : '<div class="mo-none">찾는 현장이 없습니다.</div>';
+}
+function escAttrJs(v){ return String(v==null?'':v).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+function mobGo(id,arg){
   var sc=document.getElementById('mobScr'); if(!sc)return;
-  var d=mobScreen(id);
-  sc.innerHTML='<div class="mo-nav"><button class="bk" onclick="mobBack()">‹</button><span class="ti">'+d.ti+'</span>'
-    +(d.ct?'<span class="ct">'+d.ct+'</span>':'')+'</div><div class="mo-body" id="mobScrBody">'+d.body+'</div>';
-  MOB.top=(window.pageYOffset||document.documentElement.scrollTop||0);
+  MOB.nav.push({id:id,arg:arg});
+  var d=mobScreen(id,arg);
+  sc.innerHTML='<div class="mo-nav"><button class="bk" onclick="mobBack()">‹</button><span class="ti">'+esc(d.ti)+'</span>'
+    +(d.ct?'<span class="ct">'+esc(d.ct)+'</span>':'')+'</div><div class="mo-body" id="mobScrBody">'+d.body+'</div>';
+  if(MOB.nav.length===1) MOB.top=(window.pageYOffset||document.documentElement.scrollTop||0);
   var hm=document.getElementById('mobHome'); if(hm) hm.classList.add('hide');
   sc.classList.add('on'); window.scrollTo(0,0);
   if(id==='cal') mobPick(MOB.pick||mobYmd(new Date()));
   if(id==='srch') mobSearch('');
 }
-function mobBack(){ var sc=document.getElementById('mobScr'); if(sc){sc.classList.remove('on'); sc.innerHTML='';}
+function mobGoRefresh(){
+  var sc=document.getElementById('mobScr'); if(!sc||!MOB.nav.length)return;
+  var p=MOB.nav[MOB.nav.length-1], d=mobScreen(p.id,p.arg);
+  var bd=document.getElementById('mobScrBody'); if(bd) bd.innerHTML=d.body;
+}
+function mobBack(){
+  var sc=document.getElementById('mobScr'); if(!sc)return;
+  MOB.nav.pop();
+  if(MOB.nav.length){                                  /* 한 단계만 되돌아간다 (현장 상세 → 현장 찾기) */
+    var p=MOB.nav[MOB.nav.length-1], d=mobScreen(p.id,p.arg);
+    sc.innerHTML='<div class="mo-nav"><button class="bk" onclick="mobBack()">‹</button><span class="ti">'+esc(d.ti)+'</span>'
+      +(d.ct?'<span class="ct">'+esc(d.ct)+'</span>':'')+'</div><div class="mo-body" id="mobScrBody">'+d.body+'</div>';
+    window.scrollTo(0,0);
+    if(p.id==='cal') mobPick(MOB.pick||mobYmd(new Date()));
+    if(p.id==='srch') mobSearch(null);
+    return;
+  }
+  sc.classList.remove('on'); sc.innerHTML='';
   var hm=document.getElementById('mobHome'); if(hm) hm.classList.remove('hide');
   try{ window.scrollTo(0,MOB.top||0); }catch(e){} }
 function mobToPC(){ MOB.off=true; try{sessionStorage.setItem('aws_mob_off','1');}catch(e){} mobApply(); }
@@ -7251,7 +7400,7 @@ function mobApply(){
   r.style.display=on?'block':'none';
   document.documentElement.classList.toggle('mob-on',on);
   if(on){ var open=document.getElementById('mobScr'); var wasOpen=open&&open.classList.contains('on');
-    if(!wasOpen) mobRender(); mobHistInit(); }
+    if(!wasOpen){ MOB.nav=[]; mobRender(); } mobHistInit(); }
   var bb=document.getElementById('mobBackBtn');
   if(!bb){ bb=document.createElement('button'); bb.id='mobBackBtn'; bb.textContent='간단 화면으로'; bb.onclick=mobToPhone; document.body.appendChild(bb); }
   bb.style.display=(!on&&mobPhone())?'block':'none';
