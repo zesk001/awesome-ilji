@@ -5782,27 +5782,41 @@ const WB=(function(){
   }
   function sjShort(s){return (s.n&&s.r&&s.n.indexOf(s.r+' ')===0)?s.n.slice(s.r.length+1):s.n;}
   function sjChip(s){return '<span class="wbchip" draggable="true" ondragstart="WB.onDragStartDB(event,\''+esc(s.n).replace(/'/g,"\\'")+'\')" title="드래그하여 달력에 넣기">'+esc(sjShort(s))+'</span>';}
+  /* ★검색칸(input)은 처음 한 번만 만들고 절대 다시 그리지 않는다.
+     글자를 칠 때마다 input을 새로 만들면 한글 조합이 끊겨 받침('ㄴ','ㅁ' 등)이 안 써진다.
+     (2026-08-19 수리) 결과 목록만 아래 .sjbody 안에서 다시 그린다. */
   function renderSojung(){
     const box=document.getElementById('wbList_sojung');if(!box)return;
     const cnt=document.getElementById('wbCnt_sojung');if(cnt)cnt.textContent=SJDATA.length+'곳';
+    let inp=box.querySelector('.wbsearch');
+    if(!inp){
+      box.innerHTML='<div class="wbsearchwrap"><input class="wbsearch" type="text" placeholder="현장·지역 검색" autocomplete="off"></div><div class="sjbody"></div>';
+      inp=box.querySelector('.wbsearch');
+      inp.value=sjFilter;
+      inp.addEventListener('input',function(){sjFilter=this.value||'';renderSojungBody();});
+      inp.addEventListener('keydown',function(e){if(e.key==='Escape'){this.value='';sjFilter='';renderSojungBody();}});
+    }
+    renderSojungBody();
+  }
+  function renderSojungBody(){
+    const box=document.getElementById('wbList_sojung');if(!box)return;
+    const body=box.querySelector('.sjbody');if(!body)return;
     const groups=sjGroups();
     const f=sjFilter.trim().toLowerCase();
-    let html='<div class="wbsearchwrap"><input class="wbsearch" type="text" placeholder="현장·지역 검색" value="'+esc(sjFilter)+'" oninput="WB.filterSojung(this.value)"></div>';
     if(f){   // 검색 중이면 지역 무시하고 매칭 현장 전부
       const hits=SJDATA.filter(s=>s.n.toLowerCase().indexOf(f)>=0||s.r.toLowerCase().indexOf(f)>=0);
-      html+='<div class="wbchips">'+(hits.length?hits.map(sjChip).join(''):'<div class="empty">검색 결과가 없습니다.</div>')+'</div>';
-      box.innerHTML=html;const gi=box.querySelector('.wbsearch');if(gi){gi.focus();gi.setSelectionRange(gi.value.length,gi.value.length);}
+      body.innerHTML='<div class="wbchips">'+(hits.length?hits.map(sjChip).join(''):'<div class="empty">검색 결과가 없습니다.</div>')+'</div>';
       return;
     }
     // 지역명 목록(이름만)
-    html+='<div class="wbregrow">'+groups.map(gp=>'<span class="wbregtab'+(gp.region===sjRegion?' on':'')+'" onclick="WB.selectRegion(\''+esc(gp.region)+'\')">'+esc(gp.region)+'<b>'+gp.sites.length+'</b></span>').join('')+'</div>';
+    let html='<div class="wbregrow">'+groups.map(gp=>'<span class="wbregtab'+(gp.region===sjRegion?' on':'')+'" onclick="WB.selectRegion(\''+esc(gp.region)+'\')">'+esc(gp.region)+'<b>'+gp.sites.length+'</b></span>').join('')+'</div>';
     const cur=groups.find(gp=>gp.region===sjRegion);
     if(cur){html+='<div class="wbchips">'+cur.sites.map(sjChip).join('')+'</div>';}
     else{html+='<div class="wbhint">지역을 클릭하면 해당 현장이 표시됩니다.</div>';}
-    box.innerHTML=html;
+    body.innerHTML=html;
   }
-  function selectRegion(r){sjRegion=(sjRegion===r?'':r);renderSojung();}
-  function filterSojung(v){sjFilter=v||'';renderSojung();}
+  function selectRegion(r){sjRegion=(sjRegion===r?'':r);renderSojungBody();}
+  function filterSojung(v){sjFilter=v||'';const box=document.getElementById('wbList_sojung');const i=box&&box.querySelector('.wbsearch');if(i&&i.value!==sjFilter)i.value=sjFilter;renderSojungBody();}
   function onDragStartDB(e,name){try{e.dataTransfer.setData('text/wb',JSON.stringify({list:'sojung',name:name,note:''}));e.dataTransfer.setData('wbcat-so','1');e.dataTransfer.setData('text/plain',name);e.dataTransfer.effectAllowed='copy';}catch(err){}}
   /* 공유데이터(wbdata/wbcal) 수신: 서버가 정답. 단 방금(15초 내) 이 PC에서 수정했으면 이번 수신은 건너뜀 */
   function applySharedWb(dStr,cStr){
