@@ -177,6 +177,84 @@
   .dwcnt{font-size:9.5px;font-weight:800;color:#bfe89a;line-height:1.25;}
   .dwcnt.none{color:var(--dim);font-weight:700;}
   .dwcnt.so{color:#9bd7ea;}
+  /* ===== 모바일 화면 (2026-08-19) — 아이콘 6개 홈. 보기 전용. PC 화면(위 규칙들)은 그대로 둔다 ===== */
+  html.mob-on body{overflow:hidden;}
+  #mobRoot{display:none;position:fixed;inset:0;z-index:8000;background:var(--bg,#0e1013);overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  #mobRoot *{box-sizing:border-box}
+  .mo-top{padding:16px 16px 4px;display:flex;align-items:flex-start;gap:10px}
+  .mo-lg{font-size:19px;font-weight:800;letter-spacing:-.4px}
+  .mo-lg b{color:var(--g1)}
+  .mo-dt{font-size:12px;color:var(--muted);margin-top:3px}
+  .mo-ro{margin-left:auto;font-size:10px;color:var(--dim);border:1px solid var(--stroke2);border-radius:20px;padding:3px 9px;white-space:nowrap}
+  .mo-sync{margin:10px 16px 0;font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  .mo-sync i{width:7px;height:7px;border-radius:50%;background:var(--g2);display:block;flex:0 0 auto}
+  .mo-sync.off i{background:#e07a7a}
+  .mo-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:14px 14px 8px}
+  .mo-tile{position:relative;background:var(--card,rgba(255,255,255,.05));border:1px solid var(--stroke);border-radius:18px;
+    padding:16px 14px 14px;min-height:146px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;transition:.12s}
+  .mo-tile:active{transform:scale(.975);background:rgba(255,255,255,.09)}
+  .mo-ic{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center}
+  .mo-ic svg{width:23px;height:23px;display:block}
+  .mo-tl{font-size:15.5px;font-weight:800;letter-spacing:-.3px}
+  .mo-sb{font-size:11.5px;color:var(--muted);margin-top:3px;font-weight:600}
+  .mo-bdg{position:absolute;right:13px;top:13px;font-size:11px;font-weight:800;border-radius:20px;padding:3px 9px}
+  .mo-sum{margin:6px 14px 10px;background:var(--card);border:1px solid var(--stroke);border-radius:15px;padding:13px 15px}
+  .mo-sum .h{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px}
+  .mo-sum .v{font-size:14px;font-weight:700;line-height:1.7}
+  .mo-pc{text-align:center;padding:4px 0 26px}
+  .mo-pc button{background:none;border:1px solid var(--stroke2);color:var(--dim);border-radius:20px;padding:7px 16px;font-size:12px;font-family:inherit}
+  .mo-scr{display:none;position:fixed;inset:0;z-index:8100;background:var(--bg,#0e1013);overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .mo-scr.on{display:block}
+  .mo-nav{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:10px;padding:12px 14px;
+    background:rgba(14,16,19,.97);backdrop-filter:blur(10px);border-bottom:1px solid var(--stroke)}
+  .mo-nav .bk{background:none;border:0;color:var(--muted);font-size:24px;line-height:1;padding:0 4px;font-family:inherit;cursor:pointer}
+  .mo-nav .ti{font-size:16px;font-weight:800;letter-spacing:-.3px}
+  .mo-nav .ct{margin-left:auto;font-size:11.5px;color:var(--dim);font-weight:700}
+  .mo-body{padding:12px 14px 44px}
+  .mo-grp{margin-bottom:16px}
+  .mo-dh{display:flex;align-items:center;gap:8px;margin:0 2px 8px}
+  .mo-dh .n{font-size:16px;font-weight:800}
+  .mo-dh .w{font-size:11.5px;color:var(--muted);font-weight:700}
+  .mo-dh.today .n{color:var(--g1)} .mo-dh.today .w{color:#bfe89a}
+  .mo-dh .sm{margin-left:auto;font-size:11px;color:var(--dim);font-weight:700}
+  .mo-it{background:var(--card);border:1px solid var(--stroke);border-radius:13px;padding:11px 13px;margin-bottom:7px;display:flex;gap:11px}
+  .mo-it .b4{width:3px;border-radius:3px;flex:0 0 auto}
+  .mo-it .bd{flex:1;min-width:0}
+  .mo-it .nm{font-size:14.5px;font-weight:800;letter-spacing:-.2px;word-break:keep-all}
+  .mo-it .sub{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.65;word-break:keep-all}
+  .mo-it .who{font-size:12.5px;font-weight:700;color:#dbf3c4;margin-top:6px}
+  .mo-it .who.none{color:var(--dim);font-weight:600}
+  .mo-none{color:var(--dim);font-size:12.5px;padding:8px 2px}
+  .mo-cnav{display:flex;align-items:center;gap:8px;padding:2px 2px 12px}
+  .mo-cnav .t{flex:1;text-align:center;font-size:16px;font-weight:800}
+  .mo-cnav button{background:var(--card);border:1px solid var(--stroke2);color:var(--muted);border-radius:9px;width:36px;height:32px;font-size:15px;font-family:inherit}
+  .mo-cg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .mo-cg .wd{text-align:center;font-size:10.5px;color:var(--dim);font-weight:800;padding:2px 0}
+  .mo-cg .wd.s{color:#e88} .mo-cg .wd.a{color:#88c6e6}
+  .mo-cell{aspect-ratio:1/1.12;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.02);
+    display:flex;flex-direction:column;align-items:center;padding-top:5px;gap:3px}
+  .mo-cell.e{border-color:transparent;background:transparent}
+  .mo-cell .d{font-size:12.5px;font-weight:800}
+  .mo-cell.s .d{color:#e88} .mo-cell.a .d{color:#88c6e6}
+  .mo-cell.hol{background:rgba(236,106,106,.09);border-color:rgba(236,106,106,.28)}
+  .mo-cell.hol .d{color:#f0a0a0}
+  .mo-cell.on{border-color:var(--g2);background:rgba(116,194,68,.13)}
+  .mo-cell.on .d{color:var(--g1)}
+  .mo-dots{display:flex;gap:2px}
+  .mo-dots i{width:5px;height:5px;border-radius:50%;display:block}
+  .mo-pick{margin-top:14px;border-top:1px solid var(--stroke);padding-top:12px}
+  .mo-pick .ph{font-size:13.5px;font-weight:800;margin:0 2px 9px}
+  .mo-lg2{display:flex;gap:14px;justify-content:center;margin-top:12px;font-size:11px;color:var(--muted)}
+  .mo-lg2 span{display:flex;align-items:center;gap:5px}
+  .mo-lg2 i{width:7px;height:7px;border-radius:50%;display:block}
+  .mo-lv{display:flex;flex-wrap:wrap;gap:8px}
+  .mo-lv span{font-size:13.5px;font-weight:700;background:var(--card);border:1px solid var(--stroke);border-radius:10px;padding:8px 12px}
+  .mo-lv span b{color:var(--amber);font-weight:800;font-size:11.5px;margin-left:5px}
+  .mo-memo{white-space:pre-line;font-size:14px;line-height:1.8;color:#d9e1e7;background:var(--card);border:1px solid var(--stroke);border-radius:13px;padding:14px}
+  .mo-inp{width:100%;background:var(--card);border:1px solid var(--stroke2);border-radius:12px;padding:12px 14px;color:var(--txt);font-size:15px;font-family:inherit}
+  .mo-inp:focus{outline:none;border-color:var(--g2)}
+  #mobBackBtn{display:none;position:fixed;right:12px;bottom:14px;z-index:7999;background:rgba(116,194,68,.16);
+    border:1px solid var(--g2);color:#dbf3c4;border-radius:22px;padding:9px 16px;font-size:12.5px;font-weight:700;font-family:inherit}
   /* 현장 카드: 투입 담당자 체크 */
   .wbemphint{color:var(--dim);font-weight:600;font-size:11px;margin-left:4px;}
   .wbchip .wbchipn{font-size:9.5px;font-weight:800;margin-left:4px;opacity:.75;}
@@ -5876,7 +5954,7 @@ function wbMemoSave(){
   gData.wbMemo=v;localStorage.setItem('aws_wbmemo',v);postShared('wbmemo',v);
   wbMemoEditing=false;renderMemo();
 }
-function renderOverview(){renderCalendar();renderWeekly();renderLeaveWeek();renderMemo();WB.renderAll();}
+function renderOverview(){renderCalendar();renderWeekly();renderLeaveWeek();renderMemo();WB.renderAll();try{if(typeof mobApply==='function')mobApply();}catch(e){}}
 
 
 /* ===== 학교(현장) 방문 이력 검색 — 2026-08-18 신설 =========================
@@ -6870,6 +6948,243 @@ tick();setInterval(tick,1000);
 history.replaceState({tab:'overview'},'');
 load();renderAll();
 loadGoogle();  // 시작 시 구글 시트(일일업무일지)에서 실제 데이터 자동 연동
+
+/* ===================== 모바일 화면 (2026-08-19) =====================
+   휴대폰(폭 700px 이하)에서 열면 아이콘 6개짜리 간단 화면이 위에 덮인다.
+   **보기 전용** — 추가·수정·드래그는 없다. PC 화면 코드는 하나도 건드리지 않았다.
+   자료는 PC와 똑같은 것(현황판 달력 배치·연차·메모)을 그대로 읽어 쓴다. */
+var MOB={off:false,cal:0,pick:''};
+try{ MOB.off=(sessionStorage.getItem('aws_mob_off')==='1'); }catch(e){}
+function mobPhone(){ try{return window.matchMedia('(max-width:700px)').matches;}catch(e){return innerWidth<=700;} }
+function mobP2(n){return String(n).padStart(2,'0');}
+function mobYmd(d){return d.getFullYear()+'-'+mobP2(d.getMonth()+1)+'-'+mobP2(d.getDate());}
+function mobA(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function mobWeekDays(){
+  var t=new Date(), mon=new Date(t); mon.setDate(t.getDate()-((t.getDay()+6)%7));
+  var a=[]; for(var i=0;i<7;i++){var d=new Date(mon);d.setDate(mon.getDate()+i);a.push(d);} return a;
+}
+var MOB_DOW=['일','월','화','수','목','금','토'];
+function mobDV(ds){ return (typeof WB!=='undefined'&&WB.dayView)?WB.dayView(ds):{gong:[],out:[],as:[],so:{1:[],2:[],3:[],4:[]},soEmp:{}}; }
+function mobEmps(it){ return (typeof WB!=='undefined'&&WB.empsOf)?WB.empsOf(it):[]; }
+function mobSoEmps(ds,t){ return (typeof WB!=='undefined'&&WB.soEmpsOf)?WB.soEmpsOf(ds,t):[]; }
+function mobLeaveOn(ds){
+  var emps=(gData.leaveEmps||[]),recs=(gData.leaveRecs||[]),nm={};
+  emps.forEach(function(e){if(e&&e.id)nm[e.id]=e.name||'';});
+  return recs.filter(function(r){return r&&r.date===ds;}).map(function(r){
+    var d=Number(r.days),tag=(d===0.25?'반반차':(d>0&&d<1)?'반차':(d>1?d+'일':'연차'));
+    return {name:nm[r.empId]||'?',tag:tag,plan:(r.status==='계획')};
+  });
+}
+function mobMemo(){ return (gData.wbMemo!=null?gData.wbMemo:(localStorage.getItem('aws_wbmemo')||'')); }
+
+/* 한 줄짜리 항목 그리기 */
+function mobItem(color,name,sub,who,whoNone){
+  return '<div class="mo-it"><i class="b4" style="background:'+color+'"></i><div class="bd">'
+    +'<div class="nm">'+esc(name)+'</div>'
+    +(sub?'<div class="sub">'+sub+'</div>':'')
+    +(who?'<div class="who'+(whoNone?' none':'')+'">'+esc(who)+'</div>':'')+'</div></div>';
+}
+function mobGongOf(ds){
+  var o=mobDV(ds),h='';
+  (o.gong||[]).forEach(function(it){var e=mobEmps(it);
+    h+=mobItem('#ed9b4a',it.name||'-',it.note?esc(it.note):'',e.length?e.join(' · '):'투입 인원 미정',!e.length);});
+  (o.out||[]).forEach(function(it){ h+=mobItem('#e08a8a',it.name||'-','외주 공사'+(it.note?' · '+esc(it.note):''),'',false); });
+  (o.as||[]).forEach(function(it){ h+=mobItem('#9aa9b6',it.name||'-','AS'+(it.note?' · '+esc(it.note):''),'',false); });
+  return h;
+}
+function mobSoOf(ds){
+  var o=mobDV(ds),h='';
+  for(var t=1;t<=4;t++){
+    var list=(o.so&&o.so[t])||[]; if(!list.length)continue;
+    var e=mobSoEmps(ds,t);
+    h+=mobItem('#6cc3df','소독 '+t+'팀 · '+list.length+'곳',
+      list.map(function(x){return esc(x.name)+(x.note?' <span style="color:var(--dim)">('+esc(x.note)+')</span>':'');}).join('<br>'),
+      e.length?e.join(' · '):'투입 인원 미정',!e.length);
+  }
+  return h;
+}
+function mobCounts(){
+  var days=mobWeekDays(),g=0,so=0,lv=0;
+  days.forEach(function(d){var ds=mobYmd(d),o=mobDV(ds);
+    g+=((o.gong||[]).length);
+    for(var t=1;t<=4;t++) if(((o.so&&o.so[t])||[]).length) so++;
+    lv+=mobLeaveOn(ds).length;});
+  var m=mobMemo().split('\n').filter(function(x){return x.trim();}).length;
+  return {gong:g,so:so,lv:lv,memo:m};
+}
+
+function mobHome(){
+  var c=mobCounts(), now=new Date(), ts=mobYmd(now);
+  var o=mobDV(ts), soT=0; for(var t=1;t<=4;t++) if(((o.so&&o.so[t])||[]).length) soT++;
+  var todaySum=[]; 
+  if((o.gong||[]).length) todaySum.push('공사 '+o.gong.length);
+  if(soT) todaySum.push('소독 '+soT+'팀');
+  if((o.out||[]).length) todaySum.push('외주 '+o.out.length);
+  if((o.as||[]).length) todaySum.push('AS '+o.as.length);
+  var lvT=mobLeaveOn(ts).length; if(lvT) todaySum.push('휴가 '+lvT);
+  var conn=gData.connected;
+  var tile=function(id,color,bg,badge,badgeBg,badgeCol,svg,title,sub){
+    return '<div class="mo-tile" onclick="mobGo(\''+id+'\')">'
+      +(badge?'<span class="mo-bdg" style="background:'+badgeBg+';color:'+badgeCol+'">'+badge+'</span>':'')
+      +'<div class="mo-ic" style="background:'+bg+'">'+svg+'</div>'
+      +'<div><div class="mo-tl">'+title+'</div><div class="mo-sb">'+sub+'</div></div></div>';
+  };
+  var sv=function(color,path){return '<svg viewBox="0 0 24 24" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+path+'</svg>';};
+  return '<div class="mo-top"><div><div class="mo-lg">(주)<b>어썸조경</b></div>'
+    +'<div class="mo-dt">'+now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일 '+MOB_DOW[now.getDay()]+'요일</div></div>'
+    +'<div class="mo-ro">보기 전용</div></div>'
+    +'<div class="mo-sync'+(conn?'':' off')+'"><i></i>'+(conn?'구글 연동됨':'구글 연동 전 — 잠시 기다려 주세요')+'</div>'
+    +'<div class="mo-grid">'
+    + tile('gong','#ed9b4a','rgba(237,155,74,.16)', c.gong?c.gong+'건':'', 'rgba(237,155,74,.18)','#f0b678',
+        sv('#ed9b4a','<path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M10 21v-6h4v6"/>'),'금주 공사','현장 · 투입 인원')
+    + tile('so','#6cc3df','rgba(108,195,223,.16)', c.so?c.so+'팀':'', 'rgba(108,195,223,.18)','#8fd4e8',
+        sv('#6cc3df','<path d="M9 3h5v5"/><path d="M14 3l-3 3"/><path d="M7 8h7v13H7z"/><path d="M10 12v.01M10 15v.01M10 18v.01"/>'),'금주 소독','팀 · 현장 · 인원')
+    + tile('cal','#a99bf0','rgba(169,155,240,.16)', (now.getMonth()+1)+'월', 'rgba(169,155,240,.18)','#c0b5f7',
+        sv('#a99bf0','<rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>'),'전체 달력','월 일정 한눈에')
+    + tile('lv','#e0a82e','rgba(224,168,46,.16)', c.lv?c.lv+'명':'', 'rgba(224,168,46,.18)','#f0cd7e',
+        sv('#e0a82e','<circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c0-4 3.4-6.5 7.5-6.5s7.5 2.5 7.5 6.5"/>'),'금주 휴가','요일별 휴가자')
+    + tile('memo','#7fd6a8','rgba(127,214,168,.16)', c.memo?String(c.memo):'', 'rgba(127,214,168,.18)','#a5e6c6',
+        sv('#7fd6a8','<path d="M5 3.5h14v17H5z"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>'),'메모','특별 사항')
+    + tile('srch','#8fb7e8','rgba(143,183,232,.16)','','','',
+        sv('#8fb7e8','<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>'),'현장 찾기','학교 · 지역')
+    +'</div>'
+    +'<div class="mo-sum"><div class="h">오늘 ('+(now.getMonth()+1)+'/'+now.getDate()+' '+MOB_DOW[now.getDay()]+')</div>'
+    +'<div class="v">'+(todaySum.length?todaySum.join(' · '):'등록된 일정이 없습니다.')+'</div></div>'
+    +'<div class="mo-pc"><button onclick="mobToPC()">PC 화면으로 보기</button></div>';
+}
+
+function mobWeekScreen(title,getter,unit){
+  var days=mobWeekDays(),ts=mobYmd(new Date()),h='',n=0;
+  days.forEach(function(d,i){
+    var ds=mobYmd(d),inner=getter(ds); if(!inner)return;
+    var cnt=(inner.match(/class="mo-it"/g)||[]).length; n+=cnt;
+    h+='<div class="mo-grp"><div class="mo-dh'+(ds===ts?' today':'')+'"><span class="n">'+d.getDate()+'</span>'
+      +'<span class="w">'+MOB_DOW[d.getDay()]+(ds===ts?' · 오늘':'')+'</span><span class="sm">'+cnt+unit+'</span></div>'+inner+'</div>';
+  });
+  if(!h) h='<div class="mo-none">이번 주 등록된 내용이 없습니다.</div>';
+  return {html:h,total:n};
+}
+
+function mobScreen(id){
+  var days=mobWeekDays(), ts=mobYmd(new Date());
+  if(id==='gong'){ var r=mobWeekScreen('금주 공사',mobGongOf,'건');
+    return {ti:'금주 공사',ct:days[0].getDate()+'~'+days[6].getDate()+'일 · 공사 '+mobCounts().gong+'건',
+      body:r.html+'<div class="mo-none">※ 분홍 막대는 외주, 회색 막대는 AS입니다.</div>'}; }
+  if(id==='so'){ var r2=mobWeekScreen('금주 소독',mobSoOf,'팀');
+    return {ti:'금주 소독',ct:r2.total+'팀 출동',body:r2.html}; }
+  if(id==='lv'){
+    var h='',tot=0;
+    days.forEach(function(d){var ds=mobYmd(d),ls=mobLeaveOn(ds); if(!ls.length)return; tot+=ls.length;
+      h+='<div class="mo-grp"><div class="mo-dh'+(ds===ts?' today':'')+'"><span class="n">'+d.getDate()+'</span>'
+        +'<span class="w">'+MOB_DOW[d.getDay()]+(ds===ts?' · 오늘':'')+'</span></div><div class="mo-lv">'
+        +ls.map(function(x){return '<span'+(x.plan?' style="opacity:.6"':'')+'>'+esc(x.name)+' <b>'+esc(x.tag)+'</b></span>';}).join('')+'</div></div>';});
+    if(!h)h='<div class="mo-none">이번 주 휴가자가 없습니다.</div>';
+    return {ti:'금주 휴가',ct:tot?tot+'명':'',body:h};
+  }
+  if(id==='memo'){
+    var m=mobMemo();
+    return {ti:'메모',ct:'특별 사항',
+      body:(m?'<div class="mo-memo">'+esc(m)+'</div>':'<div class="mo-none">기재된 특별 사항이 없습니다.</div>')
+        +'<div class="mo-none">※ 수정은 사무실 화면(PC)에서만 됩니다.</div>'};
+  }
+  if(id==='srch'){
+    return {ti:'현장 찾기',ct:'',
+      body:'<input class="mo-inp" id="mobQ" placeholder="학교 이름 또는 지역" autocomplete="off" oninput="mobSearch(this.value)">'
+        +'<div id="mobQR" style="margin-top:14px"></div>'};
+  }
+  if(id==='cal'){ return {ti:'전체 달력',ct:'날짜를 눌러 보세요',body:mobCalHtml()}; }
+  return {ti:'',ct:'',body:''};
+}
+
+function mobCalHtml(){
+  var base=new Date(); base.setDate(1); base.setMonth(base.getMonth()+MOB.cal);
+  var y=base.getFullYear(), m=base.getMonth();
+  var first=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate(), ts=mobYmd(new Date());
+  var h='<div class="mo-cnav"><button onclick="mobCalMove(-1)">‹</button><div class="t">'+y+'년 '+(m+1)+'월</div>'
+    +'<button onclick="mobCalMove(1)">›</button></div><div class="mo-cg">';
+  ['일','월','화','수','목','금','토'].forEach(function(w,i){h+='<div class="wd '+(i===0?'s':i===6?'a':'')+'">'+w+'</div>';});
+  for(var i=0;i<first;i++)h+='<div class="mo-cell e"></div>';
+  if(!MOB.pick||MOB.pick.slice(0,7)!==y+'-'+mobP2(m+1)) MOB.pick=(ts.slice(0,7)===y+'-'+mobP2(m+1))?ts:'';
+  for(var d=1;d<=dim;d++){
+    var ds=y+'-'+mobP2(m+1)+'-'+mobP2(d), dow=new Date(y,m,d).getDay(), o=mobDV(ds), dots='';
+    if((o.gong||[]).length)dots+='<i style="background:#ed9b4a"></i>';
+    var anySo=false; for(var t=1;t<=4;t++) if(((o.so&&o.so[t])||[]).length) anySo=true;
+    if(anySo)dots+='<i style="background:#6cc3df"></i>';
+    if((o.out||[]).length||(o.as||[]).length)dots+='<i style="background:#9aa9b6"></i>';
+    if(mobLeaveOn(ds).length)dots+='<i style="background:#e0a82e"></i>';
+    var hol=(typeof HOLIDAYS!=='undefined'&&HOLIDAYS[ds])?' hol':'';
+    h+='<div class="mo-cell'+(dow===0?' s':dow===6?' a':'')+hol+(ds===MOB.pick?' on':'')+'" onclick="mobPick(\''+ds+'\')">'
+      +'<div class="d">'+d+'</div><div class="mo-dots">'+dots+'</div></div>';
+  }
+  h+='</div><div class="mo-lg2"><span><i style="background:#ed9b4a"></i>공사</span><span><i style="background:#6cc3df"></i>소독</span>'
+    +'<span><i style="background:#9aa9b6"></i>외주·AS</span><span><i style="background:#e0a82e"></i>휴가</span></div>'
+    +'<div class="mo-pick" id="mobPickBox"></div>';
+  return h;
+}
+function mobPickHtml(ds){
+  if(!ds) return '<div class="mo-none">날짜를 눌러 보세요.</div>';
+  var d=new Date(ds.slice(0,4),Number(ds.slice(5,7))-1,Number(ds.slice(8,10)));
+  var inner=mobGongOf(ds)+mobSoOf(ds);
+  var ls=mobLeaveOn(ds);
+  if(ls.length) inner+=mobItem('#e0a82e','휴가 '+ls.length+'명',ls.map(function(x){return esc(x.name)+' '+esc(x.tag);}).join(' · '),'',false);
+  return '<div class="ph">'+(d.getMonth()+1)+'월 '+d.getDate()+'일 ('+MOB_DOW[d.getDay()]+')</div>'
+    +(inner||'<div class="mo-none">등록된 일정이 없습니다.</div>');
+}
+function mobPick(ds){
+  MOB.pick=ds;
+  var g=document.querySelectorAll('#mobRoot .mo-cell');
+  g.forEach(function(c){c.classList.remove('on');});
+  var box=document.getElementById('mobPickBox'); if(box) box.innerHTML=mobPickHtml(ds);
+  var cells=[].slice.call(document.querySelectorAll('#mobRoot .mo-cell:not(.e)'));
+  var n=Number(ds.slice(8,10)); if(cells[n-1])cells[n-1].classList.add('on');
+}
+function mobCalMove(v){ MOB.cal+=v; MOB.pick=''; var b=document.getElementById('mobScrBody'); if(b){b.innerHTML=mobCalHtml(); mobPick(MOB.pick||'');} }
+
+function mobSearch(q){
+  var box=document.getElementById('mobQR'); if(!box)return;
+  q=(q||'').trim(); if(q.length<1){box.innerHTML='<div class="mo-none">학교 이름을 한 글자만 쳐도 찾습니다.</div>';return;}
+  var lo=q.toLowerCase(), out=[];
+  (typeof WB_DIS_SITES!=='undefined'?WB_DIS_SITES:[]).forEach(function(s){
+    if(s.n.toLowerCase().indexOf(lo)>=0||s.r.toLowerCase().indexOf(lo)>=0) out.push({n:s.n,r:s.r,k:'정기 소독현장',c:'#6cc3df'});
+  });
+  (gData.est||[]).forEach(function(e){var nm=e.site||e.school||''; if(nm&&nm.toLowerCase().indexOf(lo)>=0) out.push({n:nm,r:e.region||'',k:'견적·계약'+(e.work?' · '+e.work:''),c:'#ed9b4a'});});
+  var seen={},uniq=[];
+  out.forEach(function(x){var k=x.n+'|'+x.k; if(seen[k])return; seen[k]=1; uniq.push(x);});
+  box.innerHTML = uniq.length
+    ? '<div class="mo-none">'+uniq.length+'곳</div>'+uniq.slice(0,60).map(function(x){return mobItem(x.c,x.n,esc(x.r||'')+(x.k?' · '+esc(x.k):''),'',false);}).join('')
+      +(uniq.length>60?'<div class="mo-none">※ 앞 60곳만 표시했습니다. 더 정확히 쳐 보세요.</div>':'')
+    : '<div class="mo-none">찾는 현장이 없습니다.</div>';
+}
+
+function mobGo(id){
+  var sc=document.getElementById('mobScr'); if(!sc)return;
+  var d=mobScreen(id);
+  sc.innerHTML='<div class="mo-nav"><button class="bk" onclick="mobBack()">‹</button><span class="ti">'+d.ti+'</span>'
+    +(d.ct?'<span class="ct">'+d.ct+'</span>':'')+'</div><div class="mo-body" id="mobScrBody">'+d.body+'</div>';
+  sc.classList.add('on'); sc.scrollTop=0;
+  if(id==='cal') mobPick(MOB.pick||mobYmd(new Date()));
+  if(id==='srch') mobSearch('');
+}
+function mobBack(){ var sc=document.getElementById('mobScr'); if(sc){sc.classList.remove('on'); sc.innerHTML='';} }
+function mobToPC(){ MOB.off=true; try{sessionStorage.setItem('aws_mob_off','1');}catch(e){} mobApply(); }
+function mobToPhone(){ MOB.off=false; try{sessionStorage.removeItem('aws_mob_off');}catch(e){} mobApply(); }
+
+function mobRender(){ var r=document.getElementById('mobRoot'); if(r) r.innerHTML=mobHome()+'<div class="mo-scr" id="mobScr"></div>'; }
+function mobApply(){
+  var r=document.getElementById('mobRoot');
+  if(!r){ r=document.createElement('div'); r.id='mobRoot'; document.body.appendChild(r); }
+  var on=mobPhone()&&!MOB.off;
+  r.style.display=on?'block':'none';
+  document.documentElement.classList.toggle('mob-on',on);
+  if(on){ var open=document.getElementById('mobScr'); var wasOpen=open&&open.classList.contains('on');
+    if(!wasOpen) mobRender(); }
+  var bb=document.getElementById('mobBackBtn');
+  if(!bb){ bb=document.createElement('button'); bb.id='mobBackBtn'; bb.textContent='간단 화면으로'; bb.onclick=mobToPhone; document.body.appendChild(bb); }
+  bb.style.display=(!on&&mobPhone())?'block':'none';
+}
+try{ window.addEventListener('resize',function(){ mobApply(); }); }catch(e){}
+setTimeout(mobApply,300);
+
 </script>
 </body>
 </html>
