@@ -4894,7 +4894,12 @@ function fetchJson(params,timeout){
 function jsonp(params,timeout=28000,tries=3,waitList){
   // 오래 기다리는 것보다 빨리 포기하고 새로 부르는 편이 훨씬 빠르다(새 요청은 대개 2~3초에 온다).
   // 단 묶음조회처럼 원래 오래 걸리는 건 waitList 로 넉넉한 대기시간을 따로 준다.
-  const waits=waitList||[Math.min(timeout,13000),Math.min(timeout,20000),timeout];
+  /* 2026-08-19 수리: 1차 대기 13초는 너무 짧았다.
+     첫 화면에서 여러 개를 동시에 부르면 구글이 줄을 세워 꼬리가 13~14초에 온다.
+     그런데 13초에 포기하고 전부 다시 부르면 줄이 두 배로 늘어 더 느려지고,
+     그게 또 시간초과를 불러 눈덩이처럼 커진다(실측 21번 호출·65초).
+     → 1차를 22초로 넉넉히 준다. 진짜로 막힌 요청만 다시 부른다. */
+  const waits=waitList||[Math.min(timeout,22000),timeout,timeout];
   let n=0;
   const go=()=>fetchJson(params,waits[Math.min(n,waits.length-1)]).catch(err=>{
     if(++n>=tries)return jsonpOnce(params,timeout);
@@ -4907,83 +4912,73 @@ function weekDates(){
   const arr=[];for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);arr.push(d.toISOString().slice(0,10));}
   return arr;
 }
+/* 2026-08-19 개편: 구글 연동을 2단계로 나눈다.
+   [1단계] 공유데이터(action=shared) 하나만 먼저 받는다 — 약 2~3초.
+           달력 배치·연차·메모·완료보고가 전부 여기 들어 있어 첫 화면이 이걸로 완성된다.
+   [2단계] 견적·발주·자재·사진대지·세금계산서·기본정보·이번주 일지를 뒤에서 조용히 받아 채운다.
+   예전에는 7개를 동시에 부르고 마지막 하나까지 다 기다린 뒤에야 화면을 그렸다(7~14초).
+   (참고) 서버의 묶음 창구(action=bundle)는 2026-08-06 실측에서 개별 호출보다 느려서 여기선 안 쓴다. */
 async function loadGoogle(manual){
-  gData.loading=true;gData.err='';gData.partial='';updateSyncUI();
+  gData.loading=true;gData.err='';gData.partial='';gData.rest=false;updateSyncUI();
+  const today=todayStr();const days=weekDates().filter(d=>d<=today);
   try{
-    const today=todayStr();const days=weekDates().filter(d=>d<=today);
-    const failed=[];      // 못 불러온 항목 이름(화면에 알려주기 위함)
-    let sharedOk=true;    // 공유데이터를 제대로 받았는지(못 받았으면 되올리기 금지)
-    let master={},estRows=[],ordRows=[],matRows=[],pbRows=[],txRows=[],shRes={map:{}},dayRes=[];
+    let sharedOk=true;
+    const shRes=await jsonp('action=shared').catch(()=>{sharedOk=false;return {map:{}};});
+    applyShared(shRes,sharedOk);          // 못 받았으면 applyShared 안에서 알아서 되올리기 차단
+    gData.connected=true;
+    if(!sharedOk)gData.partial='공유데이터';
+  }catch(e){
+    gData.connected=false;gData.err=String(e&&e.message||e);
+    gData.loading=false;updateSyncUI();renderAll();
+    if(manual)alert('구글 연동에 실패했습니다.\n인터넷 연결을 확인해 주세요.\n('+gData.err+')');
+    return;
+  }
+  // 첫 화면은 여기서 이미 완성 — 나머지는 뒤에서 받는다
+  gData.loading=false;gData.rest=true;updateSyncUI();renderAll();
+  return loadGoogleRest(days,manual);
+}
+/* 2단계: 첫 화면에 당장 필요하지 않은 것들 */
+async function loadGoogleRest(days,manual){
+  const failed=gData.partial?[gData.partial]:[];
+  try{
+    const estP=jsonp('action=estimates').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('견적');return [];});
+    const ordP=jsonp('action=orders').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('발주');return [];});
+    const matP=jsonp('action=materials').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('자재');return [];});
+    const pbP =jsonp('action=photoboards').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('사진대지');return [];});
+    const txP =jsonp('action=taxinvoices').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('세금계산서');return [];});
+    const mstP=jsonp('action=master').catch(()=>{failed.push('기본정보');return {};});
+    /* 2026-08-19: 하루씩 따로 부르던 걸 한 번에(action=days). 실패하면 예전 방식으로 자동 복귀 */
+    const _perDay=()=>Promise.all(days.map(d=>jsonp('action=day&date='+d).then(r=>({d,rows:(r&&r.rows)||[]})).catch(()=>{failed.push('일지 '+d.slice(5));return {d,rows:[]};})));
+    const dayP=jsonp('action=days&list='+encodeURIComponent(days.join(',')),40000,2,[25000,40000])
+      .then(r=>{ if(!r||!r.days) throw new Error('묶음 응답 아님');
+                 const D=r.days; return days.map(d=>({d:d,rows:((D[d]||{}).rows)||[]})); })
+      .catch(_perDay);
 
-    /* 2026-08-06: 예전엔 한 화면 여는 데 구글을 10~11번 따로 불렀다.
-       구글은 같은 스크립트를 동시에 여러 개 처리하지 못하고 줄을 세워서, 부를수록 느려졌다.
-       그래서 서버에 묶음 창구(action=bundle)를 만들어 한 번에 받아온다.
-       혹시 묶음이 안 되면(옛 서버 등) 예전처럼 하나씩 부르는 길로 자동으로 돌아간다. */
-    /* 2026-08-06 실측 결론: 묶음(1번)보다 항목별(여러 번)이 실제로 더 빠르다.
-       묶음은 서버가 시트를 순서대로 다 읽느라 18초 넘게 걸리고 응답도 278KB라 자주 실패했다.
-       항목별은 하나에 2~5초씩이고 동시에 나가서 전체 5~10초면 끝난다.
-       그래서 기본은 항목별. 서버의 묶음 창구(action=bundle)는 만들어 뒀으니
-       나중에 데이터가 훨씬 커지면 아래 한 줄(aws_use_bundle)로 켜서 비교해 볼 수 있다.
-       (켜기: 주소창에서 localStorage.setItem('aws_use_bundle','1') 실행 후 새로고침) */
-    let B=null,useBundle=false;
-    try{useBundle=(localStorage.getItem('aws_use_bundle')==='1');}catch(e){}
-    if(useBundle){
-      try{
-        B=await jsonp('action=bundle&parts=master,estimates,orders,materials,photoboards,taxinvoices,shared&days='+days.join(','),50000,2,[40000,50000]);
-        if(!B||typeof B!=='object'||(!B.master&&!B.shared&&!B.days))B=null;
-      }catch(e){B=null;}
-    }
-
-    if(B){
-      const pick=(key,name)=>{const v=B[key];if(!v||v.error){failed.push(name);return null;}return v;};
-      master   = pick('master','기본정보')||{};
-      const e1 = pick('estimates','견적');    estRows=(e1&&e1.items)||[];
-      const o1 = pick('orders','발주');       ordRows=(o1&&o1.items)||[];
-      const m1 = pick('materials','자재');    matRows=(m1&&m1.items)||[];
-      const p1 = pick('photoboards','사진대지'); pbRows=(p1&&p1.items)||[];
-      const t1 = pick('taxinvoices','세금계산서'); txRows=(t1&&t1.items)||[];
-      const s1 = pick('shared','공유데이터');
-      if(s1){shRes=s1;}else{sharedOk=false;}
-      dayRes = days.map(d=>({d,rows:((B.days&&B.days[d]&&B.days[d].rows)||[])}));
-    }else{
-      // ── 기본 경로: 항목별로 동시에 부르기(빠름) ──
-      if(useBundle)failed.push('묶음조회');
-      const estP=jsonp('action=estimates').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('견적');return [];});
-      const ordP=jsonp('action=orders').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('발주');return [];});
-      const matP=jsonp('action=materials').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('자재');return [];});
-      const pbP =jsonp('action=photoboards').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('사진대지');return [];});
-      const txP =jsonp('action=taxinvoices').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('세금계산서');return [];});
-      const shP =jsonp('action=shared').then(r=>r||{map:{}}).catch(()=>{sharedOk=false;failed.push('공유데이터');return {map:{}};});
-      master = await jsonp('action=master').catch(()=>{failed.push('기본정보');return {};});
-      /* 2026-08-19: 하루씩 따로 부르던 걸 한 번에(action=days). 실패하면 예전 방식으로 자동 복귀 */
-      const _perDay=()=>Promise.all(days.map(d=>jsonp('action=day&date='+d).then(r=>({d,rows:(r&&r.rows)||[]})).catch(()=>{failed.push('일지 '+d.slice(5));return {d,rows:[]};})));
-      dayRes = await jsonp('action=days&list='+encodeURIComponent(days.join(',')),40000,2,[20000,40000])
-        .then(r=>{ if(!r||!r.days) throw new Error('묶음 응답 아님');
-                   const D=r.days; return days.map(d=>({d:d,rows:((D[d]||{}).rows)||[]})); })
-        .catch(_perDay);
-      estRows=await estP;ordRows=await ordP;matRows=await matP;pbRows=await pbP;txRows=await txP;shRes=await shP;
-    }
+    const master=await mstP;
+    const estRows=await estP,ordRows=await ordP,matRows=await matP,pbRows=await pbP,txRows=await txP;
+    const dayRes=await dayP;
 
     gData.estimates=master.estimates||{};gData.wstat=master.wstat||{};gData.recv=master.recv||{};gData.docrec=master.docrec||{};
     const out=[];
     dayRes.forEach(({d,rows})=>rows.forEach(r=>out.push({date:d,type:r[0]||'',region:r[1]||'',site:r[2]||'',content:r[3]||'',stage:r[4]||'',note:r[5]||'',writer:r[6]||''})));
-    gData.logs=out;gData.est=estRows;gData.orders=ordRows;gData._okeys=null;gData.connected=true;mergeManualEst();
+    gData.logs=out;gData.est=estRows;gData.orders=ordRows;gData._okeys=null;mergeManualEst();
     // 자재 단계: 시트값을 기준으로, 시트에 없는 항목은 localStorage 값 유지(병합)
     const merged=Object.assign({},gData.matStatus||{});
     matRows.forEach(r=>{if(r&&r.key&&!gPendingMat[r.key])merged[r.key]={stage:r.stage||'발주',editor:r.editor||'',time:r.time||'',type:r.type||'발주',vendor:r.vendor||'',site:r.site||'',goods:r.goods||'',date:r.date||''};});
     gData.matStatus=merged;matLocalSave();
     gData.photoBoards=pbRows;rebuildPb();
     gData.taxInvoices=txRows;rebuildTax();
-    applyShared(shRes,sharedOk);
     gData.partial=failed.slice(0,4).join('·')+(failed.length>4?' 외':'');
     if(failed.length&&manual)alert('일부 항목을 못 불러왔습니다: '+gData.partial+'\n\n구글 응답이 늦을 때 생깁니다. 잠시 후 [구글 연동]을 다시 눌러 주세요.\n(못 불러온 항목은 화면에 옛 내용이 남아 있을 수 있습니다.)');
-  }catch(e){gData.connected=false;gData.err=String(e&&e.message||e);
-    if(manual)alert('구글 연동에 실패했습니다.\n인터넷 연결을 확인해 주세요.\n('+gData.err+')');}
-  gData.loading=false;updateSyncUI();renderAll();
+  }catch(e){
+    gData.partial=(failed.join('·')||String(e&&e.message||e)).slice(0,40);
+  }
+  gData.rest=false;updateSyncUI();renderAll();
 }
 function updateSyncUI(){
   const b=document.getElementById('syncBtn');if(!b)return;
   if(gData.loading){b.textContent='↻ 연동 중…';b.style.color='var(--amber)';b.style.borderColor='var(--amber)';}
+  else if(gData.connected&&gData.rest){b.textContent='● 연동됨 · 나머지 받는 중';b.style.color='var(--amber)';b.style.borderColor='var(--amber)';b.title='첫 화면은 준비됐고, 견적·발주 등 나머지 자료를 받고 있습니다.';}
   else if(gData.connected&&gData.partial){b.textContent='▲ 일부 못 받음('+gData.partial+')';b.style.color='var(--amber)';b.style.borderColor='var(--amber)';b.title='구글 응답이 늦어 일부 항목을 못 받았습니다. 눌러서 다시 시도하세요.';}
   else if(gData.connected){b.textContent='● 구글 연동됨';b.style.color='var(--g1)';b.style.borderColor='var(--g2)';b.title='';}
   else{b.textContent='↻ 구글 연동';b.style.color='var(--muted)';b.style.borderColor='var(--stroke2)';b.title='';}
