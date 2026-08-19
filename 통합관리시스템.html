@@ -4852,7 +4852,12 @@ async function loadGoogle(manual){
       const txP =jsonp('action=taxinvoices').then(r=>(r&&r.items)||[]).catch(()=>{failed.push('세금계산서');return [];});
       const shP =jsonp('action=shared').then(r=>r||{map:{}}).catch(()=>{sharedOk=false;failed.push('공유데이터');return {map:{}};});
       master = await jsonp('action=master').catch(()=>{failed.push('기본정보');return {};});
-      dayRes = await Promise.all(days.map(d=>jsonp('action=day&date='+d).then(r=>({d,rows:(r&&r.rows)||[]})).catch(()=>{failed.push('일지 '+d.slice(5));return {d,rows:[]};})));
+      /* 2026-08-19: 하루씩 따로 부르던 걸 한 번에(action=days). 실패하면 예전 방식으로 자동 복귀 */
+      const _perDay=()=>Promise.all(days.map(d=>jsonp('action=day&date='+d).then(r=>({d,rows:(r&&r.rows)||[]})).catch(()=>{failed.push('일지 '+d.slice(5));return {d,rows:[]};})));
+      dayRes = await jsonp('action=days&list='+encodeURIComponent(days.join(',')),40000,2,[20000,40000])
+        .then(r=>{ if(!r||!r.days) throw new Error('묶음 응답 아님');
+                   const D=r.days; return days.map(d=>({d:d,rows:((D[d]||{}).rows)||[]})); })
+        .catch(_perDay);
       estRows=await estP;ordRows=await ordP;matRows=await matP;pbRows=await pbP;txRows=await txP;shRes=await shP;
     }
 
@@ -5334,6 +5339,9 @@ let careCalMode='both';   // both 통합 · insp 점검 · dis 소독
 let careMonthCache={};     // 'YYYY-MM' -> 그 달 일지 기록 배열
 let careMonthLoading={};    // 'YYYY-MM' -> 불러오는 중 표시(중복 호출 방지)
 function careEnsureMonth(){
+  /* 2026-08-19: 일정관리 탭을 실제로 열었을 때만 그 달 일지를 부른다.
+     예전엔 첫 화면만 봐도 그 달 전체를 하루씩 19~31번 불러서 연동이 크게 느려졌다. */
+  if(typeof curTab!=='undefined' && curTab!=='care') return;
   const base=new Date();base.setDate(1);base.setMonth(base.getMonth()+careMonthOffset);
   loadCareMonth(base.getFullYear(),base.getMonth());
 }
@@ -5344,10 +5352,16 @@ function loadCareMonth(y,m){
   careMonthLoading[key]=true;
   const today=todayStr();const dim=new Date(y,m+1,0).getDate();const days=[];
   for(let dn=1;dn<=dim;dn++){const ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(dn).padStart(2,'0');if(ds<=today)days.push(ds);}   // 미래 날짜는 기록 없으니 생략
-  Promise.all(days.map(ds=>jsonp('action=day&date='+ds).then(r=>({ds,rows:(r&&r.rows)||[]})).catch(()=>({ds,rows:[]}))))
-    .then(res=>{const out=[];
-      res.forEach(o=>o.rows.forEach(r=>out.push({date:o.ds,type:r[0]||'',region:r[1]||'',site:r[2]||'',content:r[3]||'',stage:r[4]||'',note:r[5]||'',writer:r[6]||''})));
-      careMonthCache[key]=out;careMonthLoading[key]=false;renderCareCalendar();})
+  /* 2026-08-19: 하루씩 19~31번 부르던 걸 한 번에(action=days). 실패하면 예전 방식으로 자동 복귀 */
+  const _rowsToLogs=res=>{const out=[];
+    res.forEach(o=>o.rows.forEach(r=>out.push({date:o.ds,type:r[0]||'',region:r[1]||'',site:r[2]||'',content:r[3]||'',stage:r[4]||'',note:r[5]||'',writer:r[6]||''})));
+    return out;};
+  const _perDay=()=>Promise.all(days.map(ds=>jsonp('action=day&date='+ds).then(r=>({ds,rows:(r&&r.rows)||[]})).catch(()=>({ds,rows:[]}))));
+  jsonp('action=days&list='+encodeURIComponent(days.join(',')),40000,2,[20000,40000])
+    .then(r=>{ if(!r||!r.days) throw new Error('묶음 응답 아님');
+               const D=r.days; return days.map(ds=>({ds:ds,rows:((D[ds]||{}).rows)||[]})); })
+    .catch(_perDay)
+    .then(res=>{careMonthCache[key]=_rowsToLogs(res);careMonthLoading[key]=false;renderCareCalendar();})
     .catch(()=>{careMonthLoading[key]=false;});
 }
 function careShiftMonth(d){careMonthOffset=(d===0?0:careMonthOffset+d);renderCareCalendar();}
