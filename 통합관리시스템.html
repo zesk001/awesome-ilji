@@ -170,7 +170,21 @@
   .dwlab i{width:7px;height:7px;border-radius:50%;display:inline-block;flex:0 0 auto;}
   .dwlab span{font-weight:700;color:var(--dim);font-size:10.5px;}
   .dwrow .lwcol{min-height:50px;padding:5px 3px;}
-  .dwrow .lwnm{font-size:10.5px;line-height:1.32;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;text-overflow:clip;margin-bottom:2px;}
+  .dwrow .lwnm{font-size:10.5px;line-height:1.32;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;text-overflow:clip;}
+  .dwit{margin-bottom:4px;cursor:default;}
+  .dwit:last-child{margin-bottom:0;}
+  .dwcnt{font-size:9.5px;font-weight:800;color:#bfe89a;line-height:1.25;}
+  .dwcnt.none{color:var(--dim);font-weight:700;}
+  .dwcnt.so{color:#9bd7ea;}
+  /* 현장 카드: 투입 담당자 체크 */
+  .wbemphint{color:var(--dim);font-weight:600;font-size:11px;margin-left:4px;}
+  .wbchip .wbchipn{font-size:9.5px;font-weight:800;margin-left:4px;opacity:.75;}
+  .cellchip b{font-size:8.5px;font-weight:800;margin-left:3px;opacity:.7;}
+  .wbemps{display:flex;flex-wrap:wrap;gap:6px;}
+  .wbemp{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border:1px solid var(--stroke2);border-radius:8px;padding:5px 10px;font-size:12.5px;color:#dfe6ea;cursor:pointer;user-select:none;transition:.12s;}
+  .wbemp:hover{border-color:var(--g2);}
+  .wbemp input{accent-color:var(--g2);margin:0;cursor:pointer;}
+  .wbemp.on{background:rgba(116,194,68,.14);border-color:var(--g2);color:#e3f6cf;font-weight:700;}
   .glass h3 .go.wbadd{color:var(--g1);}
   .wbrow .wbdel{color:var(--dim);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;flex:0 0 auto;transition:.15s;}
   .wbrow .wbdel:hover{color:#ff6b6b;background:rgba(255,107,107,.12);}
@@ -3359,6 +3373,7 @@ window.addEventListener('DOMContentLoaded', App.init);
   <div class="form-grid" style="grid-template-columns:1fr;">
     <div class="field"><label>현장명 *</label><input type="text" id="wb_name" placeholder="예) 온산초등학교" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('wb_note').focus();}"></div>
     <div class="field"><label>비고 (진행 월·횟수·메모 등)</label><input type="text" id="wb_note" placeholder="예) 8월 요청 / 正 x3 / 외주 등" onkeydown="if(event.key==='Enter'){event.preventDefault();WB.save();}"></div>
+    <div class="field" id="wb_empwrap" style="display:none;"><label>현장 투입 담당자 <span class="wbemphint">비워 둬도 됩니다 · 확정되면 체크하세요</span></label><div class="wbemps" id="wb_emps"></div></div>
   </div>
   <div class="modal-actions">
     <button class="btn gray sm" id="wbDelBtn" onclick="WB.delCurrent()" style="display:none;margin-right:auto;">삭제</button>
@@ -5416,40 +5431,64 @@ function openWeeklyReport(){
   if(f && !f.getAttribute('srcdoc') && f.dataset.doc) f.srcdoc=f.dataset.doc;  // 처음 열 때 1회 로드
   document.getElementById('weeklyModal').classList.add('show');
 }
-/* 첫 화면 '일일업무' 칸: 금주 공사 한 줄, 금주 소독 한 줄 (금주 휴가자와 같은 요일 표) */
+/* 첫 화면 '일일업무' 칸: 금주 공사 한 줄, 금주 소독 한 줄
+   ─ 자료는 가운데 달력에 올려둔 것을 그대로 가져온다(일지 기록이 아님).
+   ─ 공사: 달력의 '공사' 칸(공사요청 현장)만. 외주·AS는 뺀다.
+   ─ 소독: 현장이 많아서 이름 대신 소독1~4팀으로 묶어 보여준다.
+   ─ 현장(또는 팀) 밑의 숫자에 마우스를 대면 누가 나가는지 이름이 뜬다. */
 function renderWeekly(){
   const el=document.getElementById('pWeekly'); if(!el) return;
-  const src=(gData.connected?gData.logs:logs).slice();
   const pad2=n=>String(n).padStart(2,'0');
   const ymd=d=>d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+  const escA=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'&#10;');
   const t=new Date(); const ts=ymd(t);
   const mon=new Date(t); mon.setDate(t.getDate()-((t.getDay()+6)%7));
   const days=[]; for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);days.push(d);}
-  const w0=ymd(days[0]), w1=ymd(days[6]);
   const DOW=['월','화','수','목','금','토','일'];
-  const wl=src.filter(l=>(l.date||'')>=w0&&(l.date||'')<=w1);
-  function lineFor(kind,color){
-    const byDate={};
-    wl.filter(l=>(l.type||'')===kind).forEach(l=>{
-      const d=l.date||''; let nm=(l.site||l.region||l.content||'-');
-      const rg=(l.region||'').trim(); if(rg&&nm.indexOf(rg+' ')===0) nm=nm.slice(rg.length+1);
-      const a=(byDate[d]=byDate[d]||[]); if(a.indexOf(nm)<0) a.push(nm);
+  if(typeof WB==='undefined'||!WB.dayView){ el.innerHTML='<div class="empty">달력을 불러오는 중입니다.</div>'; return; }
+
+  /* 하루치 공사: 현장명 + 투입 인원 수(마우스 대면 이름) */
+  function gongItems(ds){
+    return (WB.dayView(ds).gong||[]).map(function(it){
+      const es=WB.empsOf(it);
+      const tip=(it.note?it.note+'\n':'')+(es.length?'투입 '+es.length+'명\n'+es.join(', '):'투입 인원 미정 — 현황판 현장 카드에서 체크하세요');
+      return {name:it.name||'-', sub:(es.length?es.length+'명':'미정'), none:!es.length, tip:tip};
     });
-    let cnt=0; for(const k in byDate) cnt+=byDate[k].length;
-    let h='<div class="dwrow"><div class="dwlab"><i style="background:'+color+'"></i>금주 '+kind+'<span>'+(cnt?cnt+'곳':'없음')+'</span></div>';
-    h+='<div class="lwgrid">'+[0,1,2,3,4].map(i=>{
-      const ds=ymd(days[i]); const ns=byDate[ds]||[];
-      return '<div class="lwcol'+(ds===ts?' today':'')+'"><div class="lwhd">'+DOW[i]+' <b>'+days[i].getDate()+'</b></div>'
-        +(ns.length?ns.map(n=>'<div class="lwnm" title="'+esc(n)+'">'+esc(n)+'</div>').join(''):'<div class="lwdash">·</div>')
-        +'</div>';
+  }
+  /* 하루치 소독: 소독1~4팀 + 그 팀이 도는 현장 수(마우스 대면 현장명) */
+  function soItems(ds){
+    const so=WB.dayView(ds).so||{}; const out=[];
+    for(let k=1;k<=4;k++){
+      const list=so[k]||[]; if(!list.length) continue;
+      out.push({name:'소독'+k+'팀', sub:list.length+'곳', so:true,
+        tip:'소독'+k+'팀 · '+list.length+'곳\n'+list.map(function(x){return '· '+x.name+(x.note?' ('+x.note+')':'');}).join('\n')});
+    }
+    return out;
+  }
+  function cellHtml(items){
+    if(!items.length) return '<div class="lwdash">·</div>';
+    return items.map(function(o){
+      return '<div class="dwit" title="'+escA(o.tip)+'"><div class="lwnm">'+esc(o.name)+'</div>'
+        +'<div class="dwcnt'+(o.none?' none':'')+(o.so?' so':'')+'">'+esc(o.sub)+'</div></div>';
+    }).join('');
+  }
+  function lineFor(label,color,getter){
+    const per=days.map(function(d){return getter(ymd(d));});
+    let cnt=0; per.forEach(function(a){cnt+=a.length;});
+    let h='<div class="dwrow"><div class="dwlab"><i style="background:'+color+'"></i>금주 '+label+'<span>'+(cnt?cnt+'건':'없음')+'</span></div>';
+    h+='<div class="lwgrid">'+[0,1,2,3,4].map(function(i){
+      const ds=ymd(days[i]);
+      return '<div class="lwcol'+(ds===ts?' today':'')+'"><div class="lwhd">'+DOW[i]+' <b>'+days[i].getDate()+'</b></div>'+cellHtml(per[i])+'</div>';
     }).join('')+'</div>';
-    const wkd=[5,6].filter(i=>byDate[ymd(days[i])]);
-    if(wkd.length) h+='<div class="lwwk">'+wkd.map(i=>'<span class="lwhd">'+DOW[i]+' '+days[i].getDate()+'</span> '
-        +(byDate[ymd(days[i])]||[]).map(n=>'<span class="lwnm">'+esc(n)+'</span>').join(' &middot; ')).join(' &nbsp; ')+'</div>';
+    const wkd=[5,6].filter(function(i){return per[i].length;});
+    if(wkd.length) h+='<div class="lwwk">'+wkd.map(function(i){
+      return '<span class="lwhd">'+DOW[i]+' '+days[i].getDate()+'</span> '+per[i].map(function(o){
+        return '<span class="lwnm" title="'+escA(o.tip)+'">'+esc(o.name)+' <b style="font-size:9.5px;opacity:.8">'+esc(o.sub)+'</b></span>';
+      }).join(' &middot; ');
+    }).join(' &nbsp; ')+'</div>';
     return h+'</div>';
   }
-  if(!wl.length && !gData.connected){ el.innerHTML='<div class="empty">구글 연동 후 표시됩니다.</div>'; return; }
-  el.innerHTML=lineFor('공사','#ed9b4a')+lineFor('소독','#6cc3df');
+  el.innerHTML=lineFor('공사','#ed9b4a',gongItems)+lineFor('소독','#6cc3df',soItems);
 }
 /* 금주 휴가자: 월~금 요일별 칸에 그날 휴가자 이름 표시 (주말 기록은 아래 한 줄) */
 function renderLeaveWeek(){
@@ -5582,6 +5621,44 @@ const WB=(function(){
   let editing=null; // {list,id}
   function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'&#10;');}
   function catOf(src){return src==='as'?'as':(src==='sojung'||src==='sodan')?'so':src==='outsrc'?'out':'gong';}
+  /* ── 현장 투입 담당자 ──
+     현장에 실제 나가는 인원만 고른다: 사무 담당 2명(강나래·최연주)은 빼고, 퇴사자는 자동으로 빠진다.
+     명단은 연차 탭 직원 자료(gData.leaveEmps)에서 가져오므로 직원이 바뀌면 여기도 같이 바뀐다. */
+  const EMP_SKIP=['강나래','최연주'];
+  const EMP_ORDER=['박홍민','김남진','박인순','박진수','김동현','이은광','김지훈','김재성'];
+  function fieldEmps(){
+    var src=(typeof gData!=='undefined'&&gData.leaveEmps&&gData.leaveEmps.length)?gData.leaveEmps:EMP_ORDER.map(function(n){return {name:n};});
+    var ns=[];
+    src.forEach(function(e){ if(e&&e.name&&!e.retire&&EMP_SKIP.indexOf(e.name)<0&&ns.indexOf(e.name)<0) ns.push(e.name); });
+    ns.sort(function(a,b){var ia=EMP_ORDER.indexOf(a),ib=EMP_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b,'ko');});
+    return ns;
+  }
+  function renderEmpBox(sel){
+    var box=document.getElementById('wb_emps'); if(!box) return;
+    sel=sel||[];
+    box.innerHTML=fieldEmps().map(function(n){
+      var on=sel.indexOf(n)>=0;
+      return '<label class="wbemp'+(on?' on':'')+'"><input type="checkbox" value="'+escAttr(n)+'"'+(on?' checked':'')+' onchange="this.parentNode.classList.toggle(\'on\',this.checked)">'+esc(n)+'</label>';
+    }).join('');
+  }
+  function readEmpBox(){
+    var box=document.getElementById('wb_emps'); if(!box) return [];
+    return [].slice.call(box.querySelectorAll('input:checked')).map(function(i){return i.value;});
+  }
+  function showEmpBox(k,sel){
+    var wrap=document.getElementById('wb_empwrap'); if(!wrap) return;
+    if(k==='csreq'){ wrap.style.display=''; renderEmpBox(sel); }
+    else { wrap.style.display='none'; var b=document.getElementById('wb_emps'); if(b) b.innerHTML=''; }
+  }
+  /* 달력에 올려둔 현장의 담당자: 원본 카드가 정답(카드에서 고치면 달력·금주 공사에 바로 반영).
+     카드를 지웠으면 달력에 복사돼 있던 값을 쓴다. */
+  function empsOf(it){
+    if(!it) return [];
+    var card=(data[it.src||'csreq']||[]).find(function(x){return x.name===it.name;});
+    if(card&&Array.isArray(card.emps)) return card.emps;
+    return Array.isArray(it.emps)?it.emps:[];
+  }
+  function refreshHome(){ if(typeof renderCalendar==='function')renderCalendar(); if(typeof renderWeekly==='function')renderWeekly(); }
   function render(k){
     if(k==='sojung'){renderSojung();return;}
     const list=data[k]||[];
@@ -5597,15 +5674,16 @@ const WB=(function(){
       return;
     }
     if(!list.length){box.innerHTML='<div class="empty">'+CFG[k].empty+'</div>';return;}
-    box.innerHTML='<div class="wbchips">'+list.map(it=>'<span class="wbchip '+chipCls(k)+'" draggable="true" ondragstart="WB.onDragStart(event,\''+k+'\',\''+it.id+'\')" onclick="WB.openEdit(\''+k+'\',\''+it.id+'\')" title="'+(it.note?escAttr(it.note)+' · ':'')+'클릭:수정 · 드래그:달력">'+esc(it.name||'-')+'</span>').join('')+'</div>';
+    box.innerHTML='<div class="wbchips">'+list.map(it=>'<span class="wbchip '+chipCls(k)+'" draggable="true" ondragstart="WB.onDragStart(event,\''+k+'\',\''+it.id+'\')" onclick="WB.openEdit(\''+k+'\',\''+it.id+'\')" title="'+(it.note?escAttr(it.note)+' · ':'')+((it.emps&&it.emps.length)?'담당 '+it.emps.length+'명: '+escAttr(it.emps.join(', '))+' · ':'')+'클릭:수정 · 드래그:달력">'+esc(it.name||'-')+((it.emps&&it.emps.length)?'<b class="wbchipn">'+it.emps.length+'</b>':'')+'</span>').join('')+'</div>';
   }
   function renderAll(){Object.keys(CFG).forEach(render);}
-  function openAdd(k){if(!wbAuth())return;editing={list:k,id:null};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 추가';document.getElementById('wb_name').value='';document.getElementById('wb_note').value='';document.getElementById('wbDelBtn').style.display='none';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
-  function openEdit(k,id){if(!wbAuth())return;const it=(data[k]||[]).find(x=>x.id===id);if(!it)return;editing={list:k,id:id};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 수정';document.getElementById('wb_name').value=it.name||'';document.getElementById('wb_note').value=it.note||'';document.getElementById('wbDelBtn').style.display='';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
+  function openAdd(k){if(!wbAuth())return;editing={list:k,id:null};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 추가';document.getElementById('wb_name').value='';document.getElementById('wb_note').value='';showEmpBox(k,[]);document.getElementById('wbDelBtn').style.display='none';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
+  function openEdit(k,id){if(!wbAuth())return;const it=(data[k]||[]).find(x=>x.id===id);if(!it)return;editing={list:k,id:id};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 수정';document.getElementById('wb_name').value=it.name||'';document.getElementById('wb_note').value=it.note||'';showEmpBox(k,it.emps||[]);document.getElementById('wbDelBtn').style.display='';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
   function save(){if(!wbAuth())return;if(!editing)return;const k=editing.list;const name=document.getElementById('wb_name').value.trim();const note=document.getElementById('wb_note').value.trim();if(!name){alert('현장명을 입력하세요.');return;}
-    if(editing.id){const it=data[k].find(x=>x.id===editing.id);if(it){it.name=name;it.note=note;}}
-    else{data[k].push({id:'wb'+Date.now()+Math.floor(Math.random()*1000),name:name,note:note});}
-    persist();render(k);closeModal('wbModal');editing=null;}
+    const emps=(k==='csreq')?readEmpBox():null;
+    if(editing.id){const it=data[k].find(x=>x.id===editing.id);if(it){it.name=name;it.note=note;if(emps)it.emps=emps;}}
+    else{const nit={id:'wb'+Date.now()+Math.floor(Math.random()*1000),name:name,note:note};if(emps)nit.emps=emps;data[k].push(nit);}
+    persist();render(k);refreshHome();closeModal('wbModal');editing=null;}
   function del(k,id){if(!wbAuth())return;if(!confirm('이 현장을 삭제할까요?'))return;data[k]=(data[k]||[]).filter(x=>x.id!==id);persist();render(k);}
   /* ── 달력 배치: 날짜별 {gong[], as[], so:{1..4}} 구조 ── */
   const CALKEY='aws_wb_cal';
@@ -5620,21 +5698,22 @@ const WB=(function(){
   function dayEdit(date){if(!placed[date]||Array.isArray(placed[date]))placed[date]=dayView(date);return placed[date];}
   function isEmptyDay(o){return !o.gong.length&&!o.out.length&&!o.as.length&&!o.so[1].length&&!o.so[2].length&&!o.so[3].length&&!o.so[4].length;}
   function chipCls(k){return k==='outsrc'?'c-out':k==='as'?'c-as':k==='sodan'?'c-dan':'c-gong';}
-  function onDragStart(e,list,id){var it=(data[list]||[]).find(function(x){return x.id===id;});if(!it)return;try{e.dataTransfer.setData('text/wb',JSON.stringify({list:list,name:it.name,note:it.note||''}));e.dataTransfer.setData('wbcat-'+catOf(list),'1');e.dataTransfer.setData('text/plain',it.name);e.dataTransfer.effectAllowed='copy';}catch(err){}}
-  function placeInZone(date,zone,team,pl){if(!date||!pl||!pl.name)return;var o=dayEdit(date);var item={id:'wc'+Date.now()+Math.floor(Math.random()*1000),name:pl.name,note:pl.note||'',src:pl.list};
+  function onDragStart(e,list,id){var it=(data[list]||[]).find(function(x){return x.id===id;});if(!it)return;try{e.dataTransfer.setData('text/wb',JSON.stringify({list:list,name:it.name,note:it.note||'',emps:(it.emps||[])}));e.dataTransfer.setData('wbcat-'+catOf(list),'1');e.dataTransfer.setData('text/plain',it.name);e.dataTransfer.effectAllowed='copy';}catch(err){}}
+  function placeInZone(date,zone,team,pl){if(!date||!pl||!pl.name)return;var o=dayEdit(date);var item={id:'wc'+Date.now()+Math.floor(Math.random()*1000),name:pl.name,note:pl.note||'',src:pl.list,emps:(pl.emps||[]).slice()};
     if(zone==='gong'){if(o.gong.some(function(x){return x.name===item.name;}))return;o.gong.push(item);}
     else if(zone==='out'){o.out=o.out||[];if(o.out.some(function(x){return x.name===item.name;}))return;o.out.push(item);}
     else if(zone==='as'){if(o.as.some(function(x){return x.name===item.name;}))return;o.as.push(item);}
     else if(zone==='so'){team=team||1;var t=o.so[team]||(o.so[team]=[]);if(t.length>=4){alert('소독 한 팀은 하루 최대 4개 현장까지입니다.');return;}if(t.some(function(x){return x.name===item.name;}))return;t.push(item);}
-    persistCal();if(typeof renderCalendar==='function')renderCalendar();}
+    persistCal();refreshHome();}
   function removeItem(date,zone,team,id){if(!wbAuth())return;var o=placed[date];if(!o||Array.isArray(o))o=dayEdit(date);
     if(zone==='gong')o.gong=(o.gong||[]).filter(function(x){return x.id!==id;});
     else if(zone==='out')o.out=(o.out||[]).filter(function(x){return x.id!==id;});
     else if(zone==='as')o.as=(o.as||[]).filter(function(x){return x.id!==id;});
     else if(zone==='so'&&o.so&&o.so[team])o.so[team]=o.so[team].filter(function(x){return x.id!==id;});
     if(isEmptyDay(dayView(date)))delete placed[date];
-    persistCal();hideTip(true);if(typeof renderCalendar==='function')renderCalendar();}
-  function chipCell(it,zone,date){return '<span class="cellchip '+chipCls(it.src)+'" data-date="'+date+'" data-zone="'+zone+'" data-id="'+it.id+'"'+(it.note?' data-tip="'+escAttr(it.note)+'"':'')+'>'+escAttr(it.name)+'</span>';}
+    persistCal();hideTip(true);refreshHome();}
+  function chipCell(it,zone,date){var es=empsOf(it);var tip=[(it.note||''),(es.length?'투입 '+es.length+'명: '+es.join(', '):'')].filter(Boolean).join(' / ');
+    return '<span class="cellchip '+chipCls(it.src)+'" data-date="'+date+'" data-zone="'+zone+'" data-id="'+it.id+'"'+(tip?' data-tip="'+escAttr(tip)+'"':'')+'>'+escAttr(it.name)+(es.length?' <b>'+es.length+'</b>':'')+'</span>';}
   function teamBadge(date,team,list){var tip=list.map(function(x){return x.name+(x.note?' ('+x.note+')':'');}).join('\n');return '<span class="teambadge t'+team+'" data-date="'+date+'" data-zone="so" data-team="'+team+'" data-tip="'+escAttr(tip)+'">소독'+team+'팀<b>'+list.length+'</b></span>';}
   function renderCell(date){var o=dayView(date);var h='<div class="cellgrid"><div class="crow crow1">';
     h+='<div class="zone zgong" data-lb="공사" data-date="'+date+'" data-zone="gong">'+o.gong.map(function(it){return chipCell(it,'gong',date);}).join('')+'</div>';
@@ -5702,14 +5781,14 @@ const WB=(function(){
     let changed=false;
     if(dStr!=null){try{const d=JSON.parse(dStr||'{}')||{};Object.keys(CFG).forEach(k=>{if(!Array.isArray(d[k]))d[k]=[];});data=d;localStorage.setItem(KEY,JSON.stringify(data));changed=true;}catch(e){}}
     if(cStr!=null){try{placed=JSON.parse(cStr||'{}')||{};localStorage.setItem(CALKEY,JSON.stringify(placed));changed=true;}catch(e){}}
-    if(changed){try{renderAll();}catch(e){}}
+    if(changed){try{renderAll();}catch(e){} try{refreshHome();}catch(e){}}
   }
   function exportShared(){
     const any=Object.keys(data).some(k=>Array.isArray(data[k])&&data[k].length);
     const anyC=Object.keys(placed||{}).length>0;
     return {d:JSON.stringify(data), c:JSON.stringify(placed||{}), any:any, anyC:anyC};
   }
-  return {auth:wbAuth,applySharedWb,exportShared,renderAll,render,openAdd,openEdit,save,del,delCurrent,onDragStart,renderCell,removeItem,ensureCalDnD,selectRegion,filterSojung,onDragStartDB};
+  return {auth:wbAuth,applySharedWb,exportShared,renderAll,render,openAdd,openEdit,save,del,delCurrent,onDragStart,renderCell,removeItem,ensureCalDnD,selectRegion,filterSojung,onDragStartDB,dayView,empsOf,fieldEmps};
 })();
 
 /* 메모(특별 사항) 카드: 보기는 누구나, 수정은 관리자(마스터 비밀번호) — 전 기기 공유(wbmemo 키) */
