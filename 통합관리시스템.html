@@ -150,7 +150,7 @@
   .b-late{background:rgba(236,106,106,.16);color:#f0a0a0;}
   .empty{text-align:center;color:var(--dim);padding:20px;font-size:12.5px;}
   /* 금주 휴가자: 요일별 표 */
-  .lwgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;}
+  .lwgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;}
   .lwcol{background:rgba(255,255,255,.03);border:1px solid var(--stroke2);border-radius:9px;padding:6px 3px;min-height:66px;text-align:center;}
   .lwcol.today{border-color:var(--g2);background:rgba(116,194,68,.10);}
   .lwhd{font-size:10.5px;color:var(--dim);font-weight:700;}
@@ -163,6 +163,14 @@
   .lwdash{color:var(--dim);font-size:11px;}
   .lwwk{margin-top:6px;font-size:11.5px;color:#dfe6ea;text-align:center;}
   .lwwk .lwnm{display:inline;}
+  /* 금주 공사·소독: 요일별 한 줄씩 */
+  .dwrow{margin-bottom:9px;}
+  .dwrow:last-child{margin-bottom:0;}
+  .dwlab{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:#e6edf2;margin:0 0 4px 1px;}
+  .dwlab i{width:7px;height:7px;border-radius:50%;display:inline-block;flex:0 0 auto;}
+  .dwlab span{font-weight:700;color:var(--dim);font-size:10.5px;}
+  .dwrow .lwcol{min-height:50px;padding:5px 3px;}
+  .dwrow .lwnm{font-size:10.5px;line-height:1.32;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;text-overflow:clip;margin-bottom:2px;}
   .glass h3 .go.wbadd{color:var(--g1);}
   .wbrow .wbdel{color:var(--dim);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;flex:0 0 auto;transition:.15s;}
   .wbrow .wbdel:hover{color:#ff6b6b;background:rgba(255,107,107,.12);}
@@ -5408,31 +5416,40 @@ function openWeeklyReport(){
   if(f && !f.getAttribute('srcdoc') && f.dataset.doc) f.srcdoc=f.dataset.doc;  // 처음 열 때 1회 로드
   document.getElementById('weeklyModal').classList.add('show');
 }
+/* 첫 화면 '일일업무' 칸: 금주 공사 한 줄, 금주 소독 한 줄 (금주 휴가자와 같은 요일 표) */
 function renderWeekly(){
-  const day=workMode==='day';
+  const el=document.getElementById('pWeekly'); if(!el) return;
   const src=(gData.connected?gData.logs:logs).slice();
-  let wl;
-  if(day){
-    const t=todayStr();
-    wl=src.filter(l=>(l.date||'')===t);
-  }else if(gData.connected){
-    wl=src;
-  }else{
-    const base=new Date();const dy=base.getDay();const mon=new Date(base);mon.setDate(base.getDate()-((dy+6)%7));
-    const ms=mon.toISOString().slice(0,10);const sun=new Date(mon);sun.setDate(mon.getDate()+6);const ss=sun.toISOString().slice(0,10);
-    wl=src.filter(l=>l.date>=ms&&l.date<=ss);
+  const pad2=n=>String(n).padStart(2,'0');
+  const ymd=d=>d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+  const t=new Date(); const ts=ymd(t);
+  const mon=new Date(t); mon.setDate(t.getDate()-((t.getDay()+6)%7));
+  const days=[]; for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);days.push(d);}
+  const w0=ymd(days[0]), w1=ymd(days[6]);
+  const DOW=['월','화','수','목','금','토','일'];
+  const wl=src.filter(l=>(l.date||'')>=w0&&(l.date||'')<=w1);
+  function lineFor(kind,color){
+    const byDate={};
+    wl.filter(l=>(l.type||'')===kind).forEach(l=>{
+      const d=l.date||''; let nm=(l.site||l.region||l.content||'-');
+      const rg=(l.region||'').trim(); if(rg&&nm.indexOf(rg+' ')===0) nm=nm.slice(rg.length+1);
+      const a=(byDate[d]=byDate[d]||[]); if(a.indexOf(nm)<0) a.push(nm);
+    });
+    let cnt=0; for(const k in byDate) cnt+=byDate[k].length;
+    let h='<div class="dwrow"><div class="dwlab"><i style="background:'+color+'"></i>금주 '+kind+'<span>'+(cnt?cnt+'곳':'없음')+'</span></div>';
+    h+='<div class="lwgrid">'+[0,1,2,3,4].map(i=>{
+      const ds=ymd(days[i]); const ns=byDate[ds]||[];
+      return '<div class="lwcol'+(ds===ts?' today':'')+'"><div class="lwhd">'+DOW[i]+' <b>'+days[i].getDate()+'</b></div>'
+        +(ns.length?ns.map(n=>'<div class="lwnm" title="'+esc(n)+'">'+esc(n)+'</div>').join(''):'<div class="lwdash">·</div>')
+        +'</div>';
+    }).join('')+'</div>';
+    const wkd=[5,6].filter(i=>byDate[ymd(days[i])]);
+    if(wkd.length) h+='<div class="lwwk">'+wkd.map(i=>'<span class="lwhd">'+DOW[i]+' '+days[i].getDate()+'</span> '
+        +(byDate[ymd(days[i])]||[]).map(n=>'<span class="lwnm">'+esc(n)+'</span>').join(' &middot; ')).join(' &nbsp; ')+'</div>';
+    return h+'</div>';
   }
-  const byT={};wl.forEach(l=>byT[l.type]=(byT[l.type]||0)+1);
-  document.getElementById('pWeekly').innerHTML=`
-    <div class="miniwrap" style="margin-bottom:10px;">
-      <div class="mini sm"><div class="n">${wl.length}</div><div class="l">${day?'오늘 일지':'금주 일지'}</div></div>
-      <div class="mini sm"><div class="n">${Object.keys(byT).length}</div><div class="l">업무 종류</div></div>
-    </div>
-    ${wl.length?[...wl].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,day?8:5).map(l=>{
-      const txt=esc(l.content||l.note||'-');
-      const sub=[l.date,esc(l.writer||''),esc(l.site||l.region||'')].filter(Boolean).join(' · ');
-      return `<div class="row"><div><span class="nm">${txt}</span><div class="meta">${sub}</div></div>${typeBadge2(l.type)}</div>`;
-    }).join(''):'<div class="empty">'+(day?'오늘 작성된 일지 없음':'이번 주 일지 없음')+'</div>'}`;
+  if(!wl.length && !gData.connected){ el.innerHTML='<div class="empty">구글 연동 후 표시됩니다.</div>'; return; }
+  el.innerHTML=lineFor('공사','#ed9b4a')+lineFor('소독','#6cc3df');
 }
 /* 금주 휴가자: 월~금 요일별 칸에 그날 휴가자 이름 표시 (주말 기록은 아래 한 줄) */
 function renderLeaveWeek(){
