@@ -5744,10 +5744,13 @@ const WB=(function(){
      현장에 실제 나가는 인원만 고른다: 사무 담당 2명(강나래·최연주)은 빼고, 퇴사자는 자동으로 빠진다.
      명단은 연차 탭 직원 자료(gData.leaveEmps)에서 가져오므로 직원이 바뀌면 여기도 같이 바뀐다. */
   const EMP_SKIP=['강나래','최연주'];
-  const EMP_ORDER=['박홍민','김남진','박인순','박진수','김동현','이은광','김지훈','김재성'];
+  const EMP_ORDER=['신현철','박홍민','김남진','박인순','박진수','김동현','이은광','김지훈','김재성'];
+  /* 연차(직원) 명단에 없어도 현장 담당자로 고를 수 있는 사람 — 대표님. 명단 맨 앞에 항상 나온다. */
+  const EMP_EXTRA=['신현철'];
   function fieldEmps(){
     var src=(typeof gData!=='undefined'&&gData.leaveEmps&&gData.leaveEmps.length)?gData.leaveEmps:EMP_ORDER.map(function(n){return {name:n};});
     var ns=[];
+    EMP_EXTRA.forEach(function(n){ if(ns.indexOf(n)<0) ns.push(n); });
     src.forEach(function(e){ if(e&&e.name&&!e.retire&&EMP_SKIP.indexOf(e.name)<0&&ns.indexOf(e.name)<0) ns.push(e.name); });
     ns.sort(function(a,b){var ia=EMP_ORDER.indexOf(a),ib=EMP_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b,'ko');});
     return ns;
