@@ -4593,7 +4593,7 @@ function renderAll(){
   renderDetail(scope);
   const who = viewMode==='writer' ? (selWriter||'담당자') : '';
   document.getElementById('sumTitle').textContent  = viewMode==='writer' ? (dantaFor(selWriter)?'26년 하반기 단타 소독 영업 현황':(who+' · 분류별 건수')) : '담당자 × 분류 요약';
-  document.getElementById('catTitle').textContent  = viewMode==='writer' ? (who+' · 분류별 비율') : '분류별 비율';
+  document.getElementById('catTitle').textContent  = viewMode==='writer' ? (dantaFor(selWriter)?'단타 영업 통화 결과 · 3인 통합':(who+' · 분류별 비율')) : '분류별 비율';
   document.getElementById('detailTitle').textContent = viewMode==='writer' ? (who+' · 상세 업무') : '분류별 상세 업무';
 }
 
@@ -4645,6 +4645,7 @@ function renderSummary(scope){
 /* ── 분류별 비율 도넛 ── */
 function renderDonut(scope){
   const box=document.getElementById('secCat');
+  if(viewMode==='writer'){ if(dantaFor(selWriter)){ box.innerHTML=dantaChartHTML(); return; } }   /* 김재성: 도넛 대신 단타영업 그래프 (2026-09-04) */
   const byC={};CATS.forEach(c=>byC[c]=0); scope.forEach(r=>{ if(byC[r.cat]!==undefined) byC[r.cat]++; });
   /* 통합 보기에서만 견적·계약 건수 추가(담당자별은 개인 일일기록만 표시) */
   if(viewMode==='all'){ byC['견적']=ESTCOUNT; byC['계약']=DEALCOUNT; }
@@ -4720,6 +4721,35 @@ function dantaTableHTML(){
   h+='<tr class=&quot;sum-row&quot;><td colspan=&quot;2&quot;>합계</td>'+t.map(function(v,i){ return '<td class=&quot;tnum&quot;>'+v+'</td>'; }).join('')+'</tr></table>';
   h+='<div style=&quot;font-size:9.5px;color:#888;margin-top:5px;line-height:1.4&quot;>통화 = 결과 칸이 채워진 곳 · 견적 = 견적서 발송 · 보류 = 재통화·부재·보류  |  평택·안성·이천은 연간계약, 나머지는 교육지원청 발주</div>';
   return h;
+}
+/* 오른쪽 카드: PDF의 두 그래프(지역별 통화 결과 누적막대 + 전체 결과 비율 도넛)를 SVG로 (2026-09-04) */
+function dantaChartHTML(){
+  var SER=[['견적',4,'#3b8a3b'],['거절',5,'#d9534f'],['보류',6,'#e0a800'],['수주',7,'#f5c542']];
+  var rows=DANTA.rows, t=dantaSum();
+  var W=360,H=170,padL=22,padB=26,padT=14, cw=W-padL-6, bw=cw/rows.length;
+  var maxV=0; rows.forEach(function(r){ var v=r[4]+r[5]+r[6]+r[7]; if(v>maxV) maxV=v; });
+  var step=(maxV>40)?20:10, top=Math.ceil(maxV/step)*step||step, ph=H-padT-padB, sc=ph/top;
+  var g='';
+  for(var v=0; v<=top; v+=step){ var y=padT+ph-v*sc; g+='<line x1=&quot;'+padL+'&quot; y1=&quot;'+y+'&quot; x2=&quot;'+W+'&quot; y2=&quot;'+y+'&quot; stroke=&quot;#eee&quot; stroke-width=&quot;1&quot;/><text x=&quot;'+(padL-3)+'&quot; y=&quot;'+(y+3)+'&quot; font-size=&quot;8&quot; fill=&quot;#888&quot; text-anchor=&quot;end&quot;>'+v+'</text>'; }
+  rows.forEach(function(r,i){
+    var x=padL+i*bw+bw*0.18, w=bw*0.64, y=padT+ph;
+    SER.forEach(function(sr){ var v=r[sr[1]]; if(!v) return; var h=v*sc; y-=h;
+      g+='<rect x=&quot;'+x+'&quot; y=&quot;'+y+'&quot; width=&quot;'+w+'&quot; height=&quot;'+h+'&quot; fill=&quot;'+sr[2]+'&quot;/>';
+      if(h>=9) g+='<text x=&quot;'+(x+w/2)+'&quot; y=&quot;'+(y+h/2+3)+'&quot; font-size=&quot;8&quot; font-weight=&quot;700&quot; fill=&quot;#fff&quot; text-anchor=&quot;middle&quot;>'+v+'</text>'; });
+    g+='<text x=&quot;'+(x+w/2)+'&quot; y=&quot;'+(padT+ph+11)+'&quot; font-size=&quot;8.5&quot; fill=&quot;#333&quot; text-anchor=&quot;middle&quot;>'+esc(r[0])+'</text>';
+  });
+  var leg=SER.map(function(sr){ return '<span style=&quot;display:inline-flex;align-items:center;gap:3px;margin-right:8px&quot;><i style=&quot;width:8px;height:8px;border-radius:2px;background:'+sr[2]+';display:inline-block&quot;></i>'+sr[0]+'</span>'; }).join('');
+  var bar='<div style=&quot;font-size:11px;font-weight:700;color:#333;margin-bottom:2px&quot;>지역별 통화 결과 (곳)</div>'
+    +'<svg width=&quot;100%&quot; viewBox=&quot;0 0 '+W+' '+H+'&quot; style=&quot;display:block&quot;>'+g+'</svg>'
+    +'<div style=&quot;font-size:9.5px;color:#555;margin:2px 0 6px 2px&quot;>'+leg+'</div>';
+  var tot=t[2]+t[3]+t[4]+t[5]; var R=30,C=2*Math.PI*R,off=0,segs='';
+  SER.forEach(function(sr){ var v=t[sr[1]-2]; if(!v) return; var f=v/tot;
+    segs+='<circle r=&quot;'+R+'&quot; cx=&quot;40&quot; cy=&quot;40&quot; fill=&quot;none&quot; stroke=&quot;'+sr[2]+'&quot; stroke-width=&quot;16&quot; stroke-dasharray=&quot;'+(f*C)+' '+C+'&quot; stroke-dashoffset=&quot;'+(-off*C)+'&quot; transform=&quot;rotate(-90 40 40)&quot;/>'; off+=f; });
+  var pl=SER.map(function(sr){ var v=t[sr[1]-2]; return '<div style=&quot;display:flex;align-items:center;gap:5px;margin:2px 0&quot;><i style=&quot;width:9px;height:9px;border-radius:2px;background:'+sr[2]+';display:inline-block&quot;></i><span style=&quot;flex:1&quot;>'+sr[0]+' '+v+'건</span><b>'+Math.round(v/tot*100)+'%</b></div>'; }).join('');
+  var pie='<div style=&quot;display:flex;align-items:center;gap:12px;border-top:1px solid #eef1ef;padding-top:6px&quot;>'
+    +'<svg width=&quot;80&quot; height=&quot;80&quot; viewBox=&quot;0 0 80 80&quot; style=&quot;flex:none&quot;>'+segs+'<text x=&quot;40&quot; y=&quot;38&quot; text-anchor=&quot;middle&quot; font-size=&quot;13&quot; font-weight=&quot;700&quot; fill=&quot;#1e5631&quot;>'+tot+'</text><text x=&quot;40&quot; y=&quot;50&quot; text-anchor=&quot;middle&quot; font-size=&quot;7.5&quot; fill=&quot;#888&quot;>결과</text></svg>'
+    +'<div style=&quot;flex:1;font-size:11px&quot;><div style=&quot;font-weight:700;color:#333;margin-bottom:2px&quot;>전체 결과 비율</div>'+pl+'</div></div>';
+  return bar+pie;
 }
 function dantaReportBlocks(){
   var t=dantaSum();
