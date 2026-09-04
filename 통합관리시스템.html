@@ -3735,7 +3735,7 @@ window.addEventListener('DOMContentLoaded', App.init);
   .sim-blk:last-child{border-bottom:none;}
   .sim-title{font-size:13px; font-weight:bold; min-width:38px; flex:none; padding-top:2px;}
   .sim-body{font-size:12px; color:#333; flex:1; line-height:1.8;}
-  .sim-row{margin:1px 0;}
+  .sim-row{margin:1px 0;white-space:pre-wrap;word-break:break-word;}
   .sim-w{color:#888; font-size:11px;}
 
   /* ── 인쇄: A4 ── */
@@ -4592,7 +4592,7 @@ function renderAll(){
   renderDonut(scope);
   renderDetail(scope);
   const who = viewMode==='writer' ? (selWriter||'담당자') : '';
-  document.getElementById('sumTitle').textContent  = viewMode==='writer' ? (who+' · 분류별 건수') : '담당자 × 분류 요약';
+  document.getElementById('sumTitle').textContent  = viewMode==='writer' ? (dantaFor(selWriter)?'26년 하반기 단타 소독 영업 현황':(who+' · 분류별 건수')) : '담당자 × 분류 요약';
   document.getElementById('catTitle').textContent  = viewMode==='writer' ? (who+' · 분류별 비율') : '분류별 비율';
   document.getElementById('detailTitle').textContent = viewMode==='writer' ? (who+' · 상세 업무') : '분류별 상세 업무';
 }
@@ -4618,8 +4618,10 @@ function renderChips(scope){
 /* ── 요약표 (통합=담당자×분류 / 담당자별=분류별 건수) ── */
 function renderSummary(scope){
   const box=document.getElementById('secSum');
+  if(viewMode==='writer'){ if(dantaFor(selWriter)){ box.innerHTML=dantaTableHTML(); return; } }
   if(!scope.length){ box.innerHTML='<div class=&quot;empty&quot;>기록 없음</div>'; return; }
   if(viewMode==='writer'){
+    if(dantaFor(selWriter)){ box.innerHTML=dantaTableHTML(); return; }   /* 김재성: 분류별 건수 대신 단타영업 현황표 (2026-09-04) */
     const cc={};CATS.forEach(c=>cc[c]=0); scope.forEach(r=>{ if(cc[r.cat]!==undefined) cc[r.cat]++; });
     let h='<table><tr><th>분류</th><th class=&quot;tnum&quot;>건수</th><th class=&quot;tnum&quot;>비율</th></tr>';
     CATS.forEach(c=>{ const n=cc[c]; const pct=Math.round(n/scope.length*100);
@@ -4680,6 +4682,58 @@ var WR_NEXT=['방문요청','방문예정','통화','계약예정','예산나올
 var WR_ETC=['예산신청','신규사업','기타메모'];
 function wrSite(r){ var rg=(r.region==='기타지역'?'':r.region); return [rg,r.site].filter(Boolean).join(' '); }
 function wkSave(el){ try{ localStorage.setItem(el.getAttribute('data-k'), el.value); }catch(e){} }
+
+/* ── 26년 하반기 단타 소독 영업 현황 (김재성 이사 주간보고 전용, 2026-09-04) ──
+   숫자는 '2026년 하반기 단타소독 영업리스트_3인 통합' 요약표(기준일 DANTA.asOf)를 옮긴 것.
+   갱신할 땐 rows의 숫자만 고치면 표·금주 문구·합계가 같이 바뀐다.
+   rows: [지역, 담당, 대상, 통화완료, 견적, 거절, 재통화·부재·보류, 수주, 도] */
+var DANTA={
+  asOf:'2026-09-04',
+  title:'26년 하반기 단타 영업보고',
+  rows:[
+    ['평택','김재성',50,48,20,26,0,0,'경기도'],
+    ['안성','김재성',15,15,2,13,0,0,'경기도'],
+    ['이천','김재성',30,30,6,23,0,0,'경기도'],
+    ['청주','강나래',78,64,26,30,7,1,'충북'],
+    ['충주','김재성·강나래',33,32,20,10,2,0,'충북'],
+    ['진천','강나래',15,0,0,0,0,0,'충북'],
+    ['괴산·증평','이은광',16,13,0,9,3,0,'충북'],
+    ['보은','이은광',14,13,0,10,3,0,'충북'],
+    ['옥천','김재성·이은광',15,12,5,6,1,0,'충북'],
+    ['음성','김재성',20,20,18,2,0,0,'충북']
+  ],
+  extra:['26년 어썸 견적자료 정리 및 영업 거래처 내역 정리 작업 진행중']
+};
+function dantaFor(w){ return nameKey(w)==='김재성'; }
+function dantaSum(){ var t=[0,0,0,0,0,0]; DANTA.rows.forEach(function(r){ for(var i=0;i<6;i++) t[i]+=r[i+2]; }); return t; }
+function dantaTableHTML(){
+  var t=dantaSum();
+  var C=['#1e5631','#2f6f9f','#3b8a3b','#c0392b','#b7791f','#8a6d1f'];
+  function n(v,i,b){ return '<td class=&quot;tnum&quot; style=&quot;color:'+(v?C[i]:'#bbb')+(b?';font-weight:700':'')+'&quot;>'+v+'</td>'; }
+  var h='<div style=&quot;font-size:10.5px;color:#666;margin:-2px 0 5px&quot;>지역별 대상 수와 진행 현황 · 3인 통합 <span style=&quot;color:#999&quot;>(기준 '+esc(DANTA.asOf)+')</span></div>';
+  h+='<table style=&quot;font-size:11px;table-layout:fixed&quot;><colgroup><col style=&quot;width:17%&quot;><col style=&quot;width:23%&quot;><col><col><col><col><col><col></colgroup>';
+  h+='<tr><th>지역</th><th>담당</th><th class=&quot;tnum&quot;>대상</th><th class=&quot;tnum&quot;>통화</th><th class=&quot;tnum&quot;>견적</th><th class=&quot;tnum&quot;>거절</th><th class=&quot;tnum&quot;>보류</th><th class=&quot;tnum&quot;>수주</th></tr>';
+  DANTA.rows.forEach(function(r){
+    h+='<tr><td style=&quot;font-weight:700;white-space:nowrap&quot;>'+esc(r[0])+'</td><td style=&quot;font-size:10px;color:#555;line-height:1.25&quot;>'+esc(r[1])+'</td>'+n(r[2],0)+n(r[3],1)+n(r[4],2,1)+n(r[5],3)+n(r[6],4)+n(r[7],5,1)+'</tr>';
+  });
+  h+='<tr class=&quot;sum-row&quot;><td colspan=&quot;2&quot;>합계</td>'+t.map(function(v,i){ return '<td class=&quot;tnum&quot;>'+v+'</td>'; }).join('')+'</tr></table>';
+  h+='<div style=&quot;font-size:9.5px;color:#888;margin-top:5px;line-height:1.4&quot;>통화 = 결과 칸이 채워진 곳 · 견적 = 견적서 발송 · 보류 = 재통화·부재·보류  |  평택·안성·이천은 연간계약, 나머지는 교육지원청 발주</div>';
+  return h;
+}
+function dantaReportBlocks(){
+  var t=dantaSum();
+  var byP={}, po=[];
+  DANTA.rows.forEach(function(r){ var p=r[8]||'기타'; if(!byP[p]){ byP[p]=[]; po.push(p); } byP[p].push(esc(r[0])+' '+r[2]+'개소'); });
+  var line=function(txt,ind){ return '<div class=&quot;wr-item&quot; style=&quot;font-size:12px;line-height:1.55;margin:1px 0 1px '+(ind?28:15)+'px;white-space:pre-wrap;word-break:break-word&quot;>'+txt+'</div>'; };
+  var head=function(lab){ return '<div class=&quot;wr-item wr-head&quot; style=&quot;display:flex;align-items:center;gap:6px;margin:7px 0 2px&quot;><span style=&quot;width:9px;height:9px;border-radius:2px;background:'+CATCOLOR['대표']+';display:inline-block&quot;></span><b style=&quot;font-size:13px&quot;>'+esc(lab)+'</b></div>'; };
+  var body=line('- 영업지역');
+  po.forEach(function(p){ body+=line('<b>'+esc(p)+'</b>: '+byP[p].join(', '),true); });
+  body+=line('- 전체 '+t[0]+'개소 중 '+t[1]+'개소 통화 진행');
+  body+=line('- 견적서 작성 '+t[2]+'개 학교'+(t[5]?' · 수주 '+t[5]+'곳':''));
+  var out=['<div class=&quot;wr-blk&quot;>'+head(DANTA.title)+body+'</div>'];
+  (DANTA.extra||[]).forEach(function(x){ out.push('<div class=&quot;wr-blk&quot;>'+head(x)+'</div>'); });
+  return out;
+}
 function writerReport(scope){
   var data={금주:{},차주:{},기타:{}}, ord={금주:[],차주:[],기타:[]};
   function ensure(s,lab,color,geo){ if(!data[s][lab]){ data[s][lab]={type:(geo?'geo':'list'),color:color,geo:{},go:[],list:[],n:0}; ord[s].push(lab); } return data[s][lab]; }
@@ -4733,7 +4787,8 @@ function writerReport(scope){
           +'</div>';
       }).join('');
     } else {
-      body=d.list.map(function(v){ return '<div class=&quot;wr-item&quot; style=&quot;font-size:12px;line-height:1.55;margin:1px 0 1px 15px&quot;>· '+esc(v)+'</div>'; }).join('');
+      /* 일일업무일지에서 엔터로 나눈 줄을 그대로 살린다(white-space:pre-wrap) — 2026-09-04 */
+      body=d.list.map(function(v){ return '<div class=&quot;wr-item&quot; style=&quot;display:flex;gap:4px;font-size:12px;line-height:1.55;margin:1px 0 1px 15px&quot;><span>·</span><span style=&quot;flex:1;white-space:pre-wrap;word-break:break-word&quot;>'+esc(String(v).trim())+'</span></div>'; }).join('');
     }
     return '<div class=&quot;wr-blk&quot;>'+head+body+'</div>';
   }
@@ -4743,6 +4798,7 @@ function writerReport(scope){
   function catSummary(){ var cc={}; scope.forEach(function(r){ cc[r.cat]=(cc[r.cat]||0)+1; }); return CATS.filter(function(c){return cc[c];}).map(function(c){ return '<span style=&quot;color:'+CATCOLOR[c]+';font-weight:700&quot;>'+c+' '+cc[c]+'</span>'; }).join(' <span style=&quot;color:#ccc&quot;>|</span> '); }
   function sec(title,color,s,ed,ph){
     var bl=blockList(s);
+    if(s==='금주'){ if(dantaFor(selWriter)) bl=dantaReportBlocks().concat(bl); }   /* 김재성 금주보고 맨 앞: 단타 영업보고 (2026-09-04) */
     var titleHTML='<div style=&quot;color:#fff;font-weight:bold;padding:5px 11px;border-radius:5px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div>';
     var first=bl.length?bl[0]:'<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>';
     var rest=bl.slice(1).join('');
