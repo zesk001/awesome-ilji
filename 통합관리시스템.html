@@ -4689,6 +4689,7 @@ function wkSave(el){ try{ localStorage.setItem(el.getAttribute('data-k'), el.val
    rows: [지역, 담당, 대상, 통화완료, 견적, 거절, 재통화·부재·보류, 수주, 도] */
 var DANTA={
   asOf:'2026-09-04',
+  weekBlock:false,   /* true면 금주업무보고 맨 앞에 영업보고 문구 블록을 자동으로 붙임(표와 별개) */
   title:'26년 하반기 단타 영업보고',
   rows:[
     ['평택','김재성',50,48,20,26,0,0,'경기도'],
@@ -4798,7 +4799,7 @@ function writerReport(scope){
   function catSummary(){ var cc={}; scope.forEach(function(r){ cc[r.cat]=(cc[r.cat]||0)+1; }); return CATS.filter(function(c){return cc[c];}).map(function(c){ return '<span style=&quot;color:'+CATCOLOR[c]+';font-weight:700&quot;>'+c+' '+cc[c]+'</span>'; }).join(' <span style=&quot;color:#ccc&quot;>|</span> '); }
   function sec(title,color,s,ed,ph){
     var bl=blockList(s);
-    if(s==='금주'){ if(dantaFor(selWriter)) bl=dantaReportBlocks().concat(bl); }   /* 김재성 금주보고 맨 앞: 단타 영업보고 (2026-09-04) */
+    if(s==='금주'){ if(DANTA.weekBlock) if(dantaFor(selWriter)) bl=dantaReportBlocks().concat(bl); }   /* 김재성 금주보고 맨 앞 단타 영업보고 — 일일업무일지 입력과 겹쳐 weekBlock:false로 꺼 둠 (2026-09-04) */
     var titleHTML='<div style=&quot;color:#fff;font-weight:bold;padding:5px 11px;border-radius:5px;font-size:13.5px;background:'+color+'&quot;>'+title+'</div>';
     var first=bl.length?bl[0]:'<div style=&quot;font-size:12px;color:#aaa;margin-left:4px&quot;>해당 없음</div>';
     var rest=bl.slice(1).join('');
