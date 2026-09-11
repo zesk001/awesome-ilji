@@ -4706,7 +4706,7 @@ var DANTA={
   ],
   extra:['26년 어썸 견적자료 정리 및 영업 거래처 내역 정리 작업 진행중']
 };
-function dantaFor(w){ return nameKey(w)==='김재성'; }
+function dantaFor(w){ return false; } /* 2026-09-11: 단타영업 패널 끔(이사님 지시). 되살리려면 return nameKey(w)==='김재성'; 로 되돌린다. */
 function dantaSum(){ var t=[0,0,0,0,0,0]; DANTA.rows.forEach(function(r){ for(var i=0;i<6;i++) t[i]+=r[i+2]; }); return t; }
 function dantaTableHTML(){
   var t=dantaSum();
