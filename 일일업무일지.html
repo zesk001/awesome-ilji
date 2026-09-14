@@ -76,6 +76,20 @@
   .region-grid button:hover .rg-name, .region-grid button:hover .rg-cnt { color:#fff; }
   .region-grid .rg-name { display:block; font-size:17px; font-weight:bold; color:#333; }
   .region-grid .rg-cnt { display:block; font-size:12px; color:#7a93a6; margin-top:5px; }
+  .region-grid button.rg-clear { opacity:.5; }
+  .school-row .sr-note { display:inline-block; margin-left:6px; font-size:11px; font-weight:600; color:#4a6b52; background:#e4efe7; border:1px solid #cfe0d5; border-radius:9px; padding:1px 7px; vertical-align:middle; }
+  .school-row:hover .sr-note, .school-row.selected .sr-note { color:#fff; background:rgba(255,255,255,.22); border-color:rgba(255,255,255,.45); }
+  .school-row.mdone .sr-note { color:#9aa0a6; background:#eceef0; border-color:#e2e4e8; }
+  .region-grid button.rg-mine { border-width:2.5px; border-color:var(--c); }
+  .mystat { border:1.5px solid color-mix(in srgb,var(--c) 30%,#fff); background:color-mix(in srgb,var(--c) 7%,#fff); border-radius:12px; padding:13px 15px; margin-bottom:14px; }
+  .mystat .ms-top { font-size:14px; color:#333; margin-bottom:9px; }
+  .mystat .ms-reg { color:#7a8088; font-size:12.5px; margin-left:6px; }
+  .mystat .ms-bar { height:9px; border-radius:6px; background:#e3e7ea; overflow:hidden; }
+  .mystat .ms-bar i { display:block; height:100%; border-radius:6px; transition:width .3s; }
+  .mystat .ms-num { margin-top:8px; font-size:14px; color:#444; }
+  .mystat .ms-num b { font-size:18px; }
+  .mystat .ms-left { margin-left:10px; font-weight:bold; }
+  .mystat .ms-today { margin-left:10px; font-size:12px; color:#7a8088; }
   .site-search { width:100%; border:1.5px solid #cfdcd3; border-radius:10px; padding:11px 14px; font-size:15px; margin-bottom:12px; font-family:inherit; }
   .site-search:focus { outline:none; border-color:#3f9d5a; }
   .search-results { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; }
@@ -424,14 +438,65 @@
     saveSel(); renderSummary();
   }
 
+  // ===== 담당 구역 진행 현황 (2026-09-11 추가) =====
+  /* 점검·소독은 한 달에 한 번 도는 일이라, 이번 달에 끝낸 곳(MONTH_DONE)과
+     오늘 체크해 둔 곳(SEL)을 빼면 '내 구역에 아직 몇 곳 남았나'가 나온다.
+     담당은 학교DB.js 의 담당자 필드를 쓴다. 작성자를 아직 안 고르면 요약 줄은 안 나온다. */
+  /* 분교는 별도 기입란이 없다 — 본교를 체크하면 분교도 다녀온 것으로 친다.
+     학교DB.js 의 비고가 '분교포함'인 곳에만 꼬리표를 붙여 현장에서 헷갈리지 않게 한다. */
+  var BRANCH_TAG={};
+  try{ SCHOOLS.forEach(function(s){ if(s.비고==='분교포함') BRANCH_TAG[s.지역+'|'+s.학교명]=1; }); }catch(e){}
+  function branchTag(key){ return BRANCH_TAG[key]? '<span class="sr-note">분교포함</span>' : ''; }
+  function MS_TRACK(cat){ return cat==='점검'||cat==='소독'; }
+  function curWriterName(){ var el=document.getElementById('writerSel'); return (el&&el.value)||''; }
+  function myName(){ return String(curWriterName()).split(/\s+/)[0]; }
+  function doneKey(cat,key){ return monthDoneKey(cat,key) || !!(SEL[cat]&&SEL[cat][key]); }
+  function myStat(cat){
+    var me=myName(); if(!me||!MS_TRACK(cat)) return null;
+    var st={tot:0,done:0,today:0,regions:{}};
+    SCHOOLS.forEach(function(s){
+      if((s.담당자||'')!==me) return;
+      st.tot++; st.regions[s.지역]=(st.regions[s.지역]||0)+1;
+      var k=s.지역+'|'+s.학교명;
+      if(monthDoneKey(cat,k)) st.done++;
+      else if(SEL[cat]&&SEL[cat][k]){ st.done++; st.today++; }
+    });
+    if(!st.tot) return null;
+    st.left=st.tot-st.done;
+    return st;
+  }
+  function myStatHTML(cat,color){
+    var st=myStat(cat); if(!st) return '';
+    var pct=Math.round(st.done*100/st.tot);
+    var regs=Object.keys(st.regions).sort(function(a,b){ return st.regions[b]-st.regions[a]; });
+    var M=(new Date()).getMonth()+1;
+    var leftTxt = st.left? ('<span class="ms-left" style="color:#c0392b">남은 '+st.left+'곳</span>')
+                         : ('<span class="ms-left" style="color:'+color+'">이번 달 다 돌았습니다</span>');
+    return '<div class="mystat">'
+      +'<div class="ms-top"><b>'+sEsc(curWriterName())+'</b> · '+M+'월 '+cat+' 담당'
+      +'<span class="ms-reg">'+sEsc(regs.join(' · '))+'</span></div>'
+      +'<div class="ms-bar"><i style="width:'+pct+'%;background:'+color+'"></i></div>'
+      +'<div class="ms-num">완료 <b>'+st.done+'</b> / '+st.tot+leftTxt
+      +(st.today?'<span class="ms-today">오늘 체크한 '+st.today+'곳 포함</span>':'')+'</div>'
+      +'</div>';
+  }
+
   // ===== 지역/현장 화면 공통 =====
-  function renderRegionsInto(grid, extra){
+  function renderRegionsInto(grid, extra, cat){
     const order=['천안','아산','청주','논산','공주','서산','예산','부여','홍성','안성','평택','보령','태안','금산','청양','당진','세종','서천','계룡','진천','내포신도시','증평','괴산','충주','이천'];
-    const cnt={};
-    SCHOOLS.forEach(s=>cnt[s.지역]=(cnt[s.지역]||0)+1);
-    let html=order.filter(r=>cnt[r]).map(r=>
-      '<button data-region="'+r+'"><span class="rg-name">'+r+'</span><span class="rg-cnt">'+cnt[r]+'개교</span></button>'
-    ).join('');
+    const track=MS_TRACK(cat), me=myName();
+    const cnt={}, done={}, mine={};
+    SCHOOLS.forEach(s=>{
+      cnt[s.지역]=(cnt[s.지역]||0)+1;
+      if(track && doneKey(cat, s.지역+'|'+s.학교명)) done[s.지역]=(done[s.지역]||0)+1;
+      if(track && me && (s.담당자||'')===me) mine[s.지역]=true;
+    });
+    let html=order.filter(r=>cnt[r]).map(r=>{
+      const left=cnt[r]-(done[r]||0);
+      const label = track ? ('남은 <b>'+left+'</b> / '+cnt[r]) : (cnt[r]+'개교');
+      let cls=[]; if(track && left===0) cls.push('rg-clear'); if(mine[r]) cls.push('rg-mine');
+      return '<button class="'+cls.join(' ')+'" data-region="'+r+'"><span class="rg-name">'+r+'</span><span class="rg-cnt">'+label+'</span></button>';
+    }).join('');
     if(extra){ html+='<button data-region="'+extra.label+'"><span class="rg-name">'+extra.label+'</span><span class="rg-cnt">직접 작성</span></button>'; }
     grid.innerHTML=html;
   }
@@ -441,7 +506,7 @@
     if(!list.length) return '<div class="sum-empty">검색 결과 없음</div>';
     return list.map(s=>{
       const key=s.지역+'|'+s.학교명;
-      return '<div class="school-row'+(isSel(cat,key)?' selected':'')+'" data-key="'+sEsc(key)+'" data-name="'+sEsc(s.학교명)+'" data-region="'+sEsc(s.지역)+'" data-sub=""><span class="sr-name">'+sEsc(s.학교명)+'</span><span class="sr-region">'+sEsc(s.지역)+'</span></div>';
+      return '<div class="school-row'+(isSel(cat,key)?' selected':'')+'" data-key="'+sEsc(key)+'" data-name="'+sEsc(s.학교명)+'" data-region="'+sEsc(s.지역)+'" data-sub=""><span class="sr-name">'+sEsc(s.학교명)+'</span>'+branchTag(key)+'<span class="sr-region">'+sEsc(s.지역)+'</span></div>';
     }).join('');
   }
   function wireSearch(panel, cat){
@@ -476,7 +541,7 @@
       const locked = !sub && monthDoneKey(cat,key);
       return '<div class="school-row'+(sub?' sub':'')+(isSel(cat,key)?' selected':'')+(locked?' mdone':'')+'" '+
         'data-key="'+sEsc(key)+'" data-name="'+sEsc(display)+'" data-region="'+sEsc(region)+'" data-sub="'+(sub?1:'')+'"'+sty+'>'+
-        '<span class="sr-name">'+sEsc(display)+'</span>'+(locked?'<span class="mdone-tag">이번 달 완료</span>':'')+'</div>';
+        '<span class="sr-name">'+sEsc(display)+'</span>'+(sub?'':branchTag(key))+(locked?'<span class="mdone-tag">이번 달 완료</span>':'')+'</div>';
     }
     function showRegions(){
       if(office){
@@ -490,9 +555,9 @@
         panel.innerHTML=head('업무 선택')+'<div class="work-note">학교 선택 없이, 자주 하는 업무별로 <b>한 건씩</b> 적으세요.</div><div class="region-grid">'+btns+'</div>';
         return;
       }
-      panel.innerHTML=head('지역 선택')+searchBarHTML()+'<div class="region-grid"></div>';
+      panel.innerHTML=head('지역 선택')+myStatHTML(cat,color)+searchBarHTML()+'<div class="region-grid"></div>';
       const grid=panel.querySelector('.region-grid');
-      renderRegionsInto(grid, extra);
+      renderRegionsInto(grid, extra, cat);
       specials.forEach(sp=>{
         grid.insertAdjacentHTML('beforeend',
           '<button class="region-special" data-special="'+sp+'"><span class="rg-name">'+sp+'</span><span class="rg-cnt">'+(sp==='연차'?'날짜 선택':'직접 작성')+'</span></button>');
@@ -822,6 +887,8 @@
   panels['영업']=setupBoss('boss');
   panels['공사']=setupCategory('construct','공사','#e8842c',ICON_GONGSA,{extra:ETC_REGION});
   panels['사무']=setupCategory('etc','사무','#8a8f98','📋',{office:OFFICE_CATS});
+  /* 담당 진행 요약·지역별 남은 수를 다시 그린다(작성자 변경, 이번 달 완료분 수신 후) */
+  function refreshHomes(){ try{ ['점검','소독'].forEach(function(c){ var p=panels[c]; if(p&&p._home&&!p.querySelector('.school-list')) p._home(); }); }catch(e){} }
 
   // ===== 작성자 · PIN · 전송 =====
   const NAMES=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','김지훈 주임','최연주 주임'];
@@ -832,7 +899,7 @@
 
   // ===== 이번 달 이미 완료한 점검·소독 현장 잠금(중복 체크 방지, 매월 1일 자동 초기화) =====
   var MONTH_DONE={'점검':{}, '소독':{}};
-  function monthDoneKey(cat,key){ return !!(MONTH_DONE[cat] && MONTH_DONE[cat][key]); }
+  function monthDoneKey(cat,key){ return !!(typeof MONTH_DONE!=='undefined' && MONTH_DONE && MONTH_DONE[cat] && MONTH_DONE[cat][key]); }
   function applyMonthLocks(){
     ['점검','소독'].forEach(function(c){
       var pn=panels[c]; if(!pn) return;
@@ -849,7 +916,7 @@
     (rows||[]).forEach(function(r){ var c=r[1];
       if((c==='점검'||c==='소독') && r[4]!=='단타'){ var k=(r[2]||'')+'|'+(r[3]||''); if(!MONTH_DONE[c]) MONTH_DONE[c]={}; MONTH_DONE[c][k]=true; }
     });
-    applyMonthLocks();
+    applyMonthLocks(); if(typeof refreshHomes==='function') refreshHomes();
   }
   /* 구글 조회 공통 (2026-08-06 추가)
      예전엔 스크립트 태그로만 불렀는데, 구글이 결과를 돌려주는 데 2~30초까지 걸리고
@@ -891,7 +958,7 @@
             if((x.i||[]).indexOf(M)>=0) insp[k]=true;
             if((x.d||[]).indexOf(M)>=0) dis[k]=true; });
           MONTH_DONE={'점검':insp, '소독':dis};
-          applyMonthLocks();
+          applyMonthLocks(); refreshHomes();
         }catch(e){}
       }, null);
     }catch(e){}
@@ -943,7 +1010,7 @@
     if(!name){ __prevWriter=''; PINOK=false; try{ localStorage.setItem('ilji_writer',''); }catch(e){} updateAdminVis(); return; }
     PINOK=false;
     pinGate(name,
-      function(){ __prevWriter=name; try{ localStorage.setItem('ilji_writer',name); }catch(e){} updateAdminVis(); },
+      function(){ __prevWriter=name; try{ localStorage.setItem('ilji_writer',name); }catch(e){} updateAdminVis(); refreshHomes(); },
       function(){ wsel.value=__prevWriter; if(__prevWriter) PINOK=true; updateAdminVis(); });
   });
 
@@ -1011,7 +1078,7 @@
   // 현황지도(외부 페이지)
   (function(){ var mb=document.getElementById('btnMap'); if(mb) mb.addEventListener('click', function(){ var u='https://zesk001.github.io/awesome-ilji/2026_점검소독_현황지도.html'; var w=null; try{ w=window.open(u,'_blank'); }catch(e){} if(!w) location.href=u; }); })();
   // ===== 앱 버전 표시 + 🔄 최신버전 받기(캐시 비우고 새로고침) =====
-  var APP_VER='2026-06-16';
+  var APP_VER='2026-09-14';
   (function(){ var fo=document.getElementById('appFooter'); if(fo) fo.innerHTML='어썸조경 전체 업무 관리 시스템 · 일일업무일지 &nbsp;<span style="opacity:.55">v'+APP_VER+'</span>'; })();
   function appUpdate(){
     if(!confirm('최신 버전으로 새로고침할까요?\n(작성 화면에 적던 내용은 그대로 남아 있어요)')) return;

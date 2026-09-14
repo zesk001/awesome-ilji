@@ -3706,6 +3706,20 @@ window.addEventListener('DOMContentLoaded', App.init);
   .sum-row td{font-weight:bold; background:#fafcfa; border-top:1.5px solid var(--line);}
   .empty{color:#999; font-size:12px; padding:8px 2px;}
 
+  /* 담당 구역 진행 (2026-09-14) */
+  #progCard{margin-bottom:12px;}
+  .pgrow{margin:0 0 10px;}
+  .pgrow:last-child{margin-bottom:0;}
+  .pglbl{font-size:12px; color:#444; margin-bottom:5px;}
+  .pgreg{color:#8a9099; font-size:11.5px; margin-left:5px;}
+  .pgbar{height:8px; border-radius:5px; background:#e6e9ec; overflow:hidden; min-width:70px;}
+  .pgbar i{display:block; height:100%; border-radius:5px;}
+  .pgnum{margin-top:5px; font-size:12px; color:#444;}
+  .pgnum b{font-size:15px;}
+  .pgleft{margin-left:9px; font-weight:700;}
+  .pgpct{font-size:11px; color:#6b7178; margin-left:6px;}
+  #secProg td .pgbar{display:inline-block; width:78px; vertical-align:middle;}
+
   /* 차트 */
   .chartwrap{display:flex; align-items:center; gap:14px;}
   .legend{flex:1; font-size:12px;}
@@ -3794,6 +3808,12 @@ window.addEventListener('DOMContentLoaded', App.init);
   <div id=&quot;writerTabBar&quot; class=&quot;wtabs&quot; style=&quot;display:none;&quot;></div>
 
   <div class=&quot;chips&quot; id=&quot;chips&quot;></div>
+
+  <!-- 담당 구역 점검·소독 진행 (2026-09-14) -->
+  <div class=&quot;card&quot; id=&quot;progCard&quot; style=&quot;display:none&quot;>
+    <h2 id=&quot;progTitle&quot;>담당 구역 진행</h2>
+    <div id=&quot;secProg&quot;></div>
+  </div>
 
   <div class=&quot;grid2&quot;>
     <div class=&quot;card&quot;>
@@ -4051,6 +4071,7 @@ function fetchDaysAll(list){
       예전에는 1~12로 알고 세는 바람에 이번 달 숫자가 늘 0으로 나왔다. */
 let MAPSTAT=null;                 /* [{r:지역, s:현장, i:[점검월 0~11], d:[소독월 0~11]}] */
 let SCHOOLCNT=null;               /* 지역 -> 학교 수 (학교 명단 기준) */
+let SCHOOLMGR=null;               /* 담당자 -> [지역,...] (학교 명단의 담당자 필드) */
 let DISCNT=null;                  /* 지역 -> 정기 소독현장 수 (현황판 명단 기준) */
 let DAHOE=null;                   /* 다회 소독현장 이름(띄어쓰기 뺀 것) -> &quot;3회&quot;/&quot;4회&quot; */
 const SCHOOLCNT_FALLBACK={'천안':79,'아산':53,'논산':35,'청주':33,'공주':30,'서산':26,'예산':25,'홍성':23,'부여':22,'평택':20,'안성':19,'보령':18,'태안':16,'금산':13,'청양':12,'당진':9,'세종':8,'서천':5,'진천':3,'증평':2,'괴산':1,'이천':1,'충주':1};
@@ -4072,9 +4093,15 @@ function loadSchoolCounts(){
     const i=t.indexOf('['), j=t.lastIndexOf(']');
     if(i<0||j<i) throw 0;
     const arr=JSON.parse(t.slice(i,j+1));
-    const c={};
-    arr.forEach(function(x){ const rg=String(x['지역']||'').trim(); if(rg) c[rg]=(c[rg]||0)+1; });
+    const c={}, mg={};
+    arr.forEach(function(x){
+      const rg=String(x['지역']||'').trim(); if(!rg) return;
+      c[rg]=(c[rg]||0)+1;
+      const mn=String(x['담당자']||'').trim();
+      if(mn){ if(!mg[mn]) mg[mn]={}; mg[mn][rg]=(mg[mn][rg]||0)+1; }
+    });
     SCHOOLCNT=Object.keys(c).length?c:SCHOOLCNT_FALLBACK;
+    SCHOOLMGR=Object.keys(mg).length?mg:null;
     return SCHOOLCNT;
   }).catch(function(){ SCHOOLCNT=SCHOOLCNT_FALLBACK; return SCHOOLCNT; });
 }
@@ -4120,6 +4147,87 @@ function regionProgress(kind, region){
   });
   const total=(kind==='insp')?((SCHOOLCNT||SCHOOLCNT_FALLBACK)[region]||0):((DISCNT||{})[region]||0);
   return {done:done, total:total, left:Math.max(0,total-done)};
+}
+
+/* ── 담당 구역 진행 (2026-09-14) ───────────────────────────
+   지역은 담당자 한 명에게 통째로 배정되어 있으므로(학교DB.js 담당자 필드),
+   담당자의 지역들을 regionProgress 로 더하면 그 사람의 진행이 된다.
+   현장 이름을 맞출 필요가 없어 표기 차이에 안 흔들린다.
+   점검은 이번 달, 소독은 이번 반기 기준 — 위 regionProgress 와 같다. */
+function mgrKey(w){ return String(w||'').split(/\s+/)[0]; }
+function writerRegions(w){
+  if(!SCHOOLMGR) return [];
+  const o=SCHOOLMGR[mgrKey(w)];
+  if(!o) return [];
+  return Object.keys(o).sort(function(a,b){ return o[b]-o[a]; });
+}
+function writerProgress(kind, w){
+  const regs=writerRegions(w); if(!regs.length) return null;
+  let done=0, total=0;
+  regs.forEach(function(rg){ const p=regionProgress(kind,rg); if(p){ done+=p.done; total+=p.total; } });
+  if(!total) return null;
+  return {done:done, total:total, left:Math.max(0,total-done), regions:regs};
+}
+function progBarHTML(done,total,color){
+  const pct=total?Math.round(done*100/total):0;
+  return '<div class=&quot;pgbar&quot;><i style=&quot;width:'+pct+'%;background:'+color+'&quot;></i></div>';
+}
+function progSoloHTML(w){
+  const M=thisMonth0()+1;
+  const ins=writerProgress('insp',w), dis=writerProgress('dis',w);
+  if(!ins&&!dis) return '<div class=&quot;empty&quot;>담당 구역이 지정되지 않았습니다</div>';
+  let h='';
+  if(ins){
+    h+='<div class=&quot;pgrow&quot;><div class=&quot;pglbl&quot;>'+M+'월 점검 <span class=&quot;pgreg&quot;>'+esc(ins.regions.join(' · '))+'</span></div>'
+      +progBarHTML(ins.done,ins.total,'#2f80c4')
+      +'<div class=&quot;pgnum&quot;>완료 <b>'+ins.done+'</b> / '+ins.total
+      +'<span class=&quot;pgleft&quot; style=&quot;color:'+(ins.left?'#c0392b':'#2f80c4')+'&quot;>'+(ins.left?('남은 '+ins.left+'곳'):'이번 달 완료')+'</span></div></div>';
+  }
+  if(dis){
+    h+='<div class=&quot;pgrow&quot;><div class=&quot;pglbl&quot;>'+halfName()+' 소독</div>'
+      +progBarHTML(dis.done,dis.total,'#27a36a')
+      +'<div class=&quot;pgnum&quot;>완료 <b>'+dis.done+'</b> / '+dis.total
+      +'<span class=&quot;pgleft&quot; style=&quot;color:'+(dis.left?'#c0392b':'#27a36a')+'&quot;>'+(dis.left?('남은 '+dis.left+'곳'):(halfName()+' 완료'))+'</span></div></div>';
+  }
+  return h;
+}
+function progAllHTML(){
+  if(!SCHOOLMGR) return '<div class=&quot;empty&quot;>담당 명단을 읽지 못했습니다</div>';
+  const M=thisMonth0()+1;
+  const names=Object.keys(SCHOOLMGR);
+  const rows=[];
+  names.forEach(function(n){
+    const p=writerProgress('insp',n); if(!p) return;
+    rows.push({name:n, p:p, pct:p.total?Math.round(p.done*100/p.total):0});
+  });
+  if(!rows.length) return '<div class=&quot;empty&quot;>진행 자료를 읽지 못했습니다</div>';
+  rows.sort(function(a,b){ return b.pct-a.pct || b.p.total-a.p.total; });
+  let h='<table><tr><th>담당자</th><th>담당 구역</th><th class=&quot;tnum&quot;>담당</th><th class=&quot;tnum&quot;>'+M+'월 완료</th><th class=&quot;tnum&quot;>남은</th><th>진행률</th></tr>';
+  let td=0,tt=0;
+  rows.forEach(function(r){
+    td+=r.p.done; tt+=r.p.total;
+    h+='<tr><td><b>'+esc(r.name)+'</b></td><td class=&quot;pgreg&quot;>'+esc(r.p.regions.join(' · '))+'</td>'
+      +'<td class=&quot;tnum&quot;>'+r.p.total+'</td><td class=&quot;tnum&quot;>'+r.p.done+'</td>'
+      +'<td class=&quot;tnum&quot; style=&quot;color:'+(r.p.left?'#c0392b':'#2f80c4')+';font-weight:700&quot;>'+r.p.left+'</td>'
+      +'<td>'+progBarHTML(r.p.done,r.p.total,'#2f80c4')+'<span class=&quot;pgpct&quot;>'+r.pct+'%</span></td></tr>';
+  });
+  const tp=tt?Math.round(td*100/tt):0;
+  h+='<tr class=&quot;sum-row&quot;><td>합계</td><td></td><td class=&quot;tnum&quot;>'+tt+'</td><td class=&quot;tnum&quot;>'+td+'</td>'
+    +'<td class=&quot;tnum&quot;>'+Math.max(0,tt-td)+'</td><td>'+progBarHTML(td,tt,'#1e5631')+'<span class=&quot;pgpct&quot;>'+tp+'%</span></td></tr></table>';
+  return h;
+}
+function renderProgress(){
+  const card=document.getElementById('progCard');
+  if(!card) return;
+  if(!MAPSTAT || !SCHOOLMGR){ card.style.display='none'; return; }
+  const isW=(viewMode==='writer');
+  const html = isW ? progSoloHTML(selWriter) : progAllHTML();
+  if(!html){ card.style.display='none'; return; }
+  document.getElementById('progTitle').textContent = isW
+    ? ((selWriter||'담당자')+' · 담당 구역 진행')
+    : '담당자별 담당 구역 진행';
+  document.getElementById('secProg').innerHTML=html;
+  card.style.display='';
 }
 
 /* ── (예비) 옛 방식: action=day 를 하루씩 ── */
@@ -4581,6 +4689,8 @@ function renderAll(){
   var _chips=document.querySelector('.chips'), _grid=document.querySelector('.grid2');
   if(_chips) _chips.style.display=_ceo?'none':'';
   if(_grid) _grid.style.display=_ceo?'none':'';
+  var _prog=document.getElementById('progCard');
+  if(_prog && _ceo) _prog.style.display='none';
   if(_ceo){
     document.getElementById('detailTitle').textContent=CEO_NAME+' · 주간업무보고';
     document.getElementById('secDetail').innerHTML=ceoReport();
@@ -4588,6 +4698,7 @@ function renderAll(){
   }
   const scope=scopeData();
   renderChips(scope);
+  renderProgress();
   renderSummary(scope);
   renderDonut(scope);
   renderDetail(scope);
@@ -7560,7 +7671,9 @@ setTimeout(mobApply,300);
 <script>
 (function(){
   var MARK='wb_import_202609_v1';
-  try{ if(localStorage.getItem(MARK)) return; }catch(e){ return; }
+  /* 평소에는 아무것도 띄우지 않는다. 주소 끝에 #wbimport 를 붙여서 열었을 때만 버튼이 나온다. */
+  if(location.hash!=='#wbimport') return;
+  try{ if(localStorage.getItem(MARK)){ alert('이 컴퓨터에서는 이미 불러왔습니다.\n다시 넣으려면 아래 버튼을 누르세요.'); } }catch(e){}
   var IMP={"aws_wb_cal":{"2026-09-14":{"gong":[],"out":[],"as":[],"so":{"1":[{"id":"wc1789360000001","name":"증평 삼보초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000002","name":"증평 죽리초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000003","name":"청주 북이초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000004","name":"청주 오창초","note":"","src":"sojung","emps":[]}],"2":[{"id":"wc1789360000005","name":"안성 안성초","note":"","src":"sodan","emps":[]},{"id":"wc1789360000006","name":"안성 내혜홀초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000007","name":"안성 문기초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000008","name":"안성 개정초","note":"","src":"sojung","emps":[]}],"3":[{"id":"wc1789360000009","name":"서산 가사초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000010","name":"서산 예천새뜰유치원","note":"","src":"sojung","emps":[]},{"id":"wc1789360000011","name":"서산 서림유치원","note":"","src":"sojung","emps":[]},{"id":"wc1789360000012","name":"서산 서림초","note":"","src":"sojung","emps":[]}],"4":[{"id":"wc1789360000013","name":"논산 가야곡초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000014","name":"논산 반곡초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000015","name":"논산 청동초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000016","name":"논산 연산초","note":"","src":"sojung","emps":[]}]},"soEmp":{"1":[],"2":[],"3":[],"4":[]}},"2026-09-15":{"gong":[],"out":[{"id":"wc1789360000017","name":"천안 청수초","note":"모래장","src":"outsrc","emps":[]},{"id":"wc1789360000030","name":"포항장성12공원","note":"이지","src":"outsrc","emps":[]}],"as":[],"so":{"1":[{"id":"wc1789360000018","name":"천안 청룡초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000019","name":"천안 새샘초","note":"","src":"sojung","emps":[]}],"2":[{"id":"wc1789360000020","name":"보령 대창초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000021","name":"보령 웅천초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000022","name":"보령 월전초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000023","name":"보령 남포초","note":"","src":"sojung","emps":[]}],"3":[{"id":"wc1789360000024","name":"홍성 대정초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000025","name":"홍성 배양초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000026","name":"홍성 금마초","note":"","src":"sojung","emps":[]}],"4":[{"id":"wc1789360000027","name":"진천 한천초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000028","name":"진천 옥동초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000029","name":"진천 문상초 4-1","note":"","src":"sojung","emps":[]}]},"soEmp":{"1":[],"2":[],"3":[],"4":[]}},"2026-09-16":{"gong":[],"out":[],"as":[],"so":{"1":[{"id":"wc1789360000031","name":"세종 명동초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000032","name":"세종 연서초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000033","name":"세종 금남초","note":"","src":"sojung","emps":[]}],"2":[{"id":"wc1789360000034","name":"태안 소원초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000035","name":"태안 시목초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000036","name":"태안초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000037","name":"태안 송암초","note":"","src":"sojung","emps":[]}],"3":[{"id":"wc1789360000038","name":"부여 송간초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000039","name":"부여 선교유치원","note":"","src":"sojung","emps":[]},{"id":"wc1789360000040","name":"부여초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000041","name":"부여유치원","note":"","src":"sojung","emps":[]}],"4":[{"id":"wc1789360000042","name":"부여 옥산초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000043","name":"부여 홍산초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000044","name":"부여 구룡초","note":"","src":"sojung","emps":[]}]},"soEmp":{"1":[],"2":[],"3":[],"4":[]}},"2026-09-17":{"gong":[],"out":[],"as":[],"so":{"1":[{"id":"wc1789360000045","name":"태안 안면초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000046","name":"태안 창기초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000047","name":"태안 남면초","note":"","src":"sojung","emps":[]}],"2":[{"id":"wc1789360000048","name":"논산 도산초","note":"","src":"sojung","emps":[]}],"3":[],"4":[]},"soEmp":{"1":[],"2":[],"3":[],"4":[]}},"2026-09-18":{"gong":[],"out":[],"as":[{"id":"wc1789360000056","name":"천안 신흥초","note":"AS","src":"as","emps":[]}],"so":{"1":[{"id":"wc1789360000049","name":"청주 증안초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000050","name":"청주 사천초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000051","name":"청주 석교초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000052","name":"청주 서경초","note":"","src":"sodan","emps":[]}],"2":[{"id":"wc1789360000053","name":"천안 위례초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000054","name":"천안 은석초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000055","name":"천안 목천초","note":"","src":"sojung","emps":[]}],"3":[],"4":[]},"soEmp":{"1":[],"2":[],"3":[],"4":[]}},"2026-09-21":{"gong":[],"out":[{"id":"wc1789360000057","name":"오송 솔미초","note":"안내판","src":"outsrc","emps":[]}],"as":[],"so":{"1":[{"id":"wc1789360000058","name":"대전과학교육원","note":"","src":"sodan","emps":[]}],"2":[{"id":"wc1789360000059","name":"공주 신풍초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000060","name":"공주 호계초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000061","name":"공주 마곡초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000062","name":"공주 유구초","note":"","src":"sojung","emps":[]}],"3":[],"4":[]},"soEmp":{"1":[],"2":[],"3":[],"4":[]}},"2026-09-22":{"gong":[],"out":[],"as":[],"so":{"1":[{"id":"wc1789360000063","name":"아산 삼성 샛별유","note":"오전 10시","src":"sodan","emps":[]}],"2":[],"3":[],"4":[]},"soEmp":{"1":[],"2":[],"3":[],"4":[]}},"2026-09-29":{"gong":[],"out":[{"id":"wc1789360000064","name":"홍성초","note":"재설치","src":"outsrc","emps":[]}],"as":[],"so":{"1":[{"id":"wc1789360000065","name":"홍성 용봉초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000066","name":"홍성 내포초","note":"","src":"sojung","emps":[]},{"id":"wc1789360000067","name":"홍성 내포유치원","note":"","src":"sojung","emps":[]}],"2":[],"3":[],"4":[]},"soEmp":{"1":[],"2":[],"3":[],"4":[]}}},"aws_wb_lists":{"csreq":[{"id":"wb1789360000068","name":"천안 청수초","note":"색고무 + 덮개"},{"id":"wb1789360000069","name":"아산 둔포초","note":"다라동?, 벤치"},{"id":"wb1789360000070","name":"오송 솔미초","note":"안내판 → 직지"},{"id":"wb1789360000071","name":"홍성초","note":"이설"},{"id":"wb1789360000072","name":"평택 송화초","note":"색고무기둥"},{"id":"wb1789360000073","name":"안성 일죽초","note":"포맥스"},{"id":"wb1789360000074","name":"예산 삽교초","note":"포맥스"}],"outsrc":[{"id":"wb1789360000075","name":"9월 ← 포항장성12공원","note":"이지데코"},{"id":"wb1789360000076","name":"서북구 어린이공원 정비공사   → 완료","note":""},{"id":"wb1789360000077","name":"서북구 주요보행로 예초공사","note":"대영"},{"id":"wb1789360000078","name":"가로녹지유지관리공사","note":"1지구"}],"as":[{"id":"wb1789360000079","name":"천안 신흥초","note":""},{"id":"wb1789360000080","name":"홍성 금당초","note":""},{"id":"wb1789360000081","name":"예산 예목유치원","note":"매트보수"}],"sodan":[{"id":"wb1789360000082","name":"충주 산척초","note":"9월"},{"id":"wb1789360000083","name":"충주 동량초","note":"9월 28~30일"},{"id":"wb1789360000084","name":"대전 과학교육원","note":""},{"id":"wb1789360000085","name":"안성 안성초","note":"9월 3주"},{"id":"wb1789360000086","name":"아산 예지슬유치원","note":""},{"id":"wb1789360000087","name":"아산 삼성 샛별유","note":"오전 10시"},{"id":"wb1789360000088","name":"천안 새미기픈물","note":"9월 말"},{"id":"wb1789360000089","name":"청주 서경초","note":""}],"sojung":[{"id":"wb1789360000090","name":"청주 증안초","note":"선치검사전?"},{"id":"wb1789360000091","name":"청주 오창초","note":""},{"id":"wb1789360000092","name":"청주 내곡초","note":"28~30일"},{"id":"wb1789360000093","name":"청주 석교초","note":""},{"id":"wb1789360000094","name":"청주 사천초","note":""},{"id":"wb1789360000095","name":"청주 비상초","note":""},{"id":"wb1789360000096","name":"청주 모충초","note":"9-10월중"},{"id":"wb1789360000097","name":"아산 과학교육원","note":"29~30"},{"id":"wb1789360000098","name":"아산 신화초","note":""},{"id":"wb1789360000099","name":"예산 신례원초","note":"21~23"},{"id":"wb1789360000100","name":"예산 대술초","note":"추석전"},{"id":"wb1789360000101","name":"안성 문기초","note":""},{"id":"wb1789360000102","name":"안성 개정초","note":"추석전"},{"id":"wb1789360000103","name":"서산 예천새뜰유치원","note":""},{"id":"wb1789360000104","name":"서산 가사초","note":"14~22일?"},{"id":"wb1789360000105","name":"서산 동문초","note":""},{"id":"wb1789360000106","name":"서산 서림유치원","note":""},{"id":"wb1789360000107","name":"서산 오산초 3-1","note":""},{"id":"wb1789360000108","name":"서산 서령초","note":""},{"id":"wb1789360000109","name":"공주 유구초","note":""},{"id":"wb1789360000110","name":"공주 호계초","note":""},{"id":"wb1789360000111","name":"공주 신풍초","note":"21"},{"id":"wb1789360000112","name":"안성 내혜홀초","note":""},{"id":"wb1789360000113","name":"홍성 은하초","note":""},{"id":"wb1789360000114","name":"진천 옥동초","note":""},{"id":"wb1789360000115","name":"태안 소원초","note":""},{"id":"wb1789360000116","name":"태안 창기초","note":""},{"id":"wb1789360000117","name":"보령 웅천초","note":""},{"id":"wb1789360000118","name":"조치원 명동초 + 풀많음","note":""},{"id":"wb1789360000119","name":"세종 연서초","note":""},{"id":"wb1789360000120","name":"세종 금남초","note":""},{"id":"wb1789360000121","name":"부여 홍산초","note":""},{"id":"wb1789360000122","name":"부여 백제초","note":""},{"id":"wb1789360000123","name":"증평 죽리초","note":""},{"id":"wb1789360000124","name":"증평 삼보초","note":""},{"id":"wb1789360000125","name":"논산 가야곡초","note":""},{"id":"wb1789360000126","name":"논산 청동초","note":""},{"id":"wb1789360000127","name":"논산 양촌초","note":"7천만?"},{"id":"wb1789360000128","name":"논산 반월초","note":""},{"id":"wb1789360000129","name":"논산 금암초","note":"양승?"},{"id":"wb1789360000130","name":"논산 도산초","note":""},{"id":"wb1789360000143","name":"청주 교동초","note":"10월 중순"},{"id":"wb1789360000144","name":"부여 세도초","note":"10월 중순"},{"id":"wb1789360000145","name":"평택 연화초","note":"10월말 11월초"},{"id":"wb1789360000146","name":"부여 대왕초 3-1","note":""},{"id":"wb1789360000147","name":"아산 탕정미래초","note":""}],"sodahoe":[{"id":"wb1789360000131","name":"서산 오산초 3-1","note":"×3"},{"id":"wb1789360000132","name":"부여 대왕초 3-1","note":"×3"},{"id":"wb1789360000133","name":"보령 천북초 3-1","note":"×3"},{"id":"wb1789360000134","name":"아산 관대초 3-1","note":"×3"},{"id":"wb1789360000135","name":"아산 용연초 3-1","note":"×3"},{"id":"wb1789360000136","name":"서산 차동초 3-1","note":"×3"},{"id":"wb1789360000137","name":"평택 해창초 4-1","note":"×4"},{"id":"wb1789360000138","name":"평택 안중초 4-1","note":"×4"},{"id":"wb1789360000139","name":"진천 문상초 4-1","note":"×4"},{"id":"wb1789360000140","name":"천안 용소초 4-1","note":"×4"},{"id":"wb1789360000141","name":"천안 호수초 4-1","note":"×4"},{"id":"wb1789360000142","name":"아산 갈산초 4-1","note":"×4"}]}};
   function run(){
     var nCal=0,nList=0,over=[];
@@ -7588,6 +7701,7 @@ setTimeout(mobApply,300);
     try{ if(typeof postShared==='function'){ postShared('wbdata', JSON.stringify(lists)); postShared('wbcal', JSON.stringify(cal)); } }catch(e){}
     try{ localStorage.setItem(MARK, new Date().toISOString()); }catch(e){}
     var b=document.getElementById('wbImpBtn'); if(b) b.remove();
+    try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
     alert('불러왔습니다.\n달력 '+nCal+'일, 목록 '+nList+'건이 들어갔습니다.\n\n틀린 곳은 화면에서 바로 고치시면 됩니다.');
   }
   function mk(){
