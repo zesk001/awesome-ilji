@@ -283,6 +283,7 @@
   /* 현장 카드: 투입 담당자 체크 */
   .wbemphint{color:var(--dim);font-weight:600;font-size:11px;margin-left:4px;}
   .wbchip .wbchipn{font-size:9.5px;font-weight:800;margin-left:4px;opacity:.75;}
+  .wbchip .wbcd{font-size:9px;font-weight:700;margin-left:5px;opacity:.58;letter-spacing:-.2px;}
   .cellchip b{font-size:8.5px;font-weight:800;margin-left:3px;opacity:.7;}
   .wbemps{display:flex;flex-wrap:wrap;gap:6px;}
   .wbemp{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.05);border:1px solid var(--stroke2);border-radius:8px;padding:5px 10px;font-size:12.5px;color:#dfe6ea;cursor:pointer;user-select:none;transition:.12s;}
@@ -3535,6 +3536,7 @@ window.addEventListener('DOMContentLoaded', App.init);
   <div class="form-grid" style="grid-template-columns:1fr;">
     <div class="field"><label>현장명 *</label><input type="text" id="wb_name" placeholder="예) 온산초등학교" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('wb_note').focus();}"></div>
     <div class="field"><label>비고 (진행 월·횟수·메모 등)</label><input type="text" id="wb_note" placeholder="예) 8월 요청 / 正 x3 / 외주 등" onkeydown="if(event.key==='Enter'){event.preventDefault();WB.save();}"></div>
+    <div class="field"><label>기입일 <span class="wbemphint">오늘 날짜가 자동으로 들어갑니다 · 필요하면 고치세요</span></label><input type="date" id="wb_cd" onkeydown="if(event.key==='Enter'){event.preventDefault();WB.save();}"></div>
     <div class="field" id="wb_empwrap" style="display:none;"><label>현장 투입 담당자 <span class="wbemphint">비워 둬도 됩니다 · 확정되면 체크하세요</span></label><div class="wbemps" id="wb_emps"></div></div>
   </div>
   <div class="modal-actions">
@@ -5565,6 +5567,7 @@ function printBoard(){
    /* 현장 칩 */
    +'.wbchips{display:flex;flex-wrap:wrap;gap:3px}'
    +'.wbchip{font-size:9px;padding:1.5px 6px;border-radius:9px;background:#f0f3f5;border:1px solid #dfe5ea;color:#2b3138;white-space:nowrap}'
+   +'.wbchip .wbcd{font-size:8px;font-weight:700;margin-left:4px;opacity:.55}'
    +'.wbchip.c-gong{background:#fdeedd;border-color:#f2d9bd;color:#8a4c10}'
    +'.wbchip.c-out{background:#fde1e1;border-color:#f3c7c7;color:#9c2f2f}'
    +'.wbchip.c-as{background:#e8eef3;border-color:#d3dde6;color:#41505c}'
@@ -5992,6 +5995,17 @@ const WB=(function(){
   let editing=null; // {list,id}
   function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'&#10;');}
   function catOf(src){return src==='as'?'as':(src==='sojung'||src==='sodan')?'so':src==='outsrc'?'out':'gong';}
+  /* ── 기입일 (그 현장을 목록에 올린 날) ──
+     새로 저장하면 그날 날짜가 cd 필드로 함께 저장된다.
+     cd 가 없는 예전 항목·다른 경로로 들어온 항목은 id('wb'+밀리초)에서 날짜를 뽑아 쓴다. */
+  function wbToday(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function cdOf(it){
+    if(it&&it.cd) return String(it.cd).slice(0,10);
+    var m=(it&&it.id)?String(it.id).match(/^wb(\d{13})/):null;
+    if(m){var d=new Date(Number(m[1]));if(!isNaN(d.getTime()))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+    return '';
+  }
+  function cdShort(it){var s=cdOf(it);return s?(Number(s.slice(5,7))+'/'+Number(s.slice(8,10))):'';}
   /* ── 현장 투입 담당자 ──
      현장에 실제 나가는 인원만 고른다: 사무 담당 2명(강나래·최연주)은 빼고, 퇴사자는 자동으로 빠진다.
      명단은 연차 탭 직원 자료(gData.leaveEmps)에서 가져오므로 직원이 바뀌면 여기도 같이 바뀐다. */
@@ -6041,22 +6055,22 @@ const WB=(function(){
     if(k==='sodahoe'){
       if(!list.length){box.innerHTML='<div class="empty">'+CFG[k].empty+'</div>';return;}
       const is4=it=>/(x|×)\s*4|4\s*회/i.test(it.note||'');
-      const row=it=>`<div class="row wbrow" style="padding:5px 6px"><div style="cursor:pointer;flex:1;min-width:0" onclick="WB.openEdit('${k}','${it.id}')"><span class="nm" style="font-size:12px">${esc(it.name||'-')}</span>${it.note?`<div class="meta">${esc(it.note)}</div>`:''}</div><span class="wbdel" title="삭제" onclick="WB.del('${k}','${it.id}')">✕</span></div>`;
+      const row=it=>`<div class="row wbrow" style="padding:5px 6px"><div style="cursor:pointer;flex:1;min-width:0" onclick="WB.openEdit('${k}','${it.id}')"><span class="nm" style="font-size:12px">${esc(it.name||'-')}</span>${(it.note||cdOf(it))?`<div class="meta">${[esc(it.note||''),cdOf(it)?'기입 '+cdOf(it):''].filter(Boolean).join(' · ')}</div>`:''}</div><span class="wbdel" title="삭제" onclick="WB.del('${k}','${it.id}')">✕</span></div>`;
       const g3=list.filter(it=>!is4(it)), g4=list.filter(is4);
       const col=(t,arr)=>`<div style="min-width:0"><div class="lwhd" style="text-align:center;margin-bottom:4px;position:sticky;top:0;background:rgba(20,22,25,.92);padding:2px 0;border-radius:4px">${t} <b>${arr.length}</b></div>${arr.map(row).join('')||'<div class="lwdash" style="text-align:center">·</div>'}</div>`;
       box.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start">${col('3회 현장',g3)}${col('4회 현장',g4)}</div>`;
       return;
     }
     if(!list.length){box.innerHTML='<div class="empty">'+CFG[k].empty+'</div>';return;}
-    box.innerHTML='<div class="wbchips">'+list.map(it=>'<span class="wbchip '+chipCls(k)+'" draggable="true" ondragstart="WB.onDragStart(event,\''+k+'\',\''+it.id+'\')" onclick="WB.openEdit(\''+k+'\',\''+it.id+'\')" title="'+(it.note?escAttr(it.note)+' · ':'')+((it.emps&&it.emps.length)?'담당 '+it.emps.length+'명: '+escAttr(it.emps.join(', '))+' · ':'')+'클릭:수정 · 드래그:달력">'+esc(it.name||'-')+((it.emps&&it.emps.length)?'<b class="wbchipn">'+it.emps.length+'</b>':'')+'</span>').join('')+'</div>';
+    box.innerHTML='<div class="wbchips">'+list.map(it=>'<span class="wbchip '+chipCls(k)+'" draggable="true" ondragstart="WB.onDragStart(event,\''+k+'\',\''+it.id+'\')" onclick="WB.openEdit(\''+k+'\',\''+it.id+'\')" title="'+(cdOf(it)?'기입 '+cdOf(it)+' · ':'')+(it.note?escAttr(it.note)+' · ':'')+((it.emps&&it.emps.length)?'담당 '+it.emps.length+'명: '+escAttr(it.emps.join(', '))+' · ':'')+'클릭:수정 · 드래그:달력">'+esc(it.name||'-')+((it.emps&&it.emps.length)?'<b class="wbchipn">'+it.emps.length+'</b>':'')+(cdShort(it)?'<b class="wbcd">'+cdShort(it)+'</b>':'')+'</span>').join('')+'</div>';
   }
   function renderAll(){Object.keys(CFG).forEach(render);}
-  function openAdd(k){if(!wbAuth())return;editing={list:k,id:null};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 추가';document.getElementById('wb_name').value='';document.getElementById('wb_note').value='';showEmpBox(k,[]);document.getElementById('wbDelBtn').style.display='none';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
-  function openEdit(k,id){if(!wbAuth())return;const it=(data[k]||[]).find(x=>x.id===id);if(!it)return;editing={list:k,id:id};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 수정';document.getElementById('wb_name').value=it.name||'';document.getElementById('wb_note').value=it.note||'';showEmpBox(k,it.emps||[]);document.getElementById('wbDelBtn').style.display='';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
-  function save(){if(!wbAuth())return;if(!editing)return;const k=editing.list;const name=document.getElementById('wb_name').value.trim();const note=document.getElementById('wb_note').value.trim();if(!name){alert('현장명을 입력하세요.');return;}
+  function openAdd(k){if(!wbAuth())return;editing={list:k,id:null};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 추가';document.getElementById('wb_name').value='';document.getElementById('wb_note').value='';document.getElementById('wb_cd').value=wbToday();showEmpBox(k,[]);document.getElementById('wbDelBtn').style.display='none';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
+  function openEdit(k,id){if(!wbAuth())return;const it=(data[k]||[]).find(x=>x.id===id);if(!it)return;editing={list:k,id:id};document.getElementById('wbModalTitle').textContent=CFG[k].title+' 수정';document.getElementById('wb_name').value=it.name||'';document.getElementById('wb_note').value=it.note||'';document.getElementById('wb_cd').value=cdOf(it)||wbToday();showEmpBox(k,it.emps||[]);document.getElementById('wbDelBtn').style.display='';document.getElementById('wbModal').classList.add('show');setTimeout(()=>document.getElementById('wb_name').focus(),50);}
+  function save(){if(!wbAuth())return;if(!editing)return;const k=editing.list;const name=document.getElementById('wb_name').value.trim();const note=document.getElementById('wb_note').value.trim();const cd=(document.getElementById('wb_cd').value||'').slice(0,10)||wbToday();if(!name){alert('현장명을 입력하세요.');return;}
     const emps=(k==='csreq')?readEmpBox():null;
-    if(editing.id){const it=data[k].find(x=>x.id===editing.id);if(it){it.name=name;it.note=note;if(emps)it.emps=emps;}}
-    else{const nit={id:'wb'+Date.now()+Math.floor(Math.random()*1000),name:name,note:note};if(emps)nit.emps=emps;data[k].push(nit);}
+    if(editing.id){const it=data[k].find(x=>x.id===editing.id);if(it){it.name=name;it.note=note;it.cd=cd;if(emps)it.emps=emps;}}
+    else{const nit={id:'wb'+Date.now()+Math.floor(Math.random()*1000),name:name,note:note,cd:cd};if(emps)nit.emps=emps;data[k].push(nit);}
     persist();render(k);refreshHome();closeModal('wbModal');editing=null;}
   function del(k,id){if(!wbAuth())return;if(!confirm('이 현장을 삭제할까요?'))return;data[k]=(data[k]||[]).filter(x=>x.id!==id);persist();render(k);}
   /* ── 달력 배치: 날짜별 {gong[], as[], so:{1..4}} 구조 ── */
