@@ -3836,6 +3836,7 @@ window.addEventListener('DOMContentLoaded', App.init);
 const APPS_URL='https://script.google.com/macros/s/AKfycbzrITG1l2MkXIZwidtDntcKajVJ6fYc94Ejxmjs_16XazYd7pRC9trsbKdAdPV9drhrtQ/exec';
 const CATS=['점검','소독','공사','견적','계약','사무','대표'];
 const CATCOLOR={'점검':'#2e7d32','소독':'#0277bd','공사':'#ef6c00','견적':'#00acc1','계약':'#8d6e63','사무':'#6a1b9a','대표':'#c2185b'};
+function catLab(c){ return (c==='대표' &amp;&amp; viewMode==='writer' &amp;&amp; nameKey(selWriter)==='김재성') ? '영업' : c; } /* 2026-11-13 김재성 이사 담당자별 보기: 대표→영업 표기 */
 
 /* 담당자 표시 순서(직급순) — 일일업무일지 명단과 동일 */
 const ORDER=['신현철 대표','김재성 이사','김남진 부장','박인순 차장','박진수 팀장','박홍민 실장','강나래 과장','김동현 과장','이은광 대리','김지훈 주임','최연주 주임','원채아 대리'];
@@ -4738,7 +4739,7 @@ function renderSummary(scope){
     const cc={};CATS.forEach(c=>cc[c]=0); scope.forEach(r=>{ if(cc[r.cat]!==undefined) cc[r.cat]++; });
     let h='<table><tr><th>분류</th><th class=&quot;tnum&quot;>건수</th><th class=&quot;tnum&quot;>비율</th></tr>';
     CATS.forEach(c=>{ const n=cc[c]; const pct=Math.round(n/scope.length*100);
-      h+='<tr><td><span class=&quot;badge&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;>'+c+'</span></td><td class=&quot;tnum&quot;>'+n+'</td><td class=&quot;tnum&quot;>'+pct+'%</td></tr>'; });
+      h+='<tr><td><span class=&quot;badge&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;>'+catLab(c)+'</span></td><td class=&quot;tnum&quot;>'+n+'</td><td class=&quot;tnum&quot;>'+pct+'%</td></tr>'; });
     h+='<tr class=&quot;sum-row&quot;><td>합계</td><td class=&quot;tnum&quot;>'+scope.length+'</td><td class=&quot;tnum&quot;>100%</td></tr></table>';
     box.innerHTML=h;
   }else{
@@ -4770,7 +4771,7 @@ function renderDonut(scope){
     off+=frac; });
   let leg='';
   CATS.forEach(c=>{ const n=byC[c]; if(!n) return;
-    leg+='<div><span class=&quot;dot&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;></span>'+c+' '+n+'건<span class=&quot;pct&quot;>'+Math.round(n/tot*100)+'%</span></div>'; });
+    leg+='<div><span class=&quot;dot&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;></span>'+catLab(c)+' '+n+'건<span class=&quot;pct&quot;>'+Math.round(n/tot*100)+'%</span></div>'; });
   box.innerHTML=
     '<div class=&quot;chartwrap&quot;><svg width=&quot;110&quot; height=&quot;110&quot; viewBox=&quot;0 0 110 110&quot;>'+segs+
     '<text x=&quot;55&quot; y=&quot;52&quot; text-anchor=&quot;middle&quot; font-size=&quot;17&quot; font-weight=&quot;bold&quot; fill=&quot;#1e5631&quot;>'+tot+'</text>'+
@@ -4789,7 +4790,7 @@ function entryRows(list){
 }
 function entryRowsW(list){var seen={},rows='',n=0;var cs='white-space:pre-wrap;word-break:break-word;vertical-align:top';list.forEach(function(x){var site=siteLabel(x),item=x.item||'',memo=x.memo||'';var di=(item==='기타업무')?(memo||item):item;var dm=(item==='기타업무')?'':memo;var key=JSON.stringify([site,di,dm]);if(seen[key])return;seen[key]=1;n++;rows+='<tr><td style=&quot;'+cs+'&quot;>'+esc(site)+'</td><td style=&quot;'+cs+'&quot;><b>'+esc(di)+'</b></td><td style=&quot;'+cs+'&quot;>'+esc(dm)+'</td></tr>';});return {html:'<table style=&quot;width:100%;table-layout:fixed&quot;><colgroup><col style=&quot;width:22%&quot;><col style=&quot;width:40%&quot;><col style=&quot;width:38%&quot;></colgroup><tr><th>현장</th><th>내용</th><th>비고</th></tr>'+rows+'</table>',n:n};}
 function catBadges(list){ const cc={}; list.forEach(r=>cc[r.cat]=(cc[r.cat]||0)+1);
-  let b=''; CATS.forEach(c=>{ if(cc[c]) b+='<span class=&quot;badge&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;>'+c+' '+cc[c]+'</span>'; }); return b; }
+  let b=''; CATS.forEach(c=>{ if(cc[c]) b+='<span class=&quot;badge&quot; style=&quot;background:'+CATCOLOR[c]+'&quot;>'+catLab(c)+' '+cc[c]+'</span>'; }); return b; }
 
 /* ── 담당자별: 유형별 정리(금주/차주/기타) — 기존 주간업무일지 정리 방식 ── */
 var WR_NEXT=['방문요청','방문예정','통화','계약예정','예산나올곳','예산나온곳'];
@@ -4939,7 +4940,7 @@ function writerReport(scope){
   function blockList(s){ return ord[s].map(function(lab){ return blockHTML(s,lab); }); }
   function blocks(s){ return blockList(s).join(''); }
   function edit(s,ph){ var k='wk_'+selWriter+'_'+wkStart+'_'+s; var sv=''; try{ sv=localStorage.getItem(k)||''; }catch(e){} return '<textarea data-k=&quot;'+esc(k)+'&quot; oninput=&quot;wkSave(this)&quot; placeholder=&quot;'+ph+'&quot; style=&quot;width:100%;min-height:48px;border:1px solid #cbd5cf;border-radius:6px;padding:6px 8px;font-size:12.5px;font-family:inherit;margin-top:6px;box-sizing:border-box&quot;>'+esc(sv)+'</textarea>'; }
-  function catSummary(){ var cc={}; scope.forEach(function(r){ cc[r.cat]=(cc[r.cat]||0)+1; }); return CATS.filter(function(c){return cc[c];}).map(function(c){ return '<span style=&quot;color:'+CATCOLOR[c]+';font-weight:700&quot;>'+c+' '+cc[c]+'</span>'; }).join(' <span style=&quot;color:#ccc&quot;>|</span> '); }
+  function catSummary(){ var cc={}; scope.forEach(function(r){ cc[r.cat]=(cc[r.cat]||0)+1; }); return CATS.filter(function(c){return cc[c];}).map(function(c){ return '<span style=&quot;color:'+CATCOLOR[c]+';font-weight:700&quot;>'+catLab(c)+' '+cc[c]+'</span>'; }).join(' <span style=&quot;color:#ccc&quot;>|</span> '); }
   function sec(title,color,s,ed,ph){
     var bl=blockList(s);
     if(s==='금주'){ if(DANTA.weekBlock) if(dantaFor(selWriter)) bl=dantaReportBlocks().concat(bl); }   /* 김재성 금주보고 맨 앞 단타 영업보고 — 일일업무일지 입력과 겹쳐 weekBlock:false로 꺼 둠 (2026-09-04) */
